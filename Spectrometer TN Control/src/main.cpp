@@ -201,7 +201,7 @@ void handleSerial()
           pressureLog = 0; 
           break;
         default:
-          Serial.println("Invalid input");  //Invalid input
+          Serial.println("LOG: Invalid input");  //Invalid input
           break;
       }
     }
@@ -246,14 +246,14 @@ void handleSerial()
           setValve(OPH, 0);
           break;
         default:
-          Serial.println("Invalid input");  //Invalid input
+          Serial.println("LOG: Invalid input");  //Invalid input
           break;
       }
     }
   }
   else
   {
-    Serial.println("Invalid input, not a letter");  //Invalid input
+    Serial.println("LOG: Invalid input, not a letter");  //Invalid input
   }
 }
 
@@ -261,7 +261,7 @@ void decodeSequence() //decode the sequence input
 {
   if (execFlag == 1) //if a sequence is potentially running, do not load a new sequence
   {
-    Serial.println("Sequence already running, please wait for current sequence to end before loading a new one");
+    Serial.println("LOG: Sequence already running, please wait for current sequence to end before loading a new one");
     decodeFlag = 0;
     return; //exit the function to avoid loadning new sequence
 
@@ -290,7 +290,7 @@ void decodeSequence() //decode the sequence input
       }
       int stepLength = stepLengthStr.toInt();
       if (stepIndex >= maxLength) { // Check if the sequence is too long
-        Serial.println("Sequence too long, only first 9 steps will be executed");
+        Serial.println("LOG: Sequence too long, only first 9 steps will be executed");
         break;
       }
       else{
@@ -301,14 +301,14 @@ void decodeSequence() //decode the sequence input
   }
   else
   {
-    Serial.println("Expected sequence input, but none received");
+    Serial.println("LOG: Expected sequence input, but none received");
     decodeFlag = 0;
   }
 }
 
 void processStoredSequence() {  // Process the loaded sequence
   if (sequenceSteps[0].length == 0) { // Check if the sequence is empty
-    Serial.println("Sequence is empty, nothing to process.");
+    Serial.println("LOG: Sequence is empty, nothing to process.");
     execFlag = false; // Set the machine ready flag to false due to an empty sequence
     return; // Exit the function if the sequence is empty
   }
@@ -345,11 +345,11 @@ void processStep(char stepType) { // Process a step based on the type
       break;
     case 'n':
       // Handle alt bubble step
-      Serial.println("Alt bubble step not implemented");
+      Serial.println("LOG: Alt bubble step not implemented");
       break;
     // Add more cases as needed
     default:
-      Serial.println("Unknown step type");
+      Serial.println("LOG: Unknown step type");
       break;
   }
 }
@@ -405,7 +405,7 @@ void handleTTL(){
         setValve(OPH, 0);
         break;
       default:
-        Serial.println("Invalid TTL input");
+        Serial.println("LOG: Invalid TTL input");
         break;
     }
   }

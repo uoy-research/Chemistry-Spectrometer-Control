@@ -47,7 +47,7 @@ class Server:
         while not self.shutdown_flag:
             try:
                 if self.serial_connected:
-                    self.arduino.write(b'HEARTBEAT\n')
+                    self.arduino.write(b'y')
                     logging.info("Sent HEARTBEAT")
                 time.sleep(5)  # Send heartbeat every 5 seconds
             except serial.SerialException as e:
@@ -80,6 +80,9 @@ class Server:
             logging.info(f"Pressure reading: {pressure_value}")
             valve_states = response.split(" ")[4:-1]
             logging.info(f"Valve states: {valve_states}")
+        elif response.startswith("LOG "):  # Log message - "LOG <message>"
+            log_message = response.replace("LOG ", "")
+            logging.info(f"Arduino: {log_message}")
         else:
             logging.info(f"Unknown response: {response}")
 
