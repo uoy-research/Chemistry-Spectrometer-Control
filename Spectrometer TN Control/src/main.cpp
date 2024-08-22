@@ -40,6 +40,7 @@ size_t currentStepIndex = 0; //current step in the sequence
 unsigned long tNow = 0; //current time
 unsigned long tStart = 0; //start time
 unsigned long tStepStart = 0; //start time of a step
+unsigned long heartBeat = 0; //time of last heartbeat
 
 String sequence = ""; //sequence to be decoded
 
@@ -99,9 +100,10 @@ void loop() {
 
   if(TNcontrol == 1){handleTTL();}
 
-  if(tNow - tStart >= pollTime && pressureLog == 1){readPressure(); tStart = tNow;}
+  if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
   
   //need to reset if no serial or TTL signal for certain time
+  if(tNow - heartBeat >= 5000){reset();}
 }
 
 void declarePins()
@@ -179,6 +181,10 @@ void handleSerial()
     if (TNcontrol == 1)     //If TN control is enabled
     {
       switch(input){
+        case 'y': 
+          Serial.println("HEARTBEAT_ACK");  //Heartbeat response
+          heartBeat = millis(); //update the heartbeat time
+          break;
         case 'i':   //Decode a sequence input
           decodeFlag = 1; // Set the flag to indicate a new sequence is ready to be decoded
           break;
@@ -202,6 +208,10 @@ void handleSerial()
     else                    //If TN control is disabled
     {
       switch(input){
+        case 'y': 
+          Serial.println("HEARTBEAT_ACK");  //Heartbeat response
+          heartBeat = millis(); //update the heartbeat time
+          break;
         case 'M':   //Switch to spec'r control (TN = 1)
           TNcontrol = 1;
           break;
