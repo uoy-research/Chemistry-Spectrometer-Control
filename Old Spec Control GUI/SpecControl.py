@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import TKinterModernThemes as TKMT
 from TKinterModernThemes.WidgetFrame import Widget
 import serial
+from ArdControl.server import Server
 # TKMT docs https://github.com/RobertJN64/TKinterModernThemes
 
 defaultPort = "4"
@@ -118,6 +119,7 @@ class App(TKMT.ThemedTKinterFrame):
                 print("Failed to connect to Arduino")
                 self.warning_label.config(text="Failed to connect to Arduino on " + serialPort)
                 self.connectSerialButton.config(text="Connect")
+                #disable manual control
                 return
         else:
             print("Disconnecting from Arduino")
@@ -130,6 +132,7 @@ class App(TKMT.ThemedTKinterFrame):
                 print("Error disconnecting from Arduino")
                 self.connectSerialButton.config(text="Connect")
                 self.serialConnected = False
+                #disable manual control
 
     def manualControl(self, *args):
         if (self.manualEnable.get() and self.serialConnected == True):
@@ -139,9 +142,10 @@ class App(TKMT.ThemedTKinterFrame):
         else:
             print("Manual control disabled")
             self.manualEnable.set(False)
+            if self.serialConnected == False:
+                print("Cannot enable manual control without connecting to Arduino")
             for button in self.valveButtons:
                 button.grid_remove()
-            
 
     def printValve(self, valve):
         if self.valveStates[valve].get():
