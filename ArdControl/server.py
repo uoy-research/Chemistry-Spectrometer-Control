@@ -41,12 +41,12 @@ class Server:
             self.serial_connected = False
 
     def start_heartbeat(self):
-        heartbeat_thread = threading.Thread(target=self.send_heartbeat)
-        heartbeat_thread.daemon = True
-        heartbeat_thread.start()
+        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
+        self.heartbeat_thread.daemon = True
+        self.heartbeat_thread.start()
 
     def send_heartbeat(self):
-        while not self.shutdown_flag:
+        while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
                     self.arduino.write(b'y')
@@ -57,12 +57,12 @@ class Server:
                 self.serial_connected = False
 
     def start_reading(self):
-        reading_thread = threading.Thread(target=self.read_responses)
-        reading_thread.daemon = True
-        reading_thread.start()
+        self.reading_thread = threading.Thread(target=self.read_responses)
+        self.reading_thread.daemon = True
+        self.reading_thread.start()
 
     def read_responses(self):
-        while not self.shutdown_flag:
+        while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected and self.arduino.in_waiting > 0:
                     response = self.arduino.readline().decode('utf-8').strip()
@@ -90,6 +90,15 @@ class Server:
 
     def stop(self):
         self.shutdown_flag = True
-        if self.arduino:
+        if self.arduino != None:
             self.arduino.close()
+            self.arduino = None
         logging.info("Server stopped.")
+        
+        # Join the reading thread to ensure it has finished
+        if hasattr(self, 'reading_thread') and self.reading_thread.is_alive():
+            self.reading_thread.join()
+
+        # Join the heartbeat thread to ensure it has finished
+        if hasattr(self, 'heartbeat_thread') and self.heartbeat_thread.is_alive():
+            self.heartbeat_thread.join()

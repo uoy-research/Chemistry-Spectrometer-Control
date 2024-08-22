@@ -60,6 +60,48 @@ class TestServer(unittest.TestCase):
         self.assertTrue(mock_thread.return_value.daemon)
         mock_thread.return_value.start.assert_called_once()
 
+    @patch('server.logging')
+    def test_stop(self, mock_logging):
+        # Arrange
+        server = Server(port=1, baudrate=9600, verbose=False, mode='test')
+        
+        # Mock the arduino attribute
+        mock_arduino = MagicMock()
+        server.arduino = mock_arduino
+        
+        # Mock the reading_thread attribute
+        mock_reading_thread = MagicMock()
+        mock_reading_thread.is_alive.return_value = True
+        server.reading_thread = mock_reading_thread
+        
+        # Mock the heartbeat_thread attribute
+        mock_heartbeat_thread = MagicMock()
+        mock_heartbeat_thread.is_alive.return_value = True
+        server.heartbeat_thread = mock_heartbeat_thread
+        
+        server.serial_connected = True
+
+        # Act
+        server.stop()
+
+        # Assert
+        self.assertTrue(server.shutdown_flag)
+
+        # Assert arduino.close() is called
+        mock_arduino.close.assert_called_once()
+        
+        # Assert logging message
+        mock_logging.info.assert_called_with("Server stopped.")
+        
+        # Check if the server's attributes are cleaned up
+        self.assertIsNone(server.arduino)
+
+        # Assert reading_thread.join() is called
+        mock_reading_thread.join.assert_called_once()
+        
+        # Assert heartbeat_thread.join() is called
+        mock_heartbeat_thread.join.assert_called_once()
+
     # Test the process_response method
 
     def setUp(self):
