@@ -24,12 +24,12 @@ const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; co
 const int maxLength = 9; //maximum number of steps in a sequence
 
 //VARIABLES
-bool TNcontrol = 1; //TerraNova control - allows valves to be controlled by TTL signals
+bool TNcontrol = 0; //TerraNova control - allows valves to be controlled by TTL signals
 bool pressureLog = 0; //log pressure values
-
+bool TTLControl = 0; //TTL control toggle
 bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence
-bool simpleTTL = 0; //simple TTL control toggle - default off
+bool simpleTTL = 0; //simple TTL control toggle - unused
 
 int pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
@@ -212,8 +212,21 @@ void handleSerial()
           Serial.println("HEARTBEAT_ACK");  //Heartbeat response
           heartBeat = millis(); //update the heartbeat time
           break;
+        case 'K':   //Enable pressure logging
+          pressureLog = 1;
+          break;
+        case 'k':   //Disable pressure logging
+          pressureLog = 0; 
+          break;
         case 'M':   //Switch to spec'r control (TN = 1)
           TNcontrol = 1;
+          break;
+        case 'T':   //Enable TTL control
+          simpleTTL = 1;
+          pressureLog = 1;  //Enable pressure logging when TTL control is enabled
+          break;
+        case 't':   //Disable TTL control
+          simpleTTL = 0;
           break;
         case 'Z':   //Turn on short valve
           setValve(SHORT, 1);
@@ -312,7 +325,7 @@ void processStoredSequence() {  // Process the loaded sequence
     execFlag = false; // Set the machine ready flag to false due to an empty sequence
     return; // Exit the function if the sequence is empty
   }
-
+  pressureLog = 1; // Ensure pressure logging enabled when a sequence is running
   if (currentStepIndex < sizeof(sequenceSteps) / sizeof(sequenceSteps[0]) && sequenceSteps[currentStepIndex].length > 0) {
     Step& step = sequenceSteps[currentStepIndex];
     if (tNow - tStepStart >= step.length) { // Check if the current step has been processed
@@ -362,20 +375,22 @@ void readPressure() //read pressure values from the analog pins
   pressureInputs[2] = analogRead(Pressure3);
   pressureInputs[3] = analogRead(Pressure4);
 
-  //build the pressure return string the way James has been using so far
-  String pressureReturn = "P ";
-  for (int i = 0; i < 4; i++)
-  {
-    pressureReturn += pressureInputs[i];
-    pressureReturn += " ";
+  if (pressureLog == 1){
+    //build the pressure return string the way James has been using so far
+    String pressureReturn = "P ";
+    for (int i = 0; i < 4; i++)
+    {
+      pressureReturn += String(pressureInputs[i]);
+      pressureReturn += " ";
+    }
+    for (int i = 0;i < sizeof(VALVES) / sizeof(VALVES[0]); i++)
+    {
+      pressureReturn += String(digitalRead(VALVES[i]));
+      pressureReturn += " ";
+    }
+    pressureReturn += "C";
+    Serial.println(pressureReturn);
   }
-  for (int i = 0;i < sizeof(VALVES) / sizeof(VALVES[0]); i++)
-  {
-    pressureReturn += digitalRead(VALVES[i]);
-    pressureReturn += " ";
-  }
-  pressureReturn += "C";
-  Serial.println(pressureReturn);
 }
 
 void closeValves(){ //safety function run at the end of a sequence

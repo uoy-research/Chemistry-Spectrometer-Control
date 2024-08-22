@@ -10,7 +10,9 @@ class Server:
         self.baudrate = baudrate
         self.verbose = verbose
         self.mode = mode
-        self.arduino
+        self.arduino = None
+        self.valve_states = []
+        self.pressure_values = []
         self.error = ""
         self.serial_connected = False
         self.shutdown_flag = False  # Flag to indicate server shutdown
@@ -76,15 +78,15 @@ class Server:
             self.last_heartbeat_time = time.time()
             logging.info("Received HEARTBEAT_ACK")
         elif response.startswith("P "):   # Pressure reading - "P <pressure1> ... <valveState1> ... C"
-            pressure_value = response.split(" ")[1:4]
-            logging.info(f"Pressure reading: {pressure_value}")
-            valve_states = response.split(" ")[4:-1]
-            logging.info(f"Valve states: {valve_states}")
-        elif response.startswith("LOG "):  # Log message - "LOG <message>"
-            log_message = response.replace("LOG ", "")
+            self.pressure_values = response.split(" ")[1:4]
+            logging.info(f"Pressure reading: {self.pressure_values}")
+            self.valve_states = response.split(" ")[4:-1]
+            logging.info(f"Valve states: {self.valve_states}")
+        elif response.startswith("LOG: "):  # Log message - "LOG <message>"
+            log_message = response.replace("LOG: ", "")
             logging.info(f"Arduino: {log_message}")
         else:
-            logging.info(f"Unknown response: {response}")
+            logging.warning(f"Unknown response: {response}")
 
     def stop(self):
         self.shutdown_flag = True
