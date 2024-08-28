@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from server import Server
+from ArdControl.arduinoController import Server
 import serial
 
 class TestServer(unittest.TestCase):

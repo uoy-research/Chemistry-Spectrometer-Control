@@ -1,6 +1,6 @@
 import argparse
 import logging
-from .server import Server
+from .arduinoController import Server
 
 def parse_arguments():
     # Create the parser

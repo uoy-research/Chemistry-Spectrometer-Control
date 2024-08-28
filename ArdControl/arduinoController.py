@@ -1,0 +1,214 @@
+import threading
+import socket
+import serial
+import logging
+import time
+import csv
+import os
+
+
+class ArduinoController:
+    def __init__(self, port, baudrate, verbose, mode):
+        self.port = port
+        self.baudrate = baudrate
+        self.verbose = verbose
+        self.mode = mode
+        self.arduino = None
+        self.valve_states = []
+        self.pressure_values = []
+        self.error = ""
+        self.serial_connected = False
+        self.shutdown_flag = False  # Flag to indicate server shutdown
+        self.save_pressure = False  # Flag to indicate saving pressure data
+        self.new_reading = False  # Flag to indicate new pressure reading
+        self.last_heartbeat_time = time.time()
+        self.heartbeat_time = 5  # Time in seconds between heartbeats
+        self.auto_control = False
+        self.commands_dict = {
+            "HEARTBEAT": 'y',  # Heartbeat response
+            "DECODE_SEQUENCE": 'i',  # Decode a sequence input
+            "EXECUTE_SEQUENCE": 'R',  # Execute the current loaded sequence
+            "ENABLE_PRESSURE_LOG": 'K',  # Enable pressure logging
+            "DISABLE_PRESSURE_LOG": 'k',  # Disable pressure logging
+            "SWITCH_TO_MANUAL": 'm',  # Switch to manual control (TN = 0)
+            "SWITCH_TO_AUTO_CONTROL": 'M',  # Switch to spec'r control (TN = 1)
+            "ENABLE_TTL_CONTROL": 'T',  # Enable TTL control
+            "DISABLE_TTL_CONTROL": 't',  # Disable TTL control
+            "TURN_ON_SHORT_VALVE": 'Z',  # Turn on short valve
+            "TURN_OFF_SHORT_VALVE": 'z',  # Turn off short valve
+            "TURN_ON_INPUT_VALVE": 'C',  # Turn on input valve
+            "TURN_OFF_INPUT_VALVE": 'c',  # Turn off input valve
+            "TURN_ON_OUTPUT_VALVE": 'V',  # Turn on output valve
+            "TURN_OFF_OUTPUT_VALVE": 'v',  # Turn off output valve
+            "TURN_ON_NN_VALVE": 'X',  # Turn on NN valve
+            "TURN_OFF_NN_VALVE": 'x',  # Turn off NN valve
+            "TURN_ON_OPH_VALVE": 'H',  # Turn on OPH valve
+            "TURN_OFF_OPH_VALVE": 'h'  # Turn off OPH valve
+        }
+
+        if verbose:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
+
+    def start(self):
+        self.connect_arduino()
+        if self.serial_connected:
+            self.start_heartbeat()
+            self.start_reading()
+
+    def connect_arduino(self):
+        try:
+            self.arduino = serial.Serial(f"COM{self.port}", self.baudrate)
+            self.error = f"Connected to Arduino on port {self.port}"
+            logging.info(self.error)
+            self.serial_connected = True
+        except serial.SerialException as e:
+            self.error = f"Failed to connect to Arduino on port {
+                self.port}: {e}"
+            logging.error(self.error)
+            self.serial_connected = False
+
+    def start_heartbeat(self):
+        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
+        self.heartbeat_thread.daemon = True
+        self.heartbeat_thread.start()
+
+    def send_heartbeat(self):
+        while not self.shutdown_flag and self.arduino != None:
+            try:
+                if self.serial_connected:
+                    self.arduino.write(b'y')
+                    logging.info("Sent HEARTBEAT")
+                    self.last_heartbeat_time = time.time()
+                time.sleep(4.5)  # Send heartbeat every 4.5 seconds
+            except serial.SerialException as e:
+                logging.error(f"Failed to send heartbeat: {e}")
+                self.serial_connected = False
+
+    def start_reading(self):
+        self.reading_thread = threading.Thread(target=self.read_responses)
+        self.reading_thread.daemon = True
+        self.reading_thread.start()
+
+    def read_responses(self):
+        while not self.shutdown_flag and self.arduino != None:
+            try:
+                if self.serial_connected and self.arduino.in_waiting > 0:
+                    response = self.arduino.readline().decode('utf-8').strip()
+                    logging.info(f"Received: {response}")
+                    self.process_response(response)
+            except serial.SerialException as e:
+                logging.error(f"Failed to read from Arduino: {e}")
+                self.serial_connected = False
+            if self.last_heartbeat_time + self.heartbeat_time < time.time():
+                logging.error(
+                    "No heartbeat received from Arduino. Stopping server.")
+                self.stop()
+
+    def process_response(self, response):
+        # Process the response from Arduino
+        if response == "HEARTBEAT_ACK":
+            self.last_heartbeat_time = time.time()
+            logging.info("Received HEARTBEAT_ACK")
+        # Pressure reading - "P <pressure1> ... <valveState1> ... C"
+        elif response.startswith("P "):
+            self.pressure_values = response.split(" ")[1:4]
+            logging.info(f"Pressure reading: {self.pressure_values}")
+            self.valve_states = response.split(" ")[4:-1]
+            logging.info(f"Valve states: {self.valve_states}")
+            # Set flag to indicate new reading available
+            self.new_reading = True
+        elif response.startswith("LOG: "):  # Log message - "LOG <message>"
+            log_message = response.replace("LOG: ", "")
+            logging.info(f"Arduino: {log_message}")
+        else:
+            logging.warning(f"Unknown response: {response}")
+
+    def stop(self):
+        self.shutdown_flag = True
+        if self.arduino != None:
+            self.arduino.close()
+            self.arduino = None
+        logging.info("Server stopped.")
+
+        # Join the reading thread to ensure it has finished
+        if hasattr(self, 'reading_thread') and self.reading_thread.is_alive():
+            self.reading_thread.join()
+
+        # Join the heartbeat thread to ensure it has finished
+        if hasattr(self, 'heartbeat_thread') and self.heartbeat_thread.is_alive():
+            self.heartbeat_thread.join()
+
+        # Join the pressure data thread to ensure it has finished
+        if hasattr(self, 'pressure_data_thread') and self.pressure_data_thread.is_alive():
+            self.pressure_data_thread.join()
+
+    def save_pressure_data(self, save, filename):
+        if save:
+            self.pressure_data_filename = filename
+            self.save_pressure = True
+            if not self.pressure_data_thread or not self.pressure_data_thread.is_alive():
+                self.pressure_data_thread = threading.Thread(
+                    target=self.read_pressure_data)
+                self.pressure_data_thread.start()
+        else:
+            self.save_pressure = False
+            if self.pressure_data_thread and self.pressure_data_thread.is_alive():
+                self.pressure_data_thread.join()
+
+    def read_pressure_data(self):
+        # Check if the file exists
+        file_exists = os.path.isfile(self.pressure_data_filename)
+
+        if not file_exists:
+            with open(self.pressure_data_filename, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["Time", "Pressure1", "Pressure2", "Pressure3", "Pressure4", "ValveState1", "ValveState2",
+                                "ValveState3", "ValveState4", "ValveState5", "ValveState6", "ValveState7", "ValveState8"])
+
+        while self.save_pressure:
+            if self.new_reading:
+                with open(self.pressure_data_filename, 'a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(
+                        [time.time(), *self.pressure_values, *self.valve_states])
+                self.new_reading = False
+            time.sleep(0.1)
+
+    def get_pressure_values(self):
+        return self.pressure_values
+
+    def get_valve_states(self):
+        return self.valve_states
+
+    def send_command(self, command):
+        if command in self.commands_dict:
+            command = self.commands_dict[command]
+        if self.serial_connected and self.arduino != None:
+            if type(command) == str:
+                try:
+                    self.arduino.write(command.encode())
+                    logging.info(f"Sent command: {command}")
+                except serial.SerialException as e:
+                    logging.error(f"Failed to send command: {e}")
+                    self.serial_connected = False
+            else:
+                logging.error("Invalid command")
+
+    def get_auto_control(self):
+        return self.auto_control
+    
+    def send_sequence(self, sequence):
+        if not self.get_auto_control():
+            logging.error("Cannot send sequence in manual mode")
+            return
+        if self.serial_connected and self.arduino != None:
+            try:
+                self.arduino.write(b'i')
+                self.arduino.write(sequence.encode())
+                self.arduino.write(b'\n')
+                logging.info(f"Sent sequence: {sequence}")
+            except serial.SerialException as e:
+                logging.error(f"Failed to send sequence: {e}")
+                self.serial_connected = False

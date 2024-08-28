@@ -98,7 +98,7 @@ void loop() {
 
   if(execFlag == 1){processStoredSequence();}
 
-  if(TNcontrol == 1){handleTTL();}
+  if(TTLControl == 1){handleTTL();}
 
   if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
   
@@ -190,6 +190,7 @@ void handleSerial()
           break;
         case 'R':   //Execute the current loaded sequence
           execFlag = 1; // Set the machine ready flag to true
+          pressureLog = 1; // Enable pressure logging when a sequence is running
           break;
         case 'm':   //Switch to manual control (TN = 0)
           TNcontrol = 0;
@@ -199,6 +200,13 @@ void handleSerial()
           break;
         case 'k':   //Disable pressure logging
           pressureLog = 0; 
+          break;
+        case 'T':   //Enable TTL control
+          simpleTTL = 1;
+          pressureLog = 1;  //Enable pressure logging when TTL control is enabled
+          break;
+        case 't':   //Disable TTL control
+          simpleTTL = 0;
           break;
         default:
           Serial.println("LOG: Invalid input");  //Invalid input
@@ -220,13 +228,6 @@ void handleSerial()
           break;
         case 'M':   //Switch to spec'r control (TN = 1)
           TNcontrol = 1;
-          break;
-        case 'T':   //Enable TTL control
-          simpleTTL = 1;
-          pressureLog = 1;  //Enable pressure logging when TTL control is enabled
-          break;
-        case 't':   //Disable TTL control
-          simpleTTL = 0;
           break;
         case 'Z':   //Turn on short valve
           setValve(SHORT, 1);
@@ -378,7 +379,7 @@ void readPressure() //read pressure values from the analog pins
   if (pressureLog == 1){
     //build the pressure return string the way James has been using so far
     String pressureReturn = "P ";
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < sizeof(pressureInputs) / sizeof(pressureInputs[0]); i++)
     {
       pressureReturn += String(pressureInputs[i]);
       pressureReturn += " ";
@@ -433,7 +434,7 @@ void reset(){
   execFlag = 0;
   decodeFlag = 0;
   simpleTTL = 0;
-  TNcontrol = 1;
+  TNcontrol = 0;
   pressureLog = 0;
   closeValves();
   tStart = millis();
