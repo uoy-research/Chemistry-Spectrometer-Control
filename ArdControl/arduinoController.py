@@ -1,23 +1,21 @@
 import threading
-import socket
 import serial
 import logging
 import time
 import csv
 import os
 
-
 class ArduinoController:
     def __init__(self, port, baudrate, verbose, mode):
-        self.port = port
-        self.baudrate = baudrate
-        self.verbose = verbose
-        self.mode = mode
-        self.arduino = None
-        self.valve_states = []
-        self.pressure_values = []
-        self.error = ""
-        self.serial_connected = False
+        self.port = port    # Port number to connect to arduino
+        self.baudrate = baudrate    # Baudrate for serial connection
+        self.verbose = verbose  # Verbose mode
+        self.mode = mode    # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
+        self.arduino = None # Container for arduino object
+        self.valve_states = []  # Container for valve states
+        self.pressure_values = []   # Container for pressure values
+        self.readings = []  # Container for pressure readings
+        self.serial_connected = False   # Flag to indicate serial connection
         self.shutdown_flag = False  # Flag to indicate server shutdown
         self.save_pressure = False  # Flag to indicate saving pressure data
         self.new_reading = False  # Flag to indicate new pressure reading
@@ -51,6 +49,8 @@ class ArduinoController:
         else:
             logging.basicConfig(level=logging.INFO)
 
+        # TODO write about initialising based on mode variable
+
     def start(self):
         self.connect_arduino()
         if self.serial_connected:
@@ -60,13 +60,10 @@ class ArduinoController:
     def connect_arduino(self):
         try:
             self.arduino = serial.Serial(f"COM{self.port}", self.baudrate)
-            self.error = f"Connected to Arduino on port {self.port}"
-            logging.info(self.error)
+            logging.info(f"Connected to Arduino on port {self.port}")
             self.serial_connected = True
         except serial.SerialException as e:
-            self.error = f"Failed to connect to Arduino on port {
-                self.port}: {e}"
-            logging.error(self.error)
+            logging.error(f"Failed to connect to Arduino on port {self.port}: {e}")
             self.serial_connected = False
 
     def start_heartbeat(self):
@@ -78,9 +75,9 @@ class ArduinoController:
         while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
-                    self.arduino.write(b'y')
+                    self.arduino.write(self.commands_dict["HEARTBEAT"].encode())
                     logging.info("Sent HEARTBEAT")
-                    self.last_heartbeat_time = time.time()
+                    # self.last_heartbeat_time = time.time()
                 time.sleep(4.5)  # Send heartbeat every 4.5 seconds
             except serial.SerialException as e:
                 logging.error(f"Failed to send heartbeat: {e}")
@@ -109,15 +106,21 @@ class ArduinoController:
     def process_response(self, response):
         # Process the response from Arduino
         if response == "HEARTBEAT_ACK":
-            self.last_heartbeat_time = time.time()
+            self.last_heartbeat_time = time.time()  # Update heartbeat time
             logging.info("Received HEARTBEAT_ACK")
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
+        # Pressure values are in mbar, valve states are 0 or 1
+        # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
         elif response.startswith("P "):
-            self.pressure_values = response.split(" ")[1:4]
+            self.pressure_values = response.split(" ")[1:5]
             logging.info(f"Pressure reading: {self.pressure_values}")
-            self.valve_states = response.split(" ")[4:-1]
+            self.valve_states = response.split(" ")[5:-1]
             logging.info(f"Valve states: {self.valve_states}")
             # Set flag to indicate new reading available
+            self.readings.append([*self.pressure_values, *self.valve_states])
+            if len(self.readings) > 10:
+                # Remove the oldest reading
+                self.readings.pop(0)
             self.new_reading = True
         elif response.startswith("LOG: "):  # Log message - "LOG <message>"
             log_message = response.replace("LOG: ", "")
@@ -152,6 +155,8 @@ class ArduinoController:
                 self.pressure_data_thread = threading.Thread(
                     target=self.read_pressure_data)
                 self.pressure_data_thread.start()
+            else:
+                logging.error("Pressure data thread already running")
         else:
             self.save_pressure = False
             if self.pressure_data_thread and self.pressure_data_thread.is_alive():
@@ -202,6 +207,9 @@ class ArduinoController:
     def send_sequence(self, sequence):
         if not self.get_auto_control():
             logging.error("Cannot send sequence in manual mode")
+            return
+        if self.mode == 2:
+            logging.error("Cannot send sequence in TTL mode")
             return
         if self.serial_connected and self.arduino != None:
             try:

@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import TKinterModernThemes as TKMT
 from TKinterModernThemes.WidgetFrame import Widget
 import serial
-from ArdControl.arduinoController import ArduinoController
+# from ArdControl.arduinoController import ArduinoController
 # TKMT docs https://github.com/RobertJN64/TKinterModernThemes
 
 defaultPort = "4"
