@@ -14,8 +14,8 @@ const int VALVES[] = {52, 8, 9, 22, 10, 26, 28, 30};
 const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
 
 //default timings
-const int DEFPollTime = 500; //default time between pressure readings
-const int DEFPressureTime = 3000; //default time required to build pressure before bubbling
+const unsigned long DEFPollTime = 500; //default time between pressure readings
+const unsigned long DEFPressureTime = 3000; //default time required to build pressure before bubbling
 
 //TTL Pins, T4 and T5 not working??
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
@@ -53,7 +53,7 @@ struct Step {
 
 Step sequenceSteps[maxLength]; //array to hold the steps in the sequence
 
-char validTypes[3] = ['b', 'd', 'n']; //valid step types
+char validTypes[3] = {'b', 'd', 'n'};
 
 //FUNCTIONS
 void declarePins();
@@ -81,6 +81,8 @@ void processStep(char stepType);
 void closeValves();
 
 void reset();
+
+bool isValidType(char type);
 
 void setup() {
   // put your setup code here, to run once:
@@ -307,7 +309,7 @@ void decodeSequence() //decode the sequence input
     int stepIndex = 0;
     while (i < sequence.length()) {
       char stepType = sequence[i];  // Read the step type
-      if validTypes.contains(stepType) { // Check if the step type is valid
+      if (isValidType(stepType)) { // Check if the step type is valid
         i++;
         String stepLengthStr = "";
         while (i < sequence.length() && isDigit(sequence[i])) { // Read the step length until another type is found
@@ -473,4 +475,11 @@ void updateStatus(){
   //expand with more LEDs when they have a purpose
 }
 
-
+bool isValidType(char type) { // Check if the step type is valid
+  for (int i = 0; i < sizeof(validTypes) / sizeof(validTypes[0]); i++) {
+    if (type == validTypes[i]) {
+      return true;
+    }
+  }
+  return false;
+}

@@ -132,7 +132,7 @@ class ArduinoController:
             logging.info(f"Valve states: {self.valve_states}")
             # Set flag to indicate new reading available
             self.readings.append([*self.pressure_values, *self.valve_states])
-            if len(self.readings) > 10:
+            if len(self.readings) > 20:
                 # Remove the oldest reading
                 self.readings.pop(0)
             self.new_reading = True
@@ -218,9 +218,18 @@ class ArduinoController:
     def get_pressure_values(self):
         return self.pressure_values
 
+    def get_recent_readings(self):
+        return self.readings
+ 
     def get_valve_states(self):
         return self.valve_states
 
+    def get_auto_control(self):
+        return self.auto_control
+    
+    def get_sequence_loaded(self):
+        return self.sequence_loaded
+   
     def send_command(self, command):
         if command in self.commands_dict:
             command = self.commands_dict[command]
@@ -238,15 +247,6 @@ class ArduinoController:
         else:
             logging.error("Cannot send command - not connected to Arduino")
 
-    def get_auto_control(self):
-        return self.auto_control
-    
-    def get_sequence_loaded(self):
-        return self.sequence_loaded
-    
-    def get_recent_readings(self):
-        return self.readings
-    
     # Sequence e.g. b100n200d300b300 -- current max 9 "steps" in sequence
     def send_sequence(self, sequence):
         if not self.get_auto_control():
