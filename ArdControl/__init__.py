@@ -1,1 +1,1 @@
-from .arduinoController import Server
+from .arduinoController import ArduinoController

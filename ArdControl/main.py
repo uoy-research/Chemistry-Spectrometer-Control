@@ -1,6 +1,7 @@
 import argparse
 import logging
-from .arduinoController import Server
+import time
+from arduinoController import ArduinoController
 
 def parse_arguments():
     # Create the parser
@@ -16,23 +17,30 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    args = parse_arguments()
+    # args = parse_arguments()
     
     # Access the arguments
-    port = args.port
-    baudrate = args.baudrate
-    verbose = args.verbose
-    mode = args.mode
+    #port = args.port
+    #baudrate = args.baudrate
+    #verbose = args.verbose
+    #mode = args.mode
     
     # Print the arguments
-    logging.info(f"Port: {port}")
-    logging.info(f"Baudrate: {baudrate}")
-    logging.info(f"Verbose: {verbose}")
-    logging.info(f"Mode: {mode}")
+    #logging.info(f"Port: {port}")
+    #logging.info(f"Baudrate: {baudrate}")
+    #logging.info(f"Verbose: {verbose}")
+    #logging.info(f"Mode: {mode}")
 
     # Create and start the server
-    server = Server(port, baudrate, verbose, mode)
+
+    # Test to manually switch a valve on and off
+    server = ArduinoController(3, 9600, True, 0)
     server.start()
+    while True:
+        server.send_heartbeat()
+        server.send_command("TURN_ON_OUTPUT_VALVE")
+        time.sleep(4)
+        server.send_command("TURN_OFF_OUTPUT_VALVE")
 
 if __name__ == "__main__":
     main()

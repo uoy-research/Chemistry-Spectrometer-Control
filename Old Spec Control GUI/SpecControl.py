@@ -2,9 +2,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import TKinterModernThemes as TKMT
 from TKinterModernThemes.WidgetFrame import Widget
-import serial
-# from ArdControl.arduinoController import ArduinoController
 # TKMT docs https://github.com/RobertJN64/TKinterModernThemes
+import serial
+import sys
+import os
+# Add the parent directory to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Import the ArduinoController class
+from ArdControl.arduinoController import ArduinoController
+
 
 defaultPort = "4"
 
@@ -117,7 +123,7 @@ class App(TKMT.ThemedTKinterFrame):
                 self.serialConnected = True
             except serial.SerialException:
                 print("Failed to connect to Arduino")
-                self.warning_label.config(text="Failed to connect to Arduino on " + serialPort)
+                self.warning_label.config(text="Failed to connect on " + serialPort)
                 self.connectSerialButton.config(text="Connect")
                 #disable manual control
                 return
