@@ -316,14 +316,15 @@ void decodeSequence() //decode the sequence input
           stepLengthStr += sequence[i];
           i++;
         }
-        int stepLength = stepLengthStr.toInt();
+
         if (stepIndex >= maxLength) { // Check if the sequence is too long
           Serial.println("LOG: Sequence too long, only first 9 steps will be executed");
           break;
         }
         else{
-        sequenceSteps[stepIndex] = {stepType, static_cast<unsigned long>(stepLength)}; // Store the step in the list
-        stepIndex++;
+          int stepLength = stepLengthStr.toInt(); // Convert the step length to an integer
+          sequenceSteps[stepIndex] = {stepType, static_cast<unsigned long>(stepLength)}; // Store the step in the list
+          stepIndex++;
         }
       }
       else {
