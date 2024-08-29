@@ -6,9 +6,9 @@ import csv
 import os
 
 class ArduinoController:
-    def __init__(self, port, baudrate, verbose, mode):
+    def __init__(self, port, verbose, mode):
         self.port = port    # Port number to connect to arduino
-        self.baudrate = baudrate    # Baudrate for serial connection
+        self.baudrate = 9600    # Baudrate for serial connection
         self.verbose = verbose  # Verbose mode
         self.mode = mode    # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
         self.arduino = None # Container for arduino object
@@ -23,6 +23,7 @@ class ArduinoController:
         self.last_heartbeat_time = time.time()
         self.heartbeat_time = 5  # Time in seconds between heartbeats
         self.auto_control = False
+        self.pressure_data_filepath = ""
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
             "DECODE_SEQUENCE": 'i',  # Decode a sequence input
@@ -42,7 +43,8 @@ class ArduinoController:
             "TURN_ON_NN_VALVE": 'X',  # Turn on NN valve
             "TURN_OFF_NN_VALVE": 'x',  # Turn off NN valve
             "TURN_ON_OPH_VALVE": 'H',  # Turn on OPH valve
-            "TURN_OFF_OPH_VALVE": 'h'  # Turn off OPH valve
+            "TURN_OFF_OPH_VALVE": 'h',  # Turn off OPH valve
+            "RESET": 's'    # Reset the Arduino
         }
 
         if verbose:
@@ -148,11 +150,14 @@ class ArduinoController:
             logging.warning(f"Unknown response: {response}")
 
     def stop(self):
-        self.shutdown_flag = True
+        
         if self.arduino != None:
+            self.send_command("RESET")
             self.arduino.close()
             self.arduino = None
         logging.info("Server stopped.")
+
+        self.shutdown_flag = True
 
         # Join the reading thread to ensure it has finished
         if hasattr(self, 'reading_thread') and self.reading_thread.is_alive():
@@ -168,7 +173,17 @@ class ArduinoController:
 
     def save_pressure_data(self, save, filename):
         if save:
-            self.pressure_data_filename = filename
+            if filename == "":  # If no filename specified, save in NMR Results folder with timestamp
+                if not os.path.exists("C:\\NMR Results"):
+                    os.makedirs("C:\\NMR Results")
+                filename = os.path.join("C:\\NMR Results", f"pressure_data_{time.strftime('%Y%m%d-%H%M%S')}.csv")
+            elif not filename.endswith(".csv"): # If filename doesn't end in .csv, add it
+                filename = filename + ".csv"
+            if os.path.dirname(filename) == "":  # If no location specified, save in NMR Results folder
+                filename = os.path.join("C:\\NMR Results", filename)
+            if not os.path.exists(os.path.dirname(filename)): # If location doesn't exist, create it
+                os.makedirs(os.path.dirname(filename))
+            self.pressure_data_filepath = filename
             self.save_pressure = True
             if not self.pressure_data_thread or not self.pressure_data_thread.is_alive():
                 self.pressure_data_thread = threading.Thread(
@@ -183,17 +198,17 @@ class ArduinoController:
 
     def read_pressure_data(self):
         # Check if the file exists
-        file_exists = os.path.isfile(self.pressure_data_filename)
+        file_exists = os.path.isfile(self.pressure_data_filepath)
 
         if not file_exists:
-            with open(self.pressure_data_filename, 'w', newline='') as file:
+            with open(self.pressure_data_filepath, 'w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["Time", "Pressure1", "Pressure2", "Pressure3", "ValveState1", "ValveState2",
                                 "ValveState3", "ValveState4", "ValveState5", "ValveState6", "ValveState7", "ValveState8"])
 
         while self.save_pressure:
             if self.new_reading:
-                with open(self.pressure_data_filename, 'a', newline='') as file:
+                with open(self.pressure_data_filepath, 'a', newline='') as file:
                     writer = csv.writer(file)
                     writer.writerow(
                         [time.time(), *self.pressure_values, *self.valve_states])
@@ -228,6 +243,9 @@ class ArduinoController:
     
     def get_sequence_loaded(self):
         return self.sequence_loaded
+    
+    def get_recent_readings(self):
+        return self.readings
     
     # Sequence e.g. b100n200d300b300 -- current max 9 "steps" in sequence
     def send_sequence(self, sequence):

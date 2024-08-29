@@ -34,7 +34,7 @@ def main():
     # Create and start the server
 
     # Test to manually switch a valve on and off
-    server = ArduinoController(3, 9600, True, 0)
+    server = ArduinoController(3, True, 0)
     server.start()
     while True:
         server.send_heartbeat()

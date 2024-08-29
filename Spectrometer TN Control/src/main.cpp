@@ -212,6 +212,9 @@ void handleSerial()
         case 't':   //Disable TTL control
           simpleTTL = 0;
           break;
+        case 's':   //Reset the system
+          reset();
+          break;
         default:
           Serial.println("LOG: Invalid input");  //Invalid input
           break;
@@ -262,6 +265,9 @@ void handleSerial()
           break;
         case 'h':   //Turn off OPH valve
           setValve(OPH, 0);
+          break;
+        case 's':   //Reset the system
+          reset();
           break;
         default:
           Serial.println("LOG: Invalid input");  //Invalid input

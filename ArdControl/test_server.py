@@ -16,7 +16,7 @@ class TestArduinoController(unittest.TestCase):
         self.baudrate = 9600
         self.verbose = True
         self.mode = 0
-        self.controller = ArduinoController(self.port, self.baudrate, self.verbose, self.mode)
+        self.controller = ArduinoController(self.port, self.verbose, self.mode)
 
     # Test the initialization of the ArduinoController
     def test_initialization(self):
