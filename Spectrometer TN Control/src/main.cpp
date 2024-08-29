@@ -4,9 +4,11 @@
 
 //Pin values taken from communication from Chris Rhodes
 //5 valves - IN, OUT, SHORT, NN, OPH - 42, 44 and 46 unused
-const int IN = 0; const int OUT = 1; const int SHORT = 2; const int NN = 3; const int OPH = 4;
-const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
-const int VALVES[] = {8, 9, 10, 22, 52, 26, 28, 30};
+//V1 = OPH, V2 = IN, V3 = OUT, V4 = NN, V5 = SHORT
+//TODO check with James about which valve is which
+ const int OPH = 0; const int IN = 1; const int OUT = 2; const int NN = 3; const int SHORT = 4;
+const int LEDS[] = {40, 32, 34, 38, 36, 42, 44, 46};
+const int VALVES[] = {52, 8, 9, 22, 10, 26, 28, 30};
 
 // status LEDs
 const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
@@ -19,7 +21,7 @@ const int DEFPressureTime = 3000; //default time required to build pressure befo
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
 
 //Analog pins - pressure4 is external
-const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; const int Pressure4 = A6;
+const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; // const int Pressure4 = A6;
 
 const int maxLength = 9; //maximum number of steps in a sequence
 
@@ -31,7 +33,7 @@ bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence
 bool simpleTTL = 0; //simple TTL control toggle - unused
 
-int pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
+int pressureInputs[3] = {0,0,0};  //container for pressure values from the analog pins
 
 int pollTime = DEFPollTime; //time between pressure readings
 int pressureTime = DEFPressureTime; //time required to build pressure before bubbling
@@ -50,6 +52,8 @@ struct Step {
 };
 
 Step sequenceSteps[maxLength]; //array to hold the steps in the sequence
+
+char validTypes[3] = ['b', 'd', 'n']; //valid step types
 
 //FUNCTIONS
 void declarePins();
@@ -137,7 +141,7 @@ void declarePins()
   pinMode(Pressure1, INPUT);
   pinMode(Pressure2, INPUT);
   pinMode(Pressure3, INPUT);
-  pinMode(Pressure4, INPUT);
+  // pinMode(Pressure4, INPUT);
 }
 
 void initOutput(){
@@ -275,6 +279,7 @@ void decodeSequence() //decode the sequence input
 {
   if (execFlag == 1) //if a sequence is potentially running, do not load a new sequence
   {
+    Serial.println("SEQ: False"); //send a false sequence response
     Serial.println("LOG: Sequence already running, please wait for current sequence to end before loading a new one");
     decodeFlag = 0;
     return; //exit the function to avoid loadning new sequence
@@ -290,31 +295,41 @@ void decodeSequence() //decode the sequence input
   //decode the sequence
   if (Serial.available() > 0) {
     sequence = Serial.readStringUntil('\n'); // Read the entire input until newline
-    decodeFlag = 0; // Set the flag to indicate sequence has been decoded
+    decodeFlag = 0; // initialise the decode flag
 
     size_t i = 0;   // Unsigned int to avoid warning
     int stepIndex = 0;
     while (i < sequence.length()) {
       char stepType = sequence[i];  // Read the step type
-      i++;
-      String stepLengthStr = "";
-      while (i < sequence.length() && isDigit(sequence[i])) { // Read the step length until another type is found
-        stepLengthStr += sequence[i];
+      if validTypes.contains(stepType) { // Check if the step type is valid
         i++;
+        String stepLengthStr = "";
+        while (i < sequence.length() && isDigit(sequence[i])) { // Read the step length until another type is found
+          stepLengthStr += sequence[i];
+          i++;
+        }
+        int stepLength = stepLengthStr.toInt();
+        if (stepIndex >= maxLength) { // Check if the sequence is too long
+          Serial.println("LOG: Sequence too long, only first 9 steps will be executed");
+          break;
+        }
+        else{
+        sequenceSteps[stepIndex] = {stepType, static_cast<unsigned long>(stepLength)}; // Store the step in the list
+        stepIndex++;
+        }
       }
-      int stepLength = stepLengthStr.toInt();
-      if (stepIndex >= maxLength) { // Check if the sequence is too long
-        Serial.println("LOG: Sequence too long, only first 9 steps will be executed");
+      else {
+        Serial.println("LOG: Invalid step type in sequence");
+        Serial.println("SEQ: False"); //send a false sequence response
         break;
       }
-      else{
-      sequenceSteps[stepIndex] = {stepType, static_cast<unsigned long>(stepLength)}; // Store the step in the list
-      stepIndex++;
-      }
     }
+    Serial.println("SEQ: True"); //send a true sequence response
+    decodeFlag = 1; // Set the flag to indicate sequence has been decoded
   }
   else
   {
+    Serial.println("SEQ: False"); //send a false sequence response
     Serial.println("LOG: Expected sequence input, but none received");
     decodeFlag = 0;
   }
@@ -374,7 +389,7 @@ void readPressure() //read pressure values from the analog pins
   pressureInputs[0] = analogRead(Pressure1);
   pressureInputs[1] = analogRead(Pressure2);
   pressureInputs[2] = analogRead(Pressure3);
-  pressureInputs[3] = analogRead(Pressure4);
+  // pressureInputs[3] = analogRead(Pressure4);
 
   if (pressureLog == 1){
     //build the pressure return string the way James has been using so far
@@ -403,7 +418,7 @@ void closeValves(){ //safety function run at the end of a sequence
 }
 
 void handleTTL(){
-  if (simpleTTL == 1){ //simple TTL control
+  if (simpleTTL == 1){ //simple TTL control, currently unreachable
     //set valves based on TTL inputs
     setValve(IN, digitalRead(T1));
     setValve(OUT, digitalRead(T2));
@@ -415,10 +430,13 @@ void handleTTL(){
   {
     int combinedState = (digitalRead(T4) << 3) | (digitalRead(T3) << 2) | (digitalRead(T2) << 1) | digitalRead(T1);
     switch(combinedState){
+      //TODO Add more cases as needed
       case 0:
         setValve(IN, 0);
         setValve(OUT, 0);
         setValve(OPH, 0);
+        setValve(NN, 0);
+        setValve(SHORT, 0);
         break;
       default:
         Serial.println("LOG: Invalid TTL input");

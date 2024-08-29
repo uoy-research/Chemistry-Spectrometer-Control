@@ -19,6 +19,7 @@ class ArduinoController:
         self.shutdown_flag = False  # Flag to indicate server shutdown
         self.save_pressure = False  # Flag to indicate saving pressure data
         self.new_reading = False  # Flag to indicate new pressure reading
+        self.sequence_loaded = False    # Flag to indicate sequence loaded
         self.last_heartbeat_time = time.time()
         self.heartbeat_time = 5  # Time in seconds between heartbeats
         self.auto_control = False
@@ -49,7 +50,18 @@ class ArduinoController:
         else:
             logging.basicConfig(level=logging.INFO)
 
-        # TODO write about initialising based on mode variable
+        if mode == 0:
+            self.auto_control = False
+        elif mode == 1:
+            self.auto_control = True
+            logging.info("Magritek mode enabled")
+        elif mode == 2:
+            self.auto_control = True
+            logging.info("TTL mode enabled")
+        else:
+            logging.error("Invalid mode, defaulting to manual mode")
+            self.mode = 0
+            self.auto_control = False
 
     def start(self):
         self.connect_arduino()
@@ -110,11 +122,11 @@ class ArduinoController:
             logging.info("Received HEARTBEAT_ACK")
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
         # Pressure values are in mbar, valve states are 0 or 1
-        # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
+        # P 1013 1014 1015 1 1 1 1 1 1 0 1 C
         elif response.startswith("P "):
-            self.pressure_values = response.split(" ")[1:5]
+            self.pressure_values = response.split(" ")[1:4] # Currently only 3 pressure values
             logging.info(f"Pressure reading: {self.pressure_values}")
-            self.valve_states = response.split(" ")[5:-1]
+            self.valve_states = response.split(" ")[4:-1]   # Currently only 8 valve states
             logging.info(f"Valve states: {self.valve_states}")
             # Set flag to indicate new reading available
             self.readings.append([*self.pressure_values, *self.valve_states])
@@ -122,6 +134,13 @@ class ArduinoController:
                 # Remove the oldest reading
                 self.readings.pop(0)
             self.new_reading = True
+        elif response.startswith("SEQ: "):  # Sequence loaded - "SEQ: <sequence>"
+            if response.endswith("False"):
+                self.sequence_loaded = False
+                logging.info(f"Sequence loaded: {response.replace('SEQ: ', '')}")
+            else:
+                self.sequence_loaded = True
+                logging.info(f"Sequence loaded: {response.replace('SEQ: ', '')}")
         elif response.startswith("LOG: "):  # Log message - "LOG <message>"
             log_message = response.replace("LOG: ", "")
             logging.info(f"Arduino: {log_message}")
@@ -169,7 +188,7 @@ class ArduinoController:
         if not file_exists:
             with open(self.pressure_data_filename, 'w', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow(["Time", "Pressure1", "Pressure2", "Pressure3", "Pressure4", "ValveState1", "ValveState2",
+                writer.writerow(["Time", "Pressure1", "Pressure2", "Pressure3", "ValveState1", "ValveState2",
                                 "ValveState3", "ValveState4", "ValveState5", "ValveState6", "ValveState7", "ValveState8"])
 
         while self.save_pressure:
@@ -190,8 +209,9 @@ class ArduinoController:
     def send_command(self, command):
         if command in self.commands_dict:
             command = self.commands_dict[command]
+        
         if self.serial_connected and self.arduino != None:
-            if type(command) == str:
+            if command in self.commands_dict.values():
                 try:
                     self.arduino.write(command.encode())
                     logging.info(f"Sent command: {command}")
@@ -199,11 +219,17 @@ class ArduinoController:
                     logging.error(f"Failed to send command: {e}")
                     self.serial_connected = False
             else:
-                logging.error("Invalid command")
+                logging.error("Invalid command - not a recognised command")
+        else:
+            logging.error("Cannot send command - not connected to Arduino")
 
     def get_auto_control(self):
         return self.auto_control
     
+    def get_sequence_loaded(self):
+        return self.sequence_loaded
+    
+    # Sequence e.g. b100n200d300b300 -- current max 9 "steps" in sequence
     def send_sequence(self, sequence):
         if not self.get_auto_control():
             logging.error("Cannot send sequence in manual mode")
