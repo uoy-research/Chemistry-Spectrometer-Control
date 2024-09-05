@@ -176,7 +176,7 @@ class ArduinoController:
             if filename == "":  # If no filename specified, save in NMR Results folder with timestamp
                 if not os.path.exists("C:\\NMR Results"):
                     os.makedirs("C:\\NMR Results")
-                filename = os.path.join("C:\\NMR Results", f"pressure_data_{time.strftime('%Y%m%d-%H%M%S')}.csv")
+                filename = os.path.join("C:\\NMR Results", f"pressure_data_{time.strftime('%Y%m%d-%H%M')}.csv")
             elif not filename.endswith(".csv"): # If filename doesn't end in .csv, add it
                 filename = filename + ".csv"
             if os.path.dirname(filename) == "":  # If no location specified, save in NMR Results folder

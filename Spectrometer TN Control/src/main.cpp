@@ -109,14 +109,14 @@ void loop() {
 
   if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
   
-  //need to reset if no serial or TTL signal for certain time
-  if(tNow - heartBeat >= 5000){reset();}
+  //need to reset if no serial signal for certain time
+  if(tNow - heartBeat > 5000){reset();}
 }
 
 void declarePins()
 {
   //set valve pins as outputs
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 8; i++)
   {
     pinMode(VALVES[i], OUTPUT);
   }
@@ -149,7 +149,7 @@ void declarePins()
 
 void initOutput(){
   //set all valves to off
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 8; i++)
   {
     setValve(i, 0);
   }
@@ -203,6 +203,9 @@ void handleSerial()
         case 'm':   //Switch to manual control (TN = 0)
           TNcontrol = 0;
           break;
+        case 'M':   //Switch to manual control (TN = 0)
+          Serial.println("LOG: Already in auto control mode");
+          break;
         case 'K':   //Enable pressure logging
           pressureLog = 1;
           break;
@@ -239,6 +242,9 @@ void handleSerial()
           break;
         case 'M':   //Switch to spec'r control (TN = 1)
           TNcontrol = 1;
+          break;
+        case 'm':   //Switch to manual control (TN = 0)
+          Serial.println("LOG: Already in manual control mode");
           break;
         case 'Z':   //Turn on short valve
           setValve(SHORT, 1);
@@ -332,6 +338,7 @@ void decodeSequence() //decode the sequence input
       else {
         Serial.println("LOG: Invalid step type in sequence");
         Serial.println("SEQ: False"); //send a false sequence response
+        decodeFlag = 0;
         break;
       }
     }
