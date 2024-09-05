@@ -49,43 +49,24 @@ class Ui_MainWindow(object):
         self.verticalLayout.addWidget(self.ArdCOMPortLabel)
 
         # Create the COM port spin box
-        self.COMPortSpinBox = QtWidgets.QSpinBox(
+        self.ArdPortSpinBox = QtWidgets.QSpinBox(
             parent=self.verticalLayoutWidget)
-        self.COMPortSpinBox.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
+        self.ArdPortSpinBox.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
                                          QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.COMPortSpinBox.setObjectName("COMPortSpinBox")
-        self.COMPortSpinBox.setMinimum(0)
-        self.COMPortSpinBox.setMaximum(255)
-        self.verticalLayout.addWidget(self.COMPortSpinBox)
+        self.ArdPortSpinBox.setObjectName("ArdPortSpinBox")
+        self.ArdPortSpinBox.setMinimum(0)
+        self.ArdPortSpinBox.setMaximum(255)
+        self.verticalLayout.addWidget(self.ArdPortSpinBox)
 
         # Create the warning label with red text
         self.ArdCOMWarningLabel = QtWidgets.QLabel(
             parent=self.verticalLayoutWidget)
-        palette = QtGui.QPalette()
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Active,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Inactive,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(120, 120, 120))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Disabled,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        self.ArdCOMWarningLabel.setPalette(palette)
         self.ArdCOMWarningLabel.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignTop)
         self.ArdCOMWarningLabel.setObjectName("ArdCOMWarningLabel")
         self.verticalLayout.addWidget(self.ArdCOMWarningLabel)
 
-        # Create the connection buttons
-        self.ManualConnectButton = QtWidgets.QPushButton(
-            parent=self.verticalLayoutWidget)
-        self.ManualConnectButton.setMinimumSize(QtCore.QSize(0, 68))
-        self.ManualConnectButton.setObjectName("ManualConnectButton")
-        self.verticalLayout.addWidget(self.ManualConnectButton)
+        # Create the connection buttons     
         self.AutoConnectButton = QtWidgets.QPushButton(
             parent=self.verticalLayoutWidget)
         self.AutoConnectButton.setMinimumSize(QtCore.QSize(0, 68))
@@ -96,6 +77,11 @@ class Ui_MainWindow(object):
         self.TTLConnectButton.setMinimumSize(QtCore.QSize(0, 68))
         self.TTLConnectButton.setObjectName("TTLConnectButton")
         self.verticalLayout.addWidget(self.TTLConnectButton)
+        self.ManualConnectButton = QtWidgets.QPushButton(
+            parent=self.verticalLayoutWidget)
+        self.ManualConnectButton.setMinimumSize(QtCore.QSize(0, 68))
+        self.ManualConnectButton.setObjectName("ManualConnectButton")
+        self.verticalLayout.addWidget(self.ManualConnectButton)
 
         # Create the text browser
         self.textBrowser = QtWidgets.QTextBrowser(parent=self.centralwidget)
@@ -227,15 +213,19 @@ class Ui_MainWindow(object):
         # Create the graph control checkboxes
         self.P1Toggle = QtWidgets.QCheckBox(parent=self.graphControlWidget)
         self.P1Toggle.setObjectName("P1Toggle")
+        self.P1Toggle.setChecked(True)
         self.graphControlLayout.addWidget(self.P1Toggle, 1, 1, 1, 1)
         self.P2Toggle = QtWidgets.QCheckBox(parent=self.graphControlWidget)
         self.P2Toggle.setObjectName("P2Toggle")
+        self.P2Toggle.setChecked(True)
         self.graphControlLayout.addWidget(self.P2Toggle, 2, 1, 1, 1)
         self.P3Toggle = QtWidgets.QCheckBox(parent=self.graphControlWidget)
         self.P3Toggle.setObjectName("P3Toggle")
+        self.P3Toggle.setChecked(True)
         self.graphControlLayout.addWidget(self.P3Toggle, 3, 1, 1, 1)
         self.P4Toggle = QtWidgets.QCheckBox(parent=self.graphControlWidget)
         self.P4Toggle.setObjectName("P4Toggle")
+        self.P4Toggle.setChecked(True)
         self.graphControlLayout.addWidget(self.P4Toggle, 4, 1, 1, 1)
 
         # Create the motor control widgets - cols 1 & 2
@@ -283,7 +273,6 @@ class Ui_MainWindow(object):
         self.motorErrorLabel.setObjectName("motorErrorLabel")
         self.motorErrorLabel.setMinimumSize(QtCore.QSize(300, 30))       
         self.motorErrorLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.motorErrorLabel.setPalette(palette)
         self.motorControlLayout.addWidget(self.motorErrorLabel, 5, 0, 1, 2)
 
         # Create the motor control widgets - cols 3 & 4
@@ -335,6 +324,9 @@ class Ui_MainWindow(object):
 
         # Add the text to the widgets
         self.retranslateUi(MainWindow)
+        # Initialise variables
+        self.initialiseVars()
+        
         # Connect the buttons to the functions
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -343,6 +335,7 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "Spectrometer GUI"))
         self.ArdCOMPortLabel.setText(_translate("MainWindow", "Arduino COM Port"))
         self.ArdCOMWarningLabel.setText(_translate("MainWindow", "arduino not connected"))
+        self.ArdCOMWarningLabel.setStyleSheet("color: red")
         self.ManualConnectButton.setText(
             _translate("MainWindow", "Manual Connect"))
         self.AutoConnectButton.setText(
@@ -359,7 +352,7 @@ class Ui_MainWindow(object):
         self.Valve8Button.setText(_translate("MainWindow", "V8"))
         self.SetSavePathButton.setText(
             _translate("MainWindow", "Set Save Path"))
-        self.SaveButton.setText(_translate("MainWindow", "Save"))
+        self.SaveButton.setText(_translate("MainWindow", "Begin Saving"))
         self.startReadingButton.setText(
             _translate("MainWindow", "Start Reading"))
         self.graphLabel1.setText(_translate("MainWindow", "Toggle P1"))
@@ -381,6 +374,7 @@ class Ui_MainWindow(object):
         self.motorPositionButton.setText(
             _translate("MainWindow", "Move to Position"))
         self.motorErrorLabel.setText(_translate("MainWindow", "motor not connected"))
+        self.motorErrorLabel.setStyleSheet("color: red")
         self.motorReadPositionLabel.setText(_translate("MainWindow", "Motor Pos (mm)"))
         self.motorReadPositionButton.setText(_translate("MainWindow", "Get Position"))
         self.motorStopButton.setText(_translate("MainWindow", "Stop Motor"))
@@ -392,6 +386,68 @@ class Ui_MainWindow(object):
         self.motorSlowDescentButton.setText(_translate("MainWindow", "Slow Descent"))
         self.motorToBottomButton.setText(_translate("MainWindow", "Move to Bottom"))
 
+    def initialiseVars(self):
+        self.ArdCOMPort = self.ArdPortSpinBox.value()
+        self.MotorCOMPort = self.motorPortSpinBox.value()
+        self.SavePath = self.SavePathEdit.text()
+        self.P1 = self.P1Toggle.isChecked()
+        self.P2 = self.P1Toggle.isChecked()
+        self.P3 = self.P1Toggle.isChecked()
+        self.P4 = self.P1Toggle.isChecked()
+        self.ardConnected = False
+        self.connectionMode = "disconnected"
+        self.motorConnected = False
+        self.motorCalibrated = False
+        self.motorPosition = 0
+        self.motorTarget = 0
+        self.motorMoving = False
+        self.reading = False
+        self.saving = False
+        self.sequenceLoaded = False
+        self.sequenceRunning = False
+
+    def enableControls(self, control, state):
+        if control == "arduino":
+            self.AutoConnectButton.setEnabled(False)
+            self.TTLConnectButton.setEnabled(False)
+            self.ManualConnectButton.setEnabled(False)
+            self.ArdPortSpinBox.setEnabled(False)
+            self.ArdCOMWarningLabel.setText("arduino connected")
+            self.ArdCOMWarningLabel.setStyleSheet("color: green")
+        elif control == "reading":
+            self.P1Toggle.setEnabled(state)
+            self.P2Toggle.setEnabled(state)
+            self.P3Toggle.setEnabled(state)
+            self.P4Toggle.setEnabled(state)
+            self.SaveButton.setEnabled(state)
+            if state == False and self.saving == True:
+                self.on_SaveButton_clicked()
+        elif control == "saving":
+            self.SetSavePathButton.setEnabled(not(state))
+            self.SavePathEdit.setEnabled(not(state))
+            
+
+    @QtCore.pyqtSlot()
+    def on_startReadingButton_clicked(self):
+        if self.reading:
+            self.reading = False
+            self.enableControls("reading", False)
+            self.startReadingButton.setText("Start Reading")
+        else:
+            self.reading = True
+            self.enableControls("reading", True)
+            self.startReadingButton.setText("Stop Reading")
+
+    @QtCore.pyqtSlot()
+    def on_SaveButton_clicked(self):
+        if self.saving:
+            self.saving = False
+            self.enableControls("saving", False)
+            self.SaveButton.setText("Begin Saving")
+        else:
+            self.saving = True
+            self.enableControls("saving", True)
+            self.SaveButton.setText("Stop Saving")
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -407,7 +463,25 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
 if __name__ == "__main__":
+    global_stylesheet = """
+        QPushButton:disabled {
+            background-color: grey;
+            color: white;
+        }
+        QLineEdit:disabled {
+            background-color: grey;
+            color: black;
+        }
+        QSpinBox:disabled {
+            background-color: grey;
+            color: black;
+        }
+        """
+
     app = QtWidgets.QApplication(sys.argv)
+
+    app.setStyleSheet(global_stylesheet)
+
     window = MainWindow()
     window.show()
     window.plot()

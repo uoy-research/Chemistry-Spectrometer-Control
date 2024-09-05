@@ -167,6 +167,9 @@ void initOutput(){
   {
     setLED(i, 0);
   }
+
+  //Initial heartbeat in case the first one is missed due to the initialisation delay
+  Serial.println("HEARTBEAT_ACK");  //Heartbeat response
 }
 
 void setLED(int led, int state) //sets status LEDs to on or off
