@@ -21,7 +21,7 @@ const unsigned long DEFPressureTime = 3000; //default time required to build pre
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
 
 //Analog pins - pressure4 is external
-const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; // const int Pressure4 = A6;
+const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; const int Pressure4 = A6;
 
 const int maxLength = 9; //maximum number of steps in a sequence
 
@@ -33,7 +33,7 @@ bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence
 bool simpleTTL = 0; //simple TTL control toggle - unused
 
-int pressureInputs[3] = {0,0,0};  //container for pressure values from the analog pins
+int pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
 int pollTime = DEFPollTime; //time between pressure readings
 int pressureTime = DEFPressureTime; //time required to build pressure before bubbling

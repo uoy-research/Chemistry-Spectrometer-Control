@@ -124,11 +124,11 @@ class ArduinoController:
             logging.info("Received HEARTBEAT_ACK")
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
         # Pressure values are in mbar, valve states are 0 or 1
-        # P 1013 1014 1015 1 1 1 1 1 1 0 1 C
+        # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
         elif response.startswith("P "):
-            self.pressure_values = response.split(" ")[1:4] # Currently only 3 pressure values
+            self.pressure_values = response.split(" ")[1:5] # Currently only 4 pressure values
             logging.info(f"Pressure reading: {self.pressure_values}")
-            self.valve_states = response.split(" ")[4:-1]   # Currently only 8 valve states
+            self.valve_states = response.split(" ")[5:-1]   # Currently only 8 valve states
             logging.info(f"Valve states: {self.valve_states}")
             # Set flag to indicate new reading available
             self.readings.append([*self.pressure_values, *self.valve_states])
