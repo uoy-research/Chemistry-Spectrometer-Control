@@ -3,12 +3,13 @@
 //CONSTANTS
 
 //Pin values taken from communication from Chris Rhodes
-//5 valves - IN, OUT, SHORT, NN, OPH - 42, 44 and 46 unused
-//V1 = OPH, V2 = IN, V3 = OUT, V4 = NN, V5 = SHORT
+//5 valves - IN, OUT, SHORT, NN, SWITCH - 42, 44 and 46 unused
+//V1 = SWITCH, V2 = IN, V3 = OUT, V4 = NN, V5 = SHORT
 //TODO check with James about which valve is which
- const int OPH = 0; const int IN = 1; const int OUT = 2; const int NN = 3; const int SHORT = 4;
-const int LEDS[] = {40, 32, 34, 38, 36, 42, 44, 46};
-const int VALVES[] = {52, 8, 9, 22, 10, 26, 28, 30};
+//const int IN = 0; const int OUT = 1; const int SHORT = 2; const int NN = 3; const int SWITCH = 4;
+const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
+const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
+const int VALVES[] = {8, 9, 10, 22, 52, 26, 28, 30};
 
 // status LEDs
 const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
@@ -143,7 +144,7 @@ void declarePins()
   pinMode(Pressure1, INPUT);
   pinMode(Pressure2, INPUT);
   pinMode(Pressure3, INPUT);
-  // pinMode(Pressure4, INPUT);
+  pinMode(Pressure4, INPUT);
 }
 
 void initOutput(){
@@ -177,6 +178,7 @@ void setValve(int valve, int state) //sets the valve & corresponding LED to on o
 {
   digitalWrite(VALVES[valve], state); //set the valve to the desired state
   digitalWrite(LEDS[valve], state);  //set the corresponding valve LED to the same state
+  Serial.println("LOG: Valve " + String(valve+1) + " set to " + String(state));
 }
 
 void handleSerial()
@@ -244,29 +246,29 @@ void handleSerial()
         case 'z':   //Turn off short valve
           setValve(SHORT, 0);
           break;
-        case 'C':   //Turn on input valve
+        case 'C':   //Turn on INLET valve
           setValve(IN, 1);
           break;
-        case 'c':   //Turn off input valve
+        case 'c':   //Turn off INLET valve
           setValve(IN, 0);
           break;
-        case 'V':   //Turn on output valve
+        case 'V':   //Turn on OUTLET valve
           setValve(OUT, 1);
           break;
-        case 'v':   //Turn off output valve
+        case 'v':   //Turn off OUTLET valve
           setValve(OUT, 0);
           break;
-        case 'X':   //Turn on NN valve
-          setValve(NN, 1);
+        case 'X':   //Turn on VENT valve
+          setValve(VENT, 1);
           break;
-        case 'x':   //Turn off NN valve
-          setValve(NN, 0);
+        case 'x':   //Turn off VENT valve
+          setValve(VENT, 0);
           break;
-        case 'H':   //Turn on OPH valve
-          setValve(OPH, 1);
+        case 'H':   //Turn on SWITCH valve
+          setValve(SWITCH, 1);
           break;
-        case 'h':   //Turn off OPH valve
-          setValve(OPH, 0);
+        case 'h':   //Turn off SWITCH valve
+          setValve(SWITCH, 0);
           break;
         case 's':   //Reset the system
           reset();
@@ -373,13 +375,13 @@ void processStep(char stepType) { // Process a step based on the type
       // Handle bubble step
       setValve(IN, 1);
       setValve(OUT, 1);
-      setValve(OPH, 0);
+      setValve(SWITCH, 0);
       break;
     case 'd':
       // Handle delay step
       setValve(IN, 0);
       setValve(OUT, 0);
-      setValve(OPH, 0);
+      setValve(SWITCH, 0);
       break;
     case 'n':
       // Handle alt bubble step
@@ -398,7 +400,7 @@ void readPressure() //read pressure values from the analog pins
   pressureInputs[0] = analogRead(Pressure1);
   pressureInputs[1] = analogRead(Pressure2);
   pressureInputs[2] = analogRead(Pressure3);
-  // pressureInputs[3] = analogRead(Pressure4);
+  pressureInputs[3] = analogRead(Pressure4);
 
   if (pressureLog == 1){
     //build the pressure return string the way James has been using so far
@@ -432,8 +434,8 @@ void handleTTL(){
     setValve(IN, digitalRead(T1));
     setValve(OUT, digitalRead(T2));
     setValve(SHORT, digitalRead(T3));
-    setValve(NN, digitalRead(T4));
-    setValve(OPH, digitalRead(T5));
+    setValve(VENT, digitalRead(T4));
+    setValve(SWITCH, digitalRead(T5));
   }
   else
   {
@@ -443,8 +445,8 @@ void handleTTL(){
       case 0:
         setValve(IN, 0);
         setValve(OUT, 0);
-        setValve(OPH, 0);
-        setValve(NN, 0);
+        setValve(SWITCH, 0);
+        setValve(VENT, 0);
         setValve(SHORT, 0);
         break;
       default:
@@ -472,7 +474,7 @@ void updateStatus(){
   setLED(0, Serial); //LED 1 indicates serial communication
   setLED(1, TNcontrol); //LED 2 indicates TN control
   setLED(2, pressureLog); //LED 3 indicates pressure logging
-  setLED(3, digitalRead(VALVES[NN])); //LED 4 indicates NN valve state
+  setLED(3, digitalRead(VALVES[VENT])); //LED 4 indicates NN valve state
   //expand with more LEDs when they have a purpose
 }
 

@@ -195,24 +195,26 @@ class Ui_MainWindow(object):
         self.startReadingButton = QtWidgets.QPushButton(
             parent=self.graphControlWidget)
         self.startReadingButton.setObjectName("startReadingButton")
+        self.startReadingButton.setMinimumSize(QtCore.QSize(0, 100))
         self.graphControlLayout.addWidget(self.startReadingButton, 0, 0, 1, 2)
         self.graphLabel1 = QtWidgets.QLabel(parent=self.graphControlWidget)
         self.graphLabel1.setObjectName("graphLabel1")
-        self.graphControlLayout.addWidget(self.graphLabel1, 1, 0, 1, 1)
+        self.graphControlLayout.addWidget(self.graphLabel1, 1, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
         self.graphLabel2 = QtWidgets.QLabel(parent=self.graphControlWidget)
         self.graphLabel2.setObjectName("graphLabel2")
-        self.graphControlLayout.addWidget(self.graphLabel2, 2, 0, 1, 1)
+        self.graphControlLayout.addWidget(self.graphLabel2, 2, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
         self.graphLabel3 = QtWidgets.QLabel(parent=self.graphControlWidget)
         self.graphLabel3.setObjectName("graphLabel3")
-        self.graphControlLayout.addWidget(self.graphLabel3, 3, 0, 1, 1)
+        self.graphControlLayout.addWidget(self.graphLabel3, 3, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
         self.graphLabel4 = QtWidgets.QLabel(parent=self.graphControlWidget)
         self.graphLabel4.setObjectName("graphLabel4")
-        self.graphControlLayout.addWidget(self.graphLabel4, 4, 0, 1, 1)
-        self.quickBubbleButton = QtWidgets.QPushButton(
-            parent=self.graphControlWidget)
+        self.graphControlLayout.addWidget(self.graphLabel4, 4, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
         
         # Create the quick bubble widgets
+        self.quickBubbleButton = QtWidgets.QPushButton(
+            parent=self.graphControlWidget)
         self.quickBubbleButton.setObjectName("quickBubbleButton")
+        self.quickBubbleButton.setMinimumSize(QtCore.QSize(0, 50))
         self.graphControlLayout.addWidget(self.quickBubbleButton, 5, 0, 1, 2)
         self.bubbleTimeLabel = QtWidgets.QLabel(parent=self.graphControlWidget)
         self.bubbleTimeLabel.setObjectName("bubbleTimeLabel")
@@ -221,7 +223,6 @@ class Ui_MainWindow(object):
             parent=self.graphControlWidget)
         self.bubbleTimeEdit.setObjectName("bubbleTimeEdit")
         self.graphControlLayout.addWidget(self.bubbleTimeEdit, 6, 1, 1, 1)
-        self.bubbleTimeEdit.setText("100")
 
         # Create the graph control checkboxes
         self.P1Toggle = QtWidgets.QCheckBox(parent=self.graphControlWidget)
@@ -237,6 +238,64 @@ class Ui_MainWindow(object):
         self.P4Toggle.setObjectName("P4Toggle")
         self.graphControlLayout.addWidget(self.P4Toggle, 4, 1, 1, 1)
 
+        # Create the motor control widgets
+        self.motorControlWidget = QtWidgets.QWidget(parent=self.centralwidget)
+        self.motorControlWidget.setGeometry(QtCore.QRect(10, 330, 1051, 261))
+        self.motorControlWidget.setObjectName("motorControlWidget")
+        self.motorControlLayout = QtWidgets.QGridLayout(self.motorControlWidget)
+        self.motorControlLayout.setContentsMargins(0, 0, 0, 0)
+        self.motorControlLayout.setObjectName("motorControlLayout")
+        self.motorControlLabel = QtWidgets.QLabel(parent=self.motorControlWidget)
+        self.motorControlLabel.setObjectName("motorControlLabel")
+        self.motorControlLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.motorControlLayout.addWidget(self.motorControlLabel, 0, 0, 1, 1)
+        self.motorPortSpinBox = QtWidgets.QSpinBox(parent=self.motorControlWidget)
+        self.motorPortSpinBox.setObjectName("motorPortSpinBox")
+        self.motorPortSpinBox.setMinimum(0)
+        self.motorPortSpinBox.setMaximum(255)
+        self.motorControlLayout.addWidget(self.motorPortSpinBox, 0, 1, 1, 1)
+        self.motorConnectButton = QtWidgets.QPushButton(parent=self.motorControlWidget)
+        self.motorConnectButton.setObjectName("motorConnectButton")
+        self.motorControlLayout.addWidget(self.motorConnectButton, 1, 0, 1, 2)
+        self.calibrateButton = QtWidgets.QPushButton(parent=self.motorControlWidget)
+        self.calibrateButton.setObjectName("calibrateButton")
+        self.calibrateButton.setMinimumSize(QtCore.QSize(300, 50))
+        self.motorControlLayout.addWidget(self.calibrateButton, 2, 0, 1, 2)
+        self.motorPositionLabel = QtWidgets.QLabel(parent=self.motorControlWidget)
+        self.motorPositionLabel.setObjectName("motorPositionLabel")
+        self.motorPositionLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.motorControlLayout.addWidget(self.motorPositionLabel, 3, 0, 1, 1)
+        self.motorPositionSpinBox = QtWidgets.QSpinBox(parent=self.motorControlWidget)
+        self.motorPositionSpinBox.setObjectName("motorPositionSpinBox")
+        self.motorPositionSpinBox.setMinimum(0)
+        self.motorPositionSpinBox.setMaximum(1000)
+        self.motorControlLayout.addWidget(self.motorPositionSpinBox, 3, 1, 1, 1)
+        self.motorPositionButton = QtWidgets.QPushButton(parent=self.motorControlWidget)
+        self.motorPositionButton.setObjectName("motorPositionButton")
+        self.motorControlLayout.addWidget(self.motorPositionButton, 4, 0, 1, 2)
+        self.motorErrorLabel = QtWidgets.QLabel(parent=self.motorControlWidget)
+        self.motorErrorLabel.setObjectName("motorErrorLabel")
+        self.motorControlLayout.addWidget(self.motorErrorLabel, 5, 0, 1, 2)
+        self.motorErrorLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.motorErrorLabel.setPalette(palette)
+
+        self.motorReadPositionLabel = QtWidgets.QLabel(parent=self.motorControlWidget)
+        self.motorReadPositionLabel.setObjectName("motorReadPositionLabel")
+        self.motorReadPositionLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.motorControlLayout.addWidget(self.motorReadPositionLabel, 0, 3, 1, 1)
+        self.motorReadEdit = QtWidgets.QLineEdit(parent=self.motorControlWidget)
+        self.motorReadEdit.setObjectName("motorReadEdit")
+        self.motorReadEdit.setReadOnly(True)
+        self.motorControlLayout.addWidget(self.motorReadEdit, 0, 4, 1, 1)
+        self.motorReadPositionButton = QtWidgets.QPushButton(parent=self.motorControlWidget)
+        self.motorReadPositionButton.setObjectName("motorReadPositionButton")
+        self.motorControlLayout.addWidget(self.motorReadPositionButton, 2, 3, 1, 2)
+
+        
+
+        # Create generic motor control widgets
+        #self.
+
         # Add the text to the widgets
         self.retranslateUi(MainWindow)
         # Connect the buttons to the functions
@@ -245,8 +304,8 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Spectrometer GUI"))
-        self.ArdCOMPortLabel.setText(_translate("MainWindow", "COM Port"))
-        self.ArdCOMWarningLabel.setText(_translate("MainWindow", "TextLabel"))
+        self.ArdCOMPortLabel.setText(_translate("MainWindow", "Arduino COM Port"))
+        self.ArdCOMWarningLabel.setText(_translate("MainWindow", "arduino not connected"))
         self.ManualConnectButton.setText(
             _translate("MainWindow", "Manual Connect"))
         self.AutoConnectButton.setText(
@@ -274,8 +333,19 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Quick Bubble"))
         self.bubbleTimeLabel.setText(
             _translate("MainWindow", "Bubble Time (ms)"))
+        self.bubbleTimeEdit.setText(_translate("MainWindow", "100"))
         self.SavePathEdit.setText(_translate(
             "MainWindow", "C:\\NMR Results\\" + time.strftime("%m-%d-%H-%M") + ".csv"))
+        self.motorControlLabel.setText(_translate("MainWindow", "Motor COM Port"))
+        self.motorConnectButton.setText(
+            _translate("MainWindow", "Connect Motor"))
+        self.calibrateButton.setText(_translate("MainWindow", "Calibrate motor"))
+        self.motorPositionLabel.setText(_translate("MainWindow", "Position (mm)"))
+        self.motorPositionButton.setText(
+            _translate("MainWindow", "Move to Position"))
+        self.motorErrorLabel.setText(_translate("MainWindow", "motor not connected"))
+        self.motorReadPositionLabel.setText(_translate("MainWindow", "Motor Pos (mm)"))
+        self.motorReadPositionButton.setText(_translate("MainWindow", "Get Position"))
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):

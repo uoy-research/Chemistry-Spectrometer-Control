@@ -26,7 +26,7 @@ class ArduinoController:
         self.pressure_data_filepath = ""
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
-            "DECODE_SEQUENCE": 'i',  # Decode a sequence input
+            "DECODE_SEQUENCE": 'i',  # Decode a sequence INLET
             "EXECUTE_SEQUENCE": 'R',  # Execute the current loaded sequence
             "ENABLE_PRESSURE_LOG": 'K',  # Enable pressure logging
             "DISABLE_PRESSURE_LOG": 'k',  # Disable pressure logging
@@ -36,14 +36,14 @@ class ArduinoController:
             "DISABLE_TTL_CONTROL": 't',  # Disable TTL control
             "TURN_ON_SHORT_VALVE": 'Z',  # Turn on short valve
             "TURN_OFF_SHORT_VALVE": 'z',  # Turn off short valve
-            "TURN_ON_INPUT_VALVE": 'C',  # Turn on input valve
-            "TURN_OFF_INPUT_VALVE": 'c',  # Turn off input valve
-            "TURN_ON_OUTPUT_VALVE": 'V',  # Turn on output valve
-            "TURN_OFF_OUTPUT_VALVE": 'v',  # Turn off output valve
-            "TURN_ON_NN_VALVE": 'X',  # Turn on NN valve
-            "TURN_OFF_NN_VALVE": 'x',  # Turn off NN valve
-            "TURN_ON_OPH_VALVE": 'H',  # Turn on OPH valve
-            "TURN_OFF_OPH_VALVE": 'h',  # Turn off OPH valve
+            "TURN_ON_INLET_VALVE": 'C',  # Turn on INLET valve
+            "TURN_OFF_INLET_VALVE": 'c',  # Turn off INLET valve
+            "TURN_ON_OUTLET_VALVE": 'V',  # Turn on OUTLET valve
+            "TURN_OFF_OUTLET_VALVE": 'v',  # Turn off OUTLET valve
+            "TURN_ON_VENT_VALVE": 'X',  # Turn on VENT valve
+            "TURN_OFF_VENT_VALVE": 'x',  # Turn off VENT valve
+            "TURN_ON_SWITCH_VALVE": 'H',  # Turn on SWITCH valve
+            "TURN_OFF_SWITCH_VALVE": 'h',  # Turn off SWITCH valve
             "RESET": 's'    # Reset the Arduino
         }
 
@@ -92,7 +92,7 @@ class ArduinoController:
                     self.arduino.write(self.commands_dict["HEARTBEAT"].encode())
                     logging.info("Sent HEARTBEAT")
                     # self.last_heartbeat_time = time.time()
-                time.sleep(4.5)  # Send heartbeat every 4.5 seconds
+                time.sleep(4)  # Send heartbeat every 4 seconds
             except serial.SerialException as e:
                 logging.error(f"Failed to send heartbeat: {e}")
                 self.serial_connected = False

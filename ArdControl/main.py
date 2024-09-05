@@ -34,13 +34,23 @@ def main():
     # Create and start the server
 
     # Test to manually switch a valve on and off
-    server = ArduinoController(3, True, 0)
+    server = ArduinoController(4, True, 0)
     server.start()
+    time.sleep(4)
+    server.send_command("SWITCH_TO_MANUAL")
+    
+    #time.sleep(5)
+    #server.send_command("TURN_ON_INPUT_VALVE")
+    # time.sleep(5)
+    # server.send_command("TURN_ON_OUTPUT_VALVE")
+    # time.sleep(5)
+    # server.send_command("TURN_ON_SHORT_VALVE")
+    time.sleep(5)
+    server.send_command("TURN_ON_NN_VALVE")
+    #time.sleep(5)
+    #server.send_command("TURN_ON_OPH_VALVE")
     while True:
-        server.send_heartbeat()
-        server.send_command("TURN_ON_OUTPUT_VALVE")
-        time.sleep(4)
-        server.send_command("TURN_OFF_OUTPUT_VALVE")
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
