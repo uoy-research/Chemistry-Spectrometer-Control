@@ -5,13 +5,15 @@ import time
 import csv
 import os
 
+
 class ArduinoController:
     def __init__(self, port, verbose, mode):
         self.port = port    # Port number to connect to arduino
         self.baudrate = 9600    # Baudrate for serial connection
         self.verbose = verbose  # Verbose mode
-        self.mode = mode    # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
-        self.arduino = None # Container for arduino object
+        # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
+        self.mode = mode
+        self.arduino = None  # Container for arduino object
         self.valve_states = []  # Container for valve states
         self.pressure_values = []   # Container for pressure values
         self.readings = []  # Container for pressure readings
@@ -77,7 +79,8 @@ class ArduinoController:
             logging.info(f"Connected to Arduino on port {self.port}")
             self.serial_connected = True
         except serial.SerialException as e:
-            logging.error(f"Failed to connect to Arduino on port {self.port}: {e}")
+            logging.error(f"Failed to connect to Arduino on port {
+                          self.port}: {e}")
             self.serial_connected = False
 
     def start_heartbeat(self):
@@ -89,10 +92,11 @@ class ArduinoController:
         while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
-                    self.arduino.write(self.commands_dict["HEARTBEAT"].encode())
+                    self.arduino.write(
+                        self.commands_dict["HEARTBEAT"].encode())
                     logging.info("Sent HEARTBEAT")
                     # self.last_heartbeat_time = time.time()
-                time.sleep(4)  # Send heartbeat every 4 seconds
+                time.sleep(3)  # Send heartbeat every 3 seconds
             except serial.SerialException as e:
                 logging.error(f"Failed to send heartbeat: {e}")
                 self.serial_connected = False
@@ -126,9 +130,11 @@ class ArduinoController:
         # Pressure values are in mbar, valve states are 0 or 1
         # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
         elif response.startswith("P "):
-            self.pressure_values = response.split(" ")[1:5] # Currently only 4 pressure values
+            self.pressure_values = response.split(
+                " ")[1:5]  # Currently only 4 pressure values
             logging.info(f"Pressure reading: {self.pressure_values}")
-            self.valve_states = response.split(" ")[5:-1]   # Currently only 8 valve states
+            self.valve_states = response.split(
+                " ")[5:-1]   # Currently only 8 valve states
             logging.info(f"Valve states: {self.valve_states}")
             # Set flag to indicate new reading available
             self.readings.append([*self.pressure_values, *self.valve_states])
@@ -136,13 +142,16 @@ class ArduinoController:
                 # Remove the oldest reading
                 self.readings.pop(0)
             self.new_reading = True
-        elif response.startswith("SEQ: "):  # Sequence loaded - "SEQ: <sequence>"
+        # Sequence loaded - "SEQ: <sequence>"
+        elif response.startswith("SEQ: "):
             if response.endswith("False"):
                 self.sequence_loaded = False
-                logging.info(f"Sequence loaded: {response.replace('SEQ: ', '')}")
+                logging.info(f"Sequence loaded: {
+                             response.replace('SEQ: ', '')}")
             else:
                 self.sequence_loaded = True
-                logging.info(f"Sequence loaded: {response.replace('SEQ: ', '')}")
+                logging.info(f"Sequence loaded: {
+                             response.replace('SEQ: ', '')}")
         elif response.startswith("LOG: "):  # Log message - "LOG <message>"
             log_message = response.replace("LOG: ", "")
             logging.info(f"Arduino: {log_message}")
@@ -150,7 +159,7 @@ class ArduinoController:
             logging.warning(f"Unknown response: {response}")
 
     def stop(self):
-        
+
         if self.arduino != None:
             self.send_command("RESET")
             self.arduino.close()
@@ -176,12 +185,16 @@ class ArduinoController:
             if filename == "":  # If no filename specified, save in NMR Results folder with timestamp
                 if not os.path.exists("C:\\NMR Results"):
                     os.makedirs("C:\\NMR Results")
-                filename = os.path.join("C:\\NMR Results", f"pressure_data_{time.strftime('%Y%m%d-%H%M')}.csv")
-            elif not filename.endswith(".csv"): # If filename doesn't end in .csv, add it
+                filename = os.path.join("C:\\NMR Results", f"pressure_data_{
+                                        time.strftime('%Y%m%d-%H%M')}.csv")
+            # If filename doesn't end in .csv, add it
+            elif not filename.endswith(".csv"):
                 filename = filename + ".csv"
-            if os.path.dirname(filename) == "":  # If no location specified, save in NMR Results folder
+            # If no location specified, save in NMR Results folder
+            if os.path.dirname(filename) == "":
                 filename = os.path.join("C:\\NMR Results", filename)
-            if not os.path.exists(os.path.dirname(filename)): # If location doesn't exist, create it
+            # If location doesn't exist, create it
+            if not os.path.exists(os.path.dirname(filename)):
                 os.makedirs(os.path.dirname(filename))
             self.pressure_data_filepath = filename
             self.save_pressure = True
@@ -220,20 +233,20 @@ class ArduinoController:
 
     def get_recent_readings(self):
         return self.readings
- 
+
     def get_valve_states(self):
         return self.valve_states
 
     def get_auto_control(self):
         return self.auto_control
-    
+
     def get_sequence_loaded(self):
         return self.sequence_loaded
-   
+
     def send_command(self, command):
         if command in self.commands_dict:
             command = self.commands_dict[command]
-        
+
         if self.serial_connected and self.arduino != None:
             if command in self.commands_dict.values():
                 try:
