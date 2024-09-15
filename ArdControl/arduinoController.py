@@ -25,6 +25,9 @@ class ArduinoController:
         self.last_heartbeat_time = time.time()
         self.heartbeat_time = 5  # Time in seconds between heartbeats
         self.auto_control = False
+
+        self.pressure_data_thread = threading.Thread(
+            target=self.read_pressure_data)
         self.pressure_data_filepath = ""
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
@@ -70,6 +73,7 @@ class ArduinoController:
     def start(self):
         self.connect_arduino()
         if self.serial_connected:
+            self.last_heartbeat_time = time.time()
             self.start_heartbeat()
             self.start_reading()
 
@@ -108,20 +112,25 @@ class ArduinoController:
 
     def read_responses(self):
         while not self.shutdown_flag and self.arduino != None:
-            try:
-                if self.serial_connected and self.arduino.in_waiting > 0:
+
+            if self.serial_connected and self.arduino.in_waiting > 0:
+                try:
                     response = self.arduino.readline().decode('utf-8').strip()
                     logging.info(f"Received: {response}")
                     self.process_response(response)
-            except serial.SerialException as e:
-                logging.error(f"Failed to read from Arduino: {e}")
-                self.serial_connected = False
+                except serial.SerialException as e:
+                    logging.error(f"Failed to read from Arduino: {e}")
+                    self.serial_connected = False
             if self.last_heartbeat_time + self.heartbeat_time < time.time():
                 logging.error(
                     "No heartbeat received from Arduino. Stopping server.")
                 self.stop()
 
     def process_response(self, response):
+        if isinstance(response, bytes):
+            response = response.decode('utf-8').strip()
+        else:
+            response = response.strip()  # Already a string, just strip whitespace
         # Process the response from Arduino
         if response == "HEARTBEAT_ACK":
             self.last_heartbeat_time = time.time()  # Update heartbeat time
@@ -154,7 +163,7 @@ class ArduinoController:
                              response.replace('SEQ: ', '')}")
         elif response.startswith("LOG: "):  # Log message - "LOG <message>"
             log_message = response.replace("LOG: ", "")
-            logging.info(f"Arduino: {log_message}")
+            logging.info(f"Ard: {log_message}")
         else:
             logging.warning(f"Unknown response: {response}")
 
@@ -199,8 +208,6 @@ class ArduinoController:
             self.pressure_data_filepath = filename
             self.save_pressure = True
             if not self.pressure_data_thread or not self.pressure_data_thread.is_alive():
-                self.pressure_data_thread = threading.Thread(
-                    target=self.read_pressure_data)
                 self.pressure_data_thread.start()
             else:
                 logging.error("Pressure data thread already running")
@@ -214,14 +221,14 @@ class ArduinoController:
         file_exists = os.path.isfile(self.pressure_data_filepath)
 
         if not file_exists:
-            with open(self.pressure_data_filepath, 'w', newline='') as file:
+            with open(self.pressure_data_filepath, mode='w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["Time", "Pressure1", "Pressure2", "Pressure3", "ValveState1", "ValveState2",
                                 "ValveState3", "ValveState4", "ValveState5", "ValveState6", "ValveState7", "ValveState8"])
 
         while self.save_pressure:
             if self.new_reading:
-                with open(self.pressure_data_filepath, 'a', newline='') as file:
+                with open(self.pressure_data_filepath, mode='a', newline='') as file:
                     writer = csv.writer(file)
                     writer.writerow(
                         [time.time(), *self.pressure_values, *self.valve_states])
