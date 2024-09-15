@@ -19,18 +19,34 @@ class MplCanvas(FigureCanvasQTAgg):
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+
+        # Initialise variables
+        self.verbosity = True
+        self.ardConnected = False
+        self.selectedMode = None
+        self.controller = None
+
+        # Create the main window
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1029, 657)
+
+        # Create the central widget
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
         self.centralwidget.setObjectName("centralwidget")
+
+        # Create the layout widgets
         self.verticalLayoutWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 181, 291))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
+
+        # Create the layout
         self.ardConnectLayout = QtWidgets.QVBoxLayout(
             self.verticalLayoutWidget)
         self.ardConnectLayout.setContentsMargins(0, 0, 0, 0)
         self.ardConnectLayout.setObjectName("ardConnectLayout")
+
+        # Create the COM port label
         self.ardCOMPortLabel = QtWidgets.QLabel(
             parent=self.verticalLayoutWidget)
         self.ardCOMPortLabel.setEnabled(True)
@@ -40,6 +56,8 @@ class Ui_MainWindow(object):
         self.ardCOMPortLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.ardCOMPortLabel.setObjectName("ardCOMPortLabel")
         self.ardConnectLayout.addWidget(self.ardCOMPortLabel)
+
+        # Create the COM port spin box
         self.ardCOMPortSpinBox = QtWidgets.QSpinBox(
             parent=self.verticalLayoutWidget)
         self.ardCOMPortSpinBox.setMinimumSize(QtCore.QSize(0, 24))
@@ -50,28 +68,18 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.ardCOMPortSpinBox.setObjectName("ardCOMPortSpinBox")
         self.ardConnectLayout.addWidget(self.ardCOMPortSpinBox)
+
+        # Create the warning label
         self.ardWarningLabel = QtWidgets.QLabel(
             parent=self.verticalLayoutWidget)
-        palette = QtGui.QPalette()
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Active,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Inactive,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(120, 120, 120))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Disabled,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        self.ardWarningLabel.setPalette(palette)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.ardWarningLabel.setFont(font)
         self.ardWarningLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.ardWarningLabel.setObjectName("ardWarningLabel")
         self.ardConnectLayout.addWidget(self.ardWarningLabel)
+
+        # Create the radio buttons
         self.autoConnectRadioButton = QtWidgets.QRadioButton(
             parent=self.verticalLayoutWidget)
         font = QtGui.QFont()
@@ -79,7 +87,7 @@ class Ui_MainWindow(object):
         self.autoConnectRadioButton.setFont(font)
         self.autoConnectRadioButton.setObjectName("autoConnectRadioButton")
         self.ardConnectLayout.addWidget(
-            self.autoConnectRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.autoConnectRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignLeft)
         self.TTLRadioButton = QtWidgets.QRadioButton(
             parent=self.verticalLayoutWidget)
         font = QtGui.QFont()
@@ -87,7 +95,7 @@ class Ui_MainWindow(object):
         self.TTLRadioButton.setFont(font)
         self.TTLRadioButton.setObjectName("TTLRadioButton")
         self.ardConnectLayout.addWidget(
-            self.TTLRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.TTLRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignLeft)
         self.manualRadioButton = QtWidgets.QRadioButton(
             parent=self.verticalLayoutWidget)
         font = QtGui.QFont()
@@ -95,7 +103,15 @@ class Ui_MainWindow(object):
         self.manualRadioButton.setFont(font)
         self.manualRadioButton.setObjectName("manualRadioButton")
         self.ardConnectLayout.addWidget(
-            self.manualRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.manualRadioButton, 0, QtCore.Qt.AlignmentFlag.AlignLeft)
+
+        # Create the button group, this should make radio buttons exclusive
+        self.ardConnectButtonGroup = QtWidgets.QButtonGroup(MainWindow)
+        self.ardConnectButtonGroup.addButton(self.autoConnectRadioButton)
+        self.ardConnectButtonGroup.addButton(self.TTLRadioButton)
+        self.ardConnectButtonGroup.addButton(self.manualRadioButton)
+
+        # Create the connect button
         self.ardConnectButton = QtWidgets.QPushButton(
             parent=self.verticalLayoutWidget)
         self.ardConnectButton.setMinimumSize(QtCore.QSize(0, 70))
@@ -104,6 +120,8 @@ class Ui_MainWindow(object):
         self.ardConnectButton.setFont(font)
         self.ardConnectButton.setObjectName("ardConnectButton")
         self.ardConnectLayout.addWidget(self.ardConnectButton)
+
+        # Create the feedback text box
         self.textBrowser = QtWidgets.QTextBrowser(parent=self.centralwidget)
         self.textBrowser.setGeometry(QtCore.QRect(200, 10, 321, 291))
         font = QtGui.QFont()
@@ -114,17 +132,23 @@ class Ui_MainWindow(object):
         self.textBrowser.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.textBrowser.setObjectName("textBrowser")
+
+        # Create a dividing line
         self.line = QtWidgets.QFrame(parent=self.centralwidget)
         self.line.setGeometry(QtCore.QRect(10, 300, 1041, 20))
         self.line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.line.setObjectName("line")
+
+        # Create the valve layout
         self.gridLayoutWidget = QtWidgets.QWidget(parent=self.centralwidget)
         self.gridLayoutWidget.setGeometry(QtCore.QRect(10, 320, 181, 294))
         self.gridLayoutWidget.setObjectName("gridLayoutWidget")
         self.valveLayout = QtWidgets.QGridLayout(self.gridLayoutWidget)
         self.valveLayout.setContentsMargins(0, 0, 0, 0)
         self.valveLayout.setObjectName("valveLayout")
+
+        # Create the valve buttons
         self.Valve2Button = QtWidgets.QPushButton(parent=self.gridLayoutWidget)
         self.Valve2Button.setMinimumSize(QtCore.QSize(0, 50))
         font = QtGui.QFont()
@@ -181,6 +205,8 @@ class Ui_MainWindow(object):
         self.Valve5Button.setFont(font)
         self.Valve5Button.setObjectName("Valve5Button")
         self.valveLayout.addWidget(self.Valve5Button, 4, 0, 1, 1)
+
+        # Create the valve label and checkbox
         self.ValveLabel = QtWidgets.QLabel(parent=self.gridLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(18)
@@ -197,6 +223,8 @@ class Ui_MainWindow(object):
         self.showValvesCheckbox.setObjectName("showValvesCheckbox")
         self.valveLayout.addWidget(
             self.showValvesCheckbox, 6, 0, 1, 2, QtCore.Qt.AlignmentFlag.AlignHCenter)
+
+        # Create the motor layout
         self.verticalLayoutWidget_2 = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.verticalLayoutWidget_2.setGeometry(
@@ -206,6 +234,8 @@ class Ui_MainWindow(object):
             self.verticalLayoutWidget_2)
         self.motorConnectLayout.setContentsMargins(0, 0, 0, 0)
         self.motorConnectLayout.setObjectName("motorConnectLayout")
+
+        # Create the motor COM port label
         self.motorCOMPortLabel = QtWidgets.QLabel(
             parent=self.verticalLayoutWidget_2)
         self.motorCOMPortLabel.setEnabled(True)
@@ -216,6 +246,8 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignCenter)
         self.motorCOMPortLabel.setObjectName("motorCOMPortLabel")
         self.motorConnectLayout.addWidget(self.motorCOMPortLabel)
+
+        # Create the motor COM port spin box
         self.motorCOMPortSpinBox = QtWidgets.QSpinBox(
             parent=self.verticalLayoutWidget_2)
         self.motorCOMPortSpinBox.setMinimumSize(QtCore.QSize(0, 24))
@@ -226,22 +258,10 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.motorCOMPortSpinBox.setObjectName("motorCOMPortSpinBox")
         self.motorConnectLayout.addWidget(self.motorCOMPortSpinBox)
+
+        # Create the motor warning label
         self.motorWarningLabel = QtWidgets.QLabel(
             parent=self.verticalLayoutWidget_2)
-        palette = QtGui.QPalette()
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Active,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Inactive,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        brush = QtGui.QBrush(QtGui.QColor(120, 120, 120))
-        brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
-        palette.setBrush(QtGui.QPalette.ColorGroup.Disabled,
-                         QtGui.QPalette.ColorRole.WindowText, brush)
-        self.motorWarningLabel.setPalette(palette)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorWarningLabel.setFont(font)
@@ -249,6 +269,8 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignCenter)
         self.motorWarningLabel.setObjectName("motorWarningLabel")
         self.motorConnectLayout.addWidget(self.motorWarningLabel)
+
+        # Create the motor buttons
         self.motorConnectButton = QtWidgets.QPushButton(
             parent=self.verticalLayoutWidget_2)
         self.motorConnectButton.setMinimumSize(QtCore.QSize(0, 35))
@@ -273,12 +295,16 @@ class Ui_MainWindow(object):
         self.motorStopButton.setFont(font)
         self.motorStopButton.setObjectName("motorStopButton")
         self.motorConnectLayout.addWidget(self.motorStopButton)
+
+        # Create the monitor layout
         self.gridLayoutWidget_2 = QtWidgets.QWidget(parent=self.centralwidget)
         self.gridLayoutWidget_2.setGeometry(QtCore.QRect(760, 320, 261, 291))
         self.gridLayoutWidget_2.setObjectName("gridLayoutWidget_2")
         self.monitorLayout = QtWidgets.QGridLayout(self.gridLayoutWidget_2)
         self.monitorLayout.setContentsMargins(0, 0, 0, 0)
         self.monitorLayout.setObjectName("monitorLayout")
+
+        # Create the pressure monitor button
         self.pressureMonitorButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.pressureMonitorButton.setMinimumSize(QtCore.QSize(0, 50))
@@ -287,34 +313,46 @@ class Ui_MainWindow(object):
         self.pressureMonitorButton.setFont(font)
         self.pressureMonitorButton.setObjectName("pressureMonitorButton")
         self.monitorLayout.addWidget(self.pressureMonitorButton, 0, 0, 1, 2)
+
+        # Create the pressure radio buttons
         self.pressure4RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.pressure4RadioButton.setFont(font)
         self.pressure4RadioButton.setObjectName("pressure4RadioButton")
-        self.monitorLayout.addWidget(self.pressure4RadioButton, 2, 1, 1, 1)
+        self.pressure4RadioButton.setAutoExclusive(False)
+        self.monitorLayout.addWidget(
+            self.pressure4RadioButton, 2, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure2RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.pressure2RadioButton.setFont(font)
         self.pressure2RadioButton.setObjectName("pressure2RadioButton")
-        self.monitorLayout.addWidget(self.pressure2RadioButton, 1, 1, 1, 1)
+        self.pressure2RadioButton.setAutoExclusive(False)
+        self.monitorLayout.addWidget(
+            self.pressure2RadioButton, 1, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure1RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.pressure1RadioButton.setFont(font)
         self.pressure1RadioButton.setObjectName("pressure1RadioButton")
-        self.monitorLayout.addWidget(self.pressure1RadioButton, 1, 0, 1, 1)
+        self.pressure1RadioButton.setAutoExclusive(False)
+        self.monitorLayout.addWidget(
+            self.pressure1RadioButton, 1, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure3RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.pressure3RadioButton.setFont(font)
         self.pressure3RadioButton.setObjectName("pressure3RadioButton")
-        self.monitorLayout.addWidget(self.pressure3RadioButton, 2, 0, 1, 1)
+        self.pressure3RadioButton.setAutoExclusive(False)
+        self.monitorLayout.addWidget(
+            self.pressure3RadioButton, 2, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+
+        # Create the save path buttons
         self.selectSavePathButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.selectSavePathButton.setMinimumSize(QtCore.QSize(0, 30))
@@ -337,6 +375,8 @@ class Ui_MainWindow(object):
         self.beginSaveButton.setFont(font)
         self.beginSaveButton.setObjectName("beginSaveButton")
         self.monitorLayout.addWidget(self.beginSaveButton, 3, 1, 1, 1)
+
+        # Create the bubble time widgets
         self.bubbleTimeLabel = QtWidgets.QLabel(parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
@@ -359,12 +399,16 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeDoubleSpinBox.setObjectName("bubbleTimeDoubleSpinBox")
         self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 6, 1, 1, 1)
+
+        # Create the motor position layout
         self.gridLayoutWidget_3 = QtWidgets.QWidget(parent=self.centralwidget)
         self.gridLayoutWidget_3.setGeometry(QtCore.QRect(740, 10, 281, 121))
         self.gridLayoutWidget_3.setObjectName("gridLayoutWidget_3")
         self.motorPosLayout = QtWidgets.QGridLayout(self.gridLayoutWidget_3)
         self.motorPosLayout.setContentsMargins(0, 0, 0, 0)
         self.motorPosLayout.setObjectName("motorPosLayout")
+
+        # Create the motor position widgets
         self.curMotorPosLabel = QtWidgets.QLabel(
             parent=self.gridLayoutWidget_3)
         font = QtGui.QFont()
@@ -419,12 +463,16 @@ class Ui_MainWindow(object):
         self.motorMoveToTargetButton.setFont(font)
         self.motorMoveToTargetButton.setObjectName("motorMoveToTargetButton")
         self.motorPosLayout.addWidget(self.motorMoveToTargetButton, 2, 0, 1, 2)
+
+        # Create the motor macro layout
         self.gridLayoutWidget_4 = QtWidgets.QWidget(parent=self.centralwidget)
         self.gridLayoutWidget_4.setGeometry(QtCore.QRect(740, 130, 281, 171))
         self.gridLayoutWidget_4.setObjectName("gridLayoutWidget_4")
         self.motorMacroLayout = QtWidgets.QGridLayout(self.gridLayoutWidget_4)
         self.motorMacroLayout.setContentsMargins(0, 0, 0, 0)
         self.motorMacroLayout.setObjectName("motorMacroLayout")
+
+        # Create the motor macro buttons
         self.motorMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro4Button.setMinimumSize(QtCore.QSize(0, 35))
@@ -489,6 +537,8 @@ class Ui_MainWindow(object):
         self.motorMacro6Button.setFont(font)
         self.motorMacro6Button.setObjectName("motorMacro6Button")
         self.motorMacroLayout.addWidget(self.motorMacro6Button, 3, 1, 1, 1)
+
+        # Set the central widget
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(parent=MainWindow)
         self.statusbar.setObjectName("statusbar")
@@ -529,10 +579,11 @@ class Ui_MainWindow(object):
         self.ardCOMPortLabel.setText(
             _translate("MainWindow", "Arduino COM Port"))
         self.ardWarningLabel.setText(_translate("MainWindow", "TextLabel"))
+        self.ardWarningLabel.setStyleSheet("color: red")
         self.autoConnectRadioButton.setText(
-            _translate("MainWindow", "RadioButton"))
-        self.TTLRadioButton.setText(_translate("MainWindow", "RadioButton"))
-        self.manualRadioButton.setText(_translate("MainWindow", "RadioButton"))
+            _translate("MainWindow", "Automatic Mode"))
+        self.TTLRadioButton.setText(_translate("MainWindow", "TTL Mode"))
+        self.manualRadioButton.setText(_translate("MainWindow", "Manual Mode"))
         self.ardConnectButton.setText(_translate("MainWindow", "Connect"))
         self.Valve2Button.setText(_translate("MainWindow", "Inlet"))
         self.Valve7Button.setText(_translate("MainWindow", "V7"))
@@ -548,6 +599,7 @@ class Ui_MainWindow(object):
         self.motorCOMPortLabel.setText(
             _translate("MainWindow", "Motor COM Port"))
         self.motorWarningLabel.setText(_translate("MainWindow", "TextLabel"))
+        self.motorWarningLabel.setStyleSheet("color: red")
         self.motorConnectButton.setText(
             _translate("MainWindow", "Connect Motor"))
         self.motorCalibrateButton.setText(
@@ -595,6 +647,91 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Edit Motor Macros"))
         self.editMotorMacroAction.setText(_translate("MainWindow", "Edit.."))
 
+    def on_ardConnectButton_clicked(self):
+        if self.ardConnected == True:
+            self.ardConnected = False
+            self.UIUpdateArdConnection()
+            if self.controller != None:
+                self.controller.stop()
+        else:
+            if self.ardCOMPortSpinBox.value() == None:
+                self.ardWarningLabel.setText("No COM Port Selected")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                self.ardConnected = False
+                self.UIUpdateArdConnection()
+                return
+            elif self.selectedMode != None:
+                try:
+                    self.controller = ArduinoController(
+                        port=self.ardCOMPortSpinBox.value(), verbose=self.verbosity, mode=self.selectedMode)
+                    try:
+                        self.controller.start()
+                        if self.controller.serial_connected:
+                            self.ardConnected = True
+                            self.UIUpdateArdConnection()
+                        else:
+                            self.ardWarningLabel.setText(
+                                "Controller Failed to Start")
+                            self.ardWarningLabel.setStyleSheet("color: red")
+                            self.ardConnected = False
+                            self.controller.stop()
+                            self.controller = None
+                    except Exception as e:
+                        if self.verbosity:
+                            print(e)
+                        self.ardWarningLabel.setText(
+                            "Controller Failed to Start")
+                        self.ardWarningLabel.setStyleSheet("color: red")
+                        self.ardConnected = False
+                        self.controller.stop()  # type: ignore
+                        self.controller = None
+                        return
+                except Exception as e:
+                    if self.verbosity:
+                        print(e)
+                    self.ardWarningLabel.setText("Connection Failed")
+                    self.ardWarningLabel.setStyleSheet("color: red")
+                    self.ardConnected = False
+                    if self.controller != None:
+                        try:
+                            self.controller.stop()
+                        except Exception as e:
+                            if self.verbosity:
+                                print(e)
+                        self.controller = None
+                    self.UIUpdateArdConnection()
+                    return
+            else:
+                self.ardWarningLabel.setText("No Mode Selected")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                self.ardConnected = False
+                self.UIUpdateArdConnection()
+
+    def on_autoConnectRadioButton_clicked(self):
+        self.selectedMode = 1
+
+    def on_TTLRadioButton_clicked(self):
+        self.selectedMode = 2
+
+    def on_manualRadioButton_clicked(self):
+        self.selectedMode = 0
+
+    def UIUpdateArdConnection(self):
+        if self.ardConnected == False:
+            self.ardConnectButton.setText("Connect")
+            self.ardCOMPortSpinBox.setEnabled(True)
+            self.autoConnectRadioButton.setEnabled(True)
+            self.TTLRadioButton.setEnabled(True)
+            self.manualRadioButton.setEnabled(True)
+        else:
+            self.ardConnectButton.setText("Disconnect")
+            self.ardCOMPortSpinBox.setEnabled(False)
+            self.autoConnectRadioButton.setEnabled(False)
+            self.TTLRadioButton.setEnabled(False)
+            self.manualRadioButton.setEnabled(False)
+            self.ardWarningLabel.setText("Connected")
+            self.ardWarningLabel.setStyleSheet("color: green")
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -607,6 +744,22 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def plot(self):
         self.sc.axes.plot([0, 1, 2, 3], [10, 1, 20, 3])
         self.sc.draw()
+
+    def closeEvent(self, event):
+        if self.ardConnected or self.controller is not None:
+            if self.verbosity:
+                print("Arduino is still connected, stopping controller...")
+            try:
+                self.controller.stop()  # type: ignore
+            except Exception as e:
+                if self.verbosity:
+                    print(e)
+            if self.verbosity:
+                print("Controller stopped")
+        if self.verbosity:
+            print("Application is closing...")
+        # Call the base class method to ensure the window closes
+        event.accept()
 
 
 if __name__ == "__main__":
