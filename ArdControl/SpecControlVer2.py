@@ -4,9 +4,11 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from PyQt6 import QtCore, QtGui, QtWidgets
 import sys
+import os
 import logging
 import matplotlib
 import time
+import threading
 matplotlib.use('QtAgg')
 
 
@@ -27,11 +29,13 @@ class Ui_MainWindow(object):
         self.selectedMode = None
         self.controller = None
         self.connection_in_progress = False
-        self.connection_attempts = 0
+        self.monitoring = False
+        self.max_lines = 100
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1029, 657)
+        MainWindow.resize(1029, 700)
+        MainWindow.setFixedSize(1029, 700)
 
         # Create the central widget
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
@@ -208,6 +212,14 @@ class Ui_MainWindow(object):
         self.Valve5Button.setFont(font)
         self.Valve5Button.setObjectName("Valve5Button")
         self.valveLayout.addWidget(self.Valve5Button, 4, 0, 1, 1)
+        self.Valve1Button.setCheckable(True)
+        self.Valve2Button.setCheckable(True)
+        self.Valve3Button.setCheckable(True)
+        self.Valve4Button.setCheckable(True)
+        self.Valve5Button.setCheckable(True)
+        self.Valve6Button.setCheckable(True)
+        self.Valve7Button.setCheckable(True)
+        self.Valve8Button.setCheckable(True)
 
         # Create the valve label and checkbox
         self.ValveLabel = QtWidgets.QLabel(parent=self.gridLayoutWidget)
@@ -574,14 +586,33 @@ class Ui_MainWindow(object):
         self.graphLayout.addWidget(self.toolbar)
 
         self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        # QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        self.ardConnectButton.clicked.connect(self.on_ardConnectButton_clicked)
+        self.manualRadioButton.clicked.connect(self.on_manualRadioButton_clicked)
+        self.TTLRadioButton.clicked.connect(self.on_TTLRadioButton_clicked)
+        self.autoConnectRadioButton.clicked.connect(
+            self.on_autoConnectRadioButton_clicked)
+        self.Valve1Button.clicked.connect(self.on_Valve1Button_clicked)
+        self.Valve2Button.clicked.connect(self.on_Valve2Button_clicked)
+        self.Valve3Button.clicked.connect(self.on_Valve3Button_clicked)
+        self.Valve4Button.clicked.connect(self.on_Valve4Button_clicked)
+        self.Valve5Button.clicked.connect(self.on_Valve5Button_clicked)
+        self.Valve6Button.clicked.connect(self.on_Valve6Button_clicked)
+        self.Valve7Button.clicked.connect(self.on_Valve7Button_clicked)
+        self.Valve8Button.clicked.connect(self.on_Valve8Button_clicked)
+        self.pressureMonitorButton.clicked.connect(self.on_pressureMonitorButton_clicked)
+        self.pressure1RadioButton.clicked.connect(self.on_pressure1RadioButton_clicked)
+        self.pressure2RadioButton.clicked.connect(self.on_pressure2RadioButton_clicked)
+        self.pressure3RadioButton.clicked.connect(self.on_pressure3RadioButton_clicked)
+        self.pressure4RadioButton.clicked.connect(self.on_pressure4RadioButton_clicked)
+        self.selectSavePathButton.clicked.connect(self.on_selectSavePathButton_clicked)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Spectrometer GUI"))
         self.ardCOMPortLabel.setText(
             _translate("MainWindow", "Arduino COM Port"))
-        self.ardWarningLabel.setText(_translate("MainWindow", "TextLabel"))
+        self.ardWarningLabel.setText(_translate("MainWindow", ""))
         self.ardWarningLabel.setStyleSheet("color: red")
         self.autoConnectRadioButton.setText(
             _translate("MainWindow", "Automatic Mode"))
@@ -601,7 +632,7 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Show Valves on Graph"))
         self.motorCOMPortLabel.setText(
             _translate("MainWindow", "Motor COM Port"))
-        self.motorWarningLabel.setText(_translate("MainWindow", "TextLabel"))
+        self.motorWarningLabel.setText(_translate("MainWindow", ""))
         self.motorWarningLabel.setStyleSheet("color: red")
         self.motorConnectButton.setText(
             _translate("MainWindow", "Connect Motor"))
@@ -651,6 +682,7 @@ class Ui_MainWindow(object):
         self.editMotorMacroAction.setText(_translate("MainWindow", "Edit.."))
 
     def on_ardConnectButton_clicked(self):
+        
         if self.connection_in_progress:
             return  # Ignore subsequent clicks if connection is in progress
 
@@ -662,6 +694,7 @@ class Ui_MainWindow(object):
         if self.ardConnected == True:
             self.ardConnected = False
             self.UIUpdateArdConnection()
+            self.controller.serial_connected = False    # type: ignore
             if self.controller != None:
                 self.controller.stop()  # type: ignore
 
@@ -672,14 +705,10 @@ class Ui_MainWindow(object):
                 self.ardConnected = False
                 self.UIUpdateArdConnection()
                 return
-            self.connection_attempts += 1
             if self.selectedMode != None:
                 try:
                     self.controller = ArduinoController(
                         port=self.ardCOMPortSpinBox.value(), verbose=self.verbosity, mode=self.selectedMode)
-
-                    if self.verbosity:
-                        print("Connection attempts:", self.connection_attempts)
                     try:
                         self.controller.start()
                         if self.controller.serial_connected:
@@ -752,11 +781,161 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setText("Connected")
             self.ardWarningLabel.setStyleSheet("color: green")
 
+    def on_Valve1Button_clicked(self):
+        logging.info("Valve 1 button clicked")
+        self.Valve1Button.setChecked(False)
+        if self.ardConnected:
+            self.controller.get_valve_states() # type: ignore
+            if self.controller.valve_states[0] == 0:    # type: ignore
+                logging.info("Turning on valve 1")
+                self.controller.send_command("TURN_ON_SWITCH_VALVE") # type: ignore
+                self.Valve1Button.setChecked(True)
+            else:
+                logging.info("Turning off valve 1")
+                self.controller.send_command("TURN_OFF_SWITCH_VALVE") # type: ignore
+                self.Valve1Button.setChecked(False)
+
+    def on_Valve2Button_clicked(self):
+        logging.info("Valve 2 button clicked")
+        self.Valve2Button.setChecked(False)
+        if self.ardConnected:
+            self.controller.get_valve_states() # type: ignore
+            if self.controller.valve_states[1] == 0:    # type: ignore
+                logging.info("Turning on valve 2")
+                self.controller.send_command("TURN_ON_INLET_VALVE") # type: ignore
+                self.Valve2Button.setChecked(True)
+            else:
+                logging.info("Turning off valve 2")
+                self.controller.send_command("TURN_OFF_INLET_VALVE") # type: ignore
+                self.Valve2Button.setChecked(False)
+
+    def on_Valve3Button_clicked(self):
+        logging.info("Valve 3 button clicked")
+        self.Valve3Button.setChecked(False)
+        if self.ardConnected:
+            self.controller.get_valve_states() # type: ignore
+            if self.controller.valve_states[2] == 0:    # type: ignore
+                logging.info("Turning on valve 3")
+                self.controller.send_command("TURN_ON_OUTPUT_VALVE") # type: ignore
+                self.Valve3Button.setChecked(True)
+            else:
+                logging.info("Turning off valve 3")
+                self.controller.send_command("TURN_OFF_OUTPUT_VALVE") # type: ignore
+                self.Valve3Button.setChecked(False)
+            
+    def on_Valve4Button_clicked(self):
+        logging.info("Valve 4 button clicked")
+        self.Valve4Button.setChecked(False)
+        if self.ardConnected:
+            self.controller.get_valve_states() # type: ignore
+            if self.controller.valve_states[3] == 0:    # type: ignore
+                logging.info("Turning on valve 4")
+                self.controller.send_command("TURN_ON_VENT_VALVE") # type: ignore
+                self.Valve4Button.setChecked(True)
+            else:
+                logging.info("Turning off valve 4")
+                self.controller.send_command("TURN_OFF_VENT_VALVE")   # type: ignore
+                self.Valve4Button.setChecked(False)
+    
+    def on_Valve5Button_clicked(self):
+        logging.info("Valve 5 button clicked")
+        self.Valve5Button.setChecked(False)
+        self.controller.get_valve_states() # type: ignore
+        if self.ardConnected:
+            if self.controller.valve_states[4] == 0:    # type: ignore
+                logging.info("Turning on valve 5")
+                self.controller.send_command("TURN_ON_SHORT_VALVE") # type: ignore
+                self.Valve5Button.setChecked(True)
+            else:
+                logging.info("Turning off valve 5")
+                self.controller.send_command("TURN_OFF_SHORT_VALVE")   # type: ignore
+                self.Valve5Button.setChecked(False)
+
+    def on_Valve6Button_clicked(self):
+        logging.info("Valve 6 button clicked")
+        self.Valve6Button.setChecked(False)
+        logging.info("Valve 6 not implemented")
+
+    def on_Valve7Button_clicked(self):
+        logging.info("Valve 7 button clicked")
+        self.Valve7Button.setChecked(False)
+        logging.info("Valve 7 not implemented")
+
+    def on_Valve8Button_clicked(self):
+        logging.info("Valve 8 button clicked")
+        self.Valve8Button.setChecked(False)
+        logging.info("Valve 8 not implemented")
+
+    def on_pressureMonitorButton_clicked(self):
+        logging.info("Pressure monitor button clicked")
+        if self.ardConnected:
+            if self.monitoring:
+                self.monitoring = False
+                self.pressureMonitorButton.setText("Begin Pressure Monitor")
+                self.controller.send_command("DISABLE_PRESSURE_LOG") # type: ignore
+            else:
+                self.monitoring = True
+                self.pressureMonitorButton.setText("Stop Pressure Monitor")
+                self.controller.send_command("ENABLE_PRESSURE_LOG") # type: ignore
+        else:
+            if self.monitoring:
+                self.monitoring = False
+                self.pressureMonitorButton.setText("Begin Pressure Monitor")
+
+    def start_plotting(self):
+        self.plot_thread = threading.Thread(target=self.update_plot)
+        self.plot_thread.daemon = True
+        self.plot_thread.start()
+    
+    def update_plot(self):
+        while self.monitoring:
+            if self.ardConnected and self.controller.new_plot: # type: ignore
+                self.controller.new_plot = False # type: ignore
+                self.sc.axes.clear()
+                # Extract timestamps
+                timestamps = [reading[0] for reading in self.controller.readings] # type: ignore
+
+                # Extract the specific pressure readings
+                if self.pressure1RadioButton.isChecked():
+                    pressure_readings = [reading[1] for reading in self.controller.readings] # type: ignore
+                    self.sc.axes.plot(timestamps, pressure_readings) # type: ignore
+                if self.pressure2RadioButton.isChecked():
+                    pressure_readings = [reading[2] for reading in self.controller.readings] # type: ignore
+                    self.sc.axes.plot(timestamps, pressure_readings) # type: ignore
+                if self.pressure3RadioButton.isChecked():    
+                    pressure_readings = [reading[3] for reading in self.controller.readings] # type: ignore
+                    self.sc.axes.plot(timestamps, pressure_readings) # type: ignore
+                if self.pressure4RadioButton.isChecked():
+                    pressure_readings = [reading[4] for reading in self.controller.readings] # type: ignore
+                    self.sc.axes.plot(timestamps, pressure_readings) # type: ignore
+
+                # Plot pressure against time
+                self.sc.draw()
+                
+
+    def on_pressure1RadioButton_clicked(self):
+        pass
+
+    def on_pressure2RadioButton_clicked(self):
+        pass
+
+    def on_pressure3RadioButton_clicked(self):
+        pass
+
+    def on_pressure4RadioButton_clicked(self):
+        pass
+
+    def on_selectSavePathButton_clicked(self):
+        logging.info("Select save path button clicked")
+        self.save_path = QtWidgets.QFileDialog.getExistingDirectory()
+        self.savePathEdit.setText(os.path.join(self.save_path,f"pressure_data_{time.strftime('%m%d-%H%M')}.csv"))
+        
 
 class QTextBrowserHandler(logging.Handler):
     def __init__(self, text_browser: QtWidgets.QTextBrowser):
         super().__init__()
         self.text_browser = text_browser
+        self.max_lines = 1
 
     def emit(self, record):
         msg = self.format(record)
@@ -771,6 +950,15 @@ class QTextBrowserHandler(logging.Handler):
         html_msg = f'<span style="color: {color};">{msg}</span>'
         self.text_browser.append(html_msg)
 
+        # Limit the number of lines in the text browser
+        while self.text_browser.document().blockCount() > self.max_lines:   # type: ignore
+            self.text_browser.setText("")
+
+        cursor=self.text_browser.textCursor()
+        cursor.MoveOperation.End
+        self.text_browser.setTextCursor(cursor)
+        self.text_browser.ensureCursorVisible()
+
         print(record)
 
 
@@ -780,7 +968,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setup_logging()
         # Example plot
-        self.plot()
+        # self.plot()
 
     def plot(self):
         self.sc.axes.plot([0, 1, 2, 3], [10, 1, 20, 3])
@@ -797,7 +985,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         text_browser_handler.setFormatter(formatter)
 
         # Get the root logger and set its level
-        logger = logging.getLogger("UI Logger")
+        logger = logging.getLogger()
         logger.setLevel(logging.INFO)
 
         # Debug: Print existing handlers before adding the new one

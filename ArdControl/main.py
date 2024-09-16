@@ -1,6 +1,8 @@
 import argparse
 import logging
 import time
+import os
+import csv
 from arduinoController import ArduinoController
 
 
@@ -45,16 +47,16 @@ def main():
     time.sleep(2)
     server.send_command("SWITCH_TO_MANUAL")
     time.sleep(1)
-    server.send_command("ENABLE_PRESSURE_LOG")
-
+    server.send_command("TURN_ON_INLET_VALVE")
+    time.sleep(4)
+    # print("writing to file")
     # Wait for user input and send command if it exists in commands_dict values
+    # Open a CSV file to record data
+    server.send_command("RESET")
     while True:
-        user_input = input("Enter a command: ")
-        if user_input in server.commands_dict.values():
-            server.send_command(user_input)
-            print(f"Command '{user_input}' sent to the server.")
-        else:
-            print(f"Invalid command: '{user_input}'")
+        time.sleep(1)
+
+
 
 
 if __name__ == "__main__":

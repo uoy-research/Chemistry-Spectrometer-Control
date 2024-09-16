@@ -21,23 +21,23 @@ const unsigned long DEFPressureTime = 3000; //default time required to build pre
 //TTL Pins, T4 and T5 not working??
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
 
-//Analog pins - pressure4 is external
-const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; const int Pressure4 = A6;
+//Analog pins - pressure1 is external
+const int Pressure1 = A1; const int Pressure2 = A2; const int Pressure3 = A3; const int Pressure4 = A4;
 
 const int maxLength = 9; //maximum number of steps in a sequence
 
 //VARIABLES
-bool TNcontrol = 0; //TerraNova control - allows valves to be controlled by TTL signals
+bool TNcontrol = 0; //TerraNova control - allows valves to be controlled by TTL signals or sequences
 bool pressureLog = 0; //log pressure values
 bool TTLControl = 0; //TTL control toggle
 bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence
 bool simpleTTL = 0; //simple TTL control toggle - unused
 
-int pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
+float pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
-int pollTime = DEFPollTime; //time between pressure readings
-int pressureTime = DEFPressureTime; //time required to build pressure before bubbling
+unsigned long pollTime = DEFPollTime; //time between pressure readings
+unsigned long pressureTime = DEFPressureTime; //time required to build pressure before bubbling
 size_t currentStepIndex = 0; //current step in the sequence
 
 unsigned long tNow = 0; //current time
@@ -83,6 +83,8 @@ void closeValves();
 
 void reset();
 
+void depressurise();
+
 bool isValidType(char type);
 
 void setup() {
@@ -110,7 +112,9 @@ void loop() {
   if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
   
   //need to reset if no serial signal for certain time
-  if(tNow - heartBeat > 5000){reset();}
+  unsigned long heartCheck = tNow - heartBeat;
+  //Serial.println("LOG: Heartbeat check: " + String(heartCheck));
+  if(heartCheck > 5000UL && heartCheck < 4294967200UL){reset();}
 }
 
 void declarePins()
@@ -236,6 +240,14 @@ void handleSerial()
         case 'y': 
           Serial.println("HEARTBEAT_ACK");  //Heartbeat response
           heartBeat = millis(); //update the heartbeat time
+          break;
+        //enable sequence processing in manual mode for quick bubble
+        case 'i':   //Decode a sequence input
+          decodeFlag = 1; // Set the flag to indicate a new sequence is ready to be decoded
+          break;
+        case 'R':   //Execute the current loaded sequence
+          execFlag = 1; // Set the machine ready flag to true
+          pressureLog = 1; // Enable pressure logging when a sequence is running
           break;
         case 'K':   //Enable pressure logging
           pressureLog = 1;
@@ -383,15 +395,18 @@ void processStep(char stepType) { // Process a step based on the type
   switch (stepType) {
     case 'b':
       // Handle bubble step
+      setValve(SWITCH, 0);
       setValve(IN, 1);
       setValve(OUT, 1);
-      setValve(SWITCH, 0);
+      setValve(VENT, 1);
+      setValve(SHORT, 0);
       break;
     case 'd':
       // Handle delay step
       setValve(IN, 0);
       setValve(OUT, 0);
-      setValve(SWITCH, 0);
+      setValve(VENT, 0);
+      setValve(SHORT, 0);
       break;
     case 'n':
       // Handle alt bubble step
@@ -407,10 +422,10 @@ void processStep(char stepType) { // Process a step based on the type
 void readPressure() //read pressure values from the analog pins
 {
   //read pressure values
-  pressureInputs[0] = analogRead(Pressure1);
-  pressureInputs[1] = analogRead(Pressure2);
-  pressureInputs[2] = analogRead(Pressure3);
-  pressureInputs[3] = analogRead(Pressure4);
+  pressureInputs[0] = (analogRead(Pressure1)-203.53)/0.8248/100; //pressure1 is external
+  pressureInputs[1] = (analogRead(Pressure2)-203.53)/0.8248/100;
+  pressureInputs[2] = (analogRead(Pressure3)-203.53)/0.8248/100;
+  pressureInputs[3] = (analogRead(Pressure4)-203.53)/0.8248/100;
 
   if (pressureLog == 1){
     //build the pressure return string the way James has been using so far
@@ -467,6 +482,8 @@ void handleTTL(){
 }
 
 void reset(){
+  //attempt to signal to controller
+  Serial.println("RESET");
   //reset the system
   memset(sequenceSteps, 0, sizeof(sequenceSteps));
   currentStepIndex = 0;
@@ -475,6 +492,7 @@ void reset(){
   simpleTTL = 0;
   TNcontrol = 0;
   pressureLog = 0;
+  //depressurise();
   closeValves();
   tStart = millis();
 }
@@ -495,4 +513,21 @@ bool isValidType(char type) { // Check if the step type is valid
     }
   }
   return false;
+}
+
+void depressurise(){
+  //depressurise the system
+  Serial.println("LOG: Depressurising system");
+  if(((analogRead(Pressure3)-203.53)/0.8248/100) > 0.1){
+    setValve(SWITCH,0);
+    setValve(IN, 0);
+    setValve(OUT, 1);
+    setValve(VENT, 0);
+    setValve(SHORT, 1);
+    while (((analogRead(Pressure3)-203.53)/0.8248/100) > 0.1){
+      delay(50);
+    }
+    setValve(SHORT, 0);
+    setValve(OUT, 0);
+  }
 }

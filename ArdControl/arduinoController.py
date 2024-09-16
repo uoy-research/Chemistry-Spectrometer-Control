@@ -14,13 +14,14 @@ class ArduinoController:
         # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
         self.mode = mode
         self.arduino = None  # Container for arduino object
-        self.valve_states = []  # Container for valve states
-        self.pressure_values = []   # Container for pressure values
+        self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]  # Container for valve states
+        self.pressure_values = [0, 0, 0, 0]   # Container for pressure values
         self.readings = []  # Container for pressure readings
         self.serial_connected = False   # Flag to indicate serial connection
         self.shutdown_flag = False  # Flag to indicate server shutdown
         self.save_pressure = False  # Flag to indicate saving pressure data
         self.new_reading = False  # Flag to indicate new pressure reading
+        self.new_plot = False  # Flag to indicate new plot data
         self.sequence_loaded = False    # Flag to indicate sequence loaded
         self.last_heartbeat_time = time.time()
         self.heartbeat_time = 5  # Time in seconds between heartbeats
@@ -77,6 +78,17 @@ class ArduinoController:
             self.last_heartbeat_time = time.time()
             self.start_heartbeat()
             self.start_reading()
+            if self.mode == 0:
+                self.send_command("SWITCH_TO_MANUAL") # Should be in manual by default, but just in case
+            elif self.mode == 1:
+                self.send_command("SWITCH_TO_AUTO_CONTROL")
+            elif self.mode == 2:
+                self.send_command("ENABLE_TTL_CONTROL")
+            else:
+                logging.error("Invalid mode, defaulting to manual mode")
+                self.mode = 0
+                self.auto_control = False
+                self.send_command("SWITCH_TO_MANUAL")
         else:
             # logging.error("Failed to connect to Arduino. Server not started.")
             # self.stop()
@@ -125,7 +137,11 @@ class ArduinoController:
                     self.process_response(response)
                 except serial.SerialException as e:
                     logging.error(f"Failed to read from Arduino: {e}")
-                    self.serial_connected = False
+                    try:
+                        self.start_reading()
+                    except Exception as e:
+                        logging.error(f"Failed to restart reading thread: {e}")
+                        self.serial_connected = False
             if self.last_heartbeat_time + self.heartbeat_time < time.time():
                 logging.error(
                     "No heartbeat received from Arduino. Stopping server.")
@@ -137,7 +153,11 @@ class ArduinoController:
         else:
             response = response.strip()  # Already a string, just strip whitespace
         # Process the response from Arduino
-        if response == "HEARTBEAT_ACK":
+        if response == "RESET":
+            logging.info("Arduino reset")
+            self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]
+        # Heartbeat response - "HEARTBEAT_ACK"
+        elif response == "HEARTBEAT_ACK":
             self.last_heartbeat_time = time.time()  # Update heartbeat time
             logging.info("Received HEARTBEAT_ACK")
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
@@ -150,12 +170,14 @@ class ArduinoController:
             self.valve_states = response.split(
                 " ")[5:-1]   # Currently only 8 valve states
             logging.info(f"Valve states: {self.valve_states}")
-            # Set flag to indicate new reading available
-            self.readings.append([*self.pressure_values, *self.valve_states])
-            if len(self.readings) > 20:
+            
+            self.readings.append([time.time(), *self.pressure_values, *self.valve_states])
+            while len(self.readings) > 20:
                 # Remove the oldest reading
                 self.readings.pop(0)
+            # Set flag to indicate new reading available
             self.new_reading = True
+            self.new_plot = True
         # Sequence loaded - "SEQ: <sequence>"
         elif response.startswith("SEQ: "):
             if response.endswith("False"):
@@ -200,7 +222,7 @@ class ArduinoController:
                 if not os.path.exists("C:\\NMR Results"):
                     os.makedirs("C:\\NMR Results")
                 filename = os.path.join("C:\\NMR Results", f"pressure_data_{
-                                        time.strftime('%Y%m%d-%H%M')}.csv")
+                                        time.strftime('%m%d-%H%M')}.csv")
             # If filename doesn't end in .csv, add it
             elif not filename.endswith(".csv"):
                 filename = filename + ".csv"
@@ -235,8 +257,7 @@ class ArduinoController:
             if self.new_reading:
                 with open(self.pressure_data_filepath, mode='a', newline='') as file:
                     writer = csv.writer(file)
-                    writer.writerow(
-                        [time.time(), *self.pressure_values, *self.valve_states])
+                    writer.writerow([self.readings[-1][0], *self.readings[-1][1:]])
                 self.new_reading = False
             time.sleep(0.1)
 
