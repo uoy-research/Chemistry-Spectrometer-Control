@@ -56,6 +56,8 @@ Step sequenceSteps[maxLength]; //array to hold the steps in the sequence
 
 char validTypes[3] = {'b', 'd', 'n'};
 
+bool started = 0; //flag to indicate if the system has been started
+
 //FUNCTIONS
 void declarePins();
 
@@ -93,9 +95,21 @@ void setup() {
   initOutput(); //set all valves and LEDs to off & flash status LEDs
   tStart = millis();  //begin polling timer
   Serial.begin(9600); //Open serial communication
+  started = 0; //set the started flag to false
 }
 
 void loop() {
+  while (started == 0){
+    //wait for the system to be started
+    if (Serial.available()){
+      char input = Serial.read();
+      if (input == 'S'){
+        started = 1;
+        Serial.println("LOG: System started");
+      }
+    }
+  }
+
   // put your main code here, to run repeatedly:
   tNow = millis();
 
@@ -483,7 +497,7 @@ void handleTTL(){
 
 void reset(){
   //attempt to signal to controller
-  Serial.println("RESET");
+  Serial.println("System Reset, please reconnect");
   //reset the system
   memset(sequenceSteps, 0, sizeof(sequenceSteps));
   currentStepIndex = 0;
@@ -495,6 +509,7 @@ void reset(){
   //depressurise();
   closeValves();
   tStart = millis();
+  started = 0;
 }
 
 void updateStatus(){
@@ -502,7 +517,7 @@ void updateStatus(){
   setLED(0, Serial); //LED 1 indicates serial communication
   setLED(1, TNcontrol); //LED 2 indicates TN control
   setLED(2, pressureLog); //LED 3 indicates pressure logging
-  setLED(3, digitalRead(VALVES[VENT])); //LED 4 indicates NN valve state
+  setLED(3, digitalRead(VALVES[SHORT])); //LED 4 indicates NN valve state
   //expand with more LEDs when they have a purpose
 }
 

@@ -50,7 +50,8 @@ class ArduinoController:
             "TURN_OFF_VENT_VALVE": 'x',  # Turn off VENT valve
             "TURN_ON_SWITCH_VALVE": 'H',  # Turn on SWITCH valve
             "TURN_OFF_SWITCH_VALVE": 'h',  # Turn off SWITCH valve
-            "RESET": 's'    # Reset the Arduino
+            "RESET": 's',    # Reset the Arduino
+            "START": 'S'    # Start the Arduino
         }
 
         if verbose:
@@ -76,6 +77,7 @@ class ArduinoController:
         self.connect_arduino()
         if self.serial_connected:
             self.last_heartbeat_time = time.time()
+            self.send_command("START")
             self.start_heartbeat()
             self.start_reading()
             if self.mode == 0:
