@@ -4,6 +4,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from PyQt6 import QtCore, QtGui, QtWidgets
 import sys
+import logging
 import matplotlib
 import time
 matplotlib.use('QtAgg')
@@ -25,6 +26,8 @@ class Ui_MainWindow(object):
         self.ardConnected = False
         self.selectedMode = None
         self.controller = None
+        self.connection_in_progress = False
+        self.connection_attempts = 0
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
@@ -648,11 +651,20 @@ class Ui_MainWindow(object):
         self.editMotorMacroAction.setText(_translate("MainWindow", "Edit.."))
 
     def on_ardConnectButton_clicked(self):
+        if self.connection_in_progress:
+            return  # Ignore subsequent clicks if connection is in progress
+
+        # Set the flag to indicate connection in progress
+        self.connection_in_progress = True
+        # Disable the button to prevent multiple clicks
+        self.ardConnectButton.setEnabled(False)
+
         if self.ardConnected == True:
             self.ardConnected = False
             self.UIUpdateArdConnection()
             if self.controller != None:
-                self.controller.stop()
+                self.controller.stop()  # type: ignore
+
         else:
             if self.ardCOMPortSpinBox.value() == None:
                 self.ardWarningLabel.setText("No COM Port Selected")
@@ -660,10 +672,14 @@ class Ui_MainWindow(object):
                 self.ardConnected = False
                 self.UIUpdateArdConnection()
                 return
-            elif self.selectedMode != None:
+            self.connection_attempts += 1
+            if self.selectedMode != None:
                 try:
                     self.controller = ArduinoController(
                         port=self.ardCOMPortSpinBox.value(), verbose=self.verbosity, mode=self.selectedMode)
+
+                    if self.verbosity:
+                        print("Connection attempts:", self.connection_attempts)
                     try:
                         self.controller.start()
                         if self.controller.serial_connected:
@@ -676,6 +692,7 @@ class Ui_MainWindow(object):
                             self.ardConnected = False
                             self.controller.stop()
                             self.controller = None
+                            self.UIUpdateArdConnection()
                     except Exception as e:
                         if self.verbosity:
                             print(e)
@@ -685,6 +702,7 @@ class Ui_MainWindow(object):
                         self.ardConnected = False
                         self.controller.stop()  # type: ignore
                         self.controller = None
+                        self.UIUpdateArdConnection()
                         return
                 except Exception as e:
                     if self.verbosity:
@@ -717,6 +735,8 @@ class Ui_MainWindow(object):
         self.selectedMode = 0
 
     def UIUpdateArdConnection(self):
+        self.connection_in_progress = False  # Reset the flag
+        self.ardConnectButton.setEnabled(True)  # Re-enable the button
         if self.ardConnected == False:
             self.ardConnectButton.setText("Connect")
             self.ardCOMPortSpinBox.setEnabled(True)
@@ -733,17 +753,64 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setStyleSheet("color: green")
 
 
+class QTextBrowserHandler(logging.Handler):
+    def __init__(self, text_browser: QtWidgets.QTextBrowser):
+        super().__init__()
+        self.text_browser = text_browser
+
+    def emit(self, record):
+        msg = self.format(record)
+        # Determine the color based on the log level
+        if record.levelno == logging.INFO:
+            color = 'blue'
+        elif record.levelno == logging.ERROR:
+            color = 'red'
+        else:
+            color = 'black'
+        # Wrap the message in HTML tags to set the font color
+        html_msg = f'<span style="color: {color};">{msg}</span>'
+        self.text_browser.append(html_msg)
+
+        print(record)
+
+
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
+        self.setup_logging()
         # Example plot
         self.plot()
 
     def plot(self):
         self.sc.axes.plot([0, 1, 2, 3], [10, 1, 20, 3])
         self.sc.draw()
+
+    def setup_logging(self):
+        # Create a QTextBrowserHandler and set the logging level
+        text_browser_handler = QTextBrowserHandler(self.textBrowser)
+        text_browser_handler.setLevel(logging.INFO)
+
+        # Create a logging format
+        formatter = logging.Formatter(
+            '%(levelname)s - %(message)s')
+        text_browser_handler.setFormatter(formatter)
+
+        # Get the root logger and set its level
+        logger = logging.getLogger("UI Logger")
+        logger.setLevel(logging.INFO)
+
+        # Debug: Print existing handlers before adding the new one
+        print("Handlers before adding QTextBrowserHandler:", logger.handlers)
+
+        # Add the QTextBrowserHandler to the logger if not already added
+        if text_browser_handler not in logger.handlers:
+            logger.addHandler(text_browser_handler)
+
+        # Debug: Print existing handlers after adding the new one
+        print("Handlers after adding QTextBrowserHandler:", logger.handlers)
+
+        logger.propagate = True
 
     def closeEvent(self, event):
         if self.ardConnected or self.controller is not None:

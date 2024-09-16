@@ -71,11 +71,16 @@ class ArduinoController:
             self.auto_control = False
 
     def start(self):
+        logging.info("Starting server...")
         self.connect_arduino()
         if self.serial_connected:
             self.last_heartbeat_time = time.time()
             self.start_heartbeat()
             self.start_reading()
+        else:
+            # logging.error("Failed to connect to Arduino. Server not started.")
+            # self.stop()
+            pass
 
     def connect_arduino(self):
         try:
