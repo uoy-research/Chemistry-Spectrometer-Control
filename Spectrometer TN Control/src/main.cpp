@@ -17,6 +17,7 @@ const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
 //default timings
 const unsigned long DEFPollTime = 500; //default time between pressure readings
 const unsigned long DEFPressureTime = 3000; //default time required to build pressure before bubbling
+const unsigned long DEFHeartbeatTime = 5000; //default time between heartbeats
 
 //TTL Pins, T4 and T5 not working??
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
@@ -94,6 +95,7 @@ void setup() {
   declarePins();
   initOutput(); //set all valves and LEDs to off & flash status LEDs
   tStart = millis();  //begin polling timer
+  heartBeat = millis();
   Serial.begin(9600); //Open serial communication
   started = 0; //set the started flag to false
 }
@@ -106,6 +108,7 @@ void loop() {
       if (input == 'S'){
         started = 1;
         Serial.println("LOG: System started");
+        heartBeat = millis(); //update the heartbeat time
       }
     }
   }
@@ -124,12 +127,8 @@ void loop() {
   if(TTLControl == 1){handleTTL();}
 
   if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
-  
-  //need to reset if no serial signal for certain time
-  unsigned long heartCheck = tNow - heartBeat;
-  //Serial.println("LOG: Heartbeat check: " + String(heartCheck));
-  if(heartCheck > 5000UL && heartCheck < 4294967200UL){reset();}
-}
+
+  if((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime) {reset();} //reset if no heartbeat for 5 seconds
 
 void declarePins()
 {
