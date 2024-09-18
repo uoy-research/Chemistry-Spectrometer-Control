@@ -126,7 +126,7 @@ void loop() {
 
   if(TTLControl == 1){handleTTL();}
 
-  if(tNow - tStart >= pollTime){readPressure(); tStart = tNow;}
+  if((long)(tNow - tStart) >= (long)pollTime){readPressure(); tStart = tNow;}
 
   if((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime) {reset();} //reset if no heartbeat for 5 seconds
 
@@ -242,6 +242,9 @@ void handleSerial()
         case 's':   //Reset the system
           reset();
           break;
+        case 'd':   //Depressurise the system
+          depressurise();
+          break;
         default:
           Serial.println("LOG: Invalid input");  //Invalid input
           break;
@@ -306,6 +309,9 @@ void handleSerial()
           break;
         case 's':   //Reset the system
           reset();
+          break;
+        case 'd':   //Depressurise the system
+          depressurise();
           break;
         default:
           Serial.println("LOG: Invalid input");  //Invalid input

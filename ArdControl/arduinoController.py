@@ -14,7 +14,8 @@ class ArduinoController:
         # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
         self.mode = mode
         self.arduino = None  # Container for arduino object
-        self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]  # Container for valve states
+        # Container for valve states
+        self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]
         self.pressure_values = [0, 0, 0, 0]   # Container for pressure values
         self.readings = []  # Container for pressure readings
         self.serial_connected = False   # Flag to indicate serial connection
@@ -51,7 +52,8 @@ class ArduinoController:
             "TURN_ON_SWITCH_VALVE": 'H',  # Turn on SWITCH valve
             "TURN_OFF_SWITCH_VALVE": 'h',  # Turn off SWITCH valve
             "RESET": 's',    # Reset the Arduino
-            "START": 'S'    # Start the Arduino
+            "START": 'S',    # Start the Arduino
+            "DEPRESSURISE": 'd'    # Depressurise the system
         }
 
         if verbose:
@@ -81,7 +83,8 @@ class ArduinoController:
             self.start_heartbeat()
             self.start_reading()
             if self.mode == 0:
-                self.send_command("SWITCH_TO_MANUAL") # Should be in manual by default, but just in case
+                # Should be in manual by default, but just in case
+                self.send_command("SWITCH_TO_MANUAL")
             elif self.mode == 1:
                 self.send_command("SWITCH_TO_AUTO_CONTROL")
             elif self.mode == 2:
@@ -172,8 +175,9 @@ class ArduinoController:
             self.valve_states = response.split(
                 " ")[5:-1]   # Currently only 8 valve states
             logging.info(f"Valve states: {self.valve_states}")
-            
-            self.readings.append([time.time(), *self.pressure_values, *self.valve_states])
+
+            self.readings.append(
+                [time.time(), *self.pressure_values, *self.valve_states])
             while len(self.readings) > 20:
                 # Remove the oldest reading
                 self.readings.pop(0)
@@ -259,7 +263,8 @@ class ArduinoController:
             if self.new_reading:
                 with open(self.pressure_data_filepath, mode='a', newline='') as file:
                     writer = csv.writer(file)
-                    writer.writerow([self.readings[-1][0], *self.readings[-1][1:]])
+                    writer.writerow(
+                        [self.readings[-1][0], *self.readings[-1][1:]])
                 self.new_reading = False
             time.sleep(0.1)
 

@@ -171,7 +171,7 @@ class Ui_MainWindow(object):
         self.Valve7Button.setFont(font)
         self.Valve7Button.setObjectName("Valve7Button")
         self.valveLayout.addWidget(self.Valve7Button, 5, 0, 1, 1)
-        
+
         self.Valve6Button = QtWidgets.QPushButton(parent=self.gridLayoutWidget)
         self.Valve6Button.setMinimumSize(QtCore.QSize(0, 50))
         font = QtGui.QFont()
@@ -424,6 +424,7 @@ class Ui_MainWindow(object):
         self.pressure4RadioButton.setFont(font)
         self.pressure4RadioButton.setObjectName("pressure4RadioButton")
         self.pressure4RadioButton.setAutoExclusive(False)
+        self.pressure4RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
             self.pressure4RadioButton, 5, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure2RadioButton = QtWidgets.QRadioButton(
@@ -433,6 +434,7 @@ class Ui_MainWindow(object):
         self.pressure2RadioButton.setFont(font)
         self.pressure2RadioButton.setObjectName("pressure2RadioButton")
         self.pressure2RadioButton.setAutoExclusive(False)
+        self.pressure2RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
             self.pressure2RadioButton, 4, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure1RadioButton = QtWidgets.QRadioButton(
@@ -442,6 +444,7 @@ class Ui_MainWindow(object):
         self.pressure1RadioButton.setFont(font)
         self.pressure1RadioButton.setObjectName("pressure1RadioButton")
         self.pressure1RadioButton.setAutoExclusive(False)
+        self.pressure1RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
             self.pressure1RadioButton, 4, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure3RadioButton = QtWidgets.QRadioButton(
@@ -451,6 +454,7 @@ class Ui_MainWindow(object):
         self.pressure3RadioButton.setFont(font)
         self.pressure3RadioButton.setObjectName("pressure3RadioButton")
         self.pressure3RadioButton.setAutoExclusive(False)
+        self.pressure3RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
             self.pressure3RadioButton, 5, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
@@ -500,6 +504,8 @@ class Ui_MainWindow(object):
         self.bubbleTimeDoubleSpinBox.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeDoubleSpinBox.setObjectName("bubbleTimeDoubleSpinBox")
+        self.bubbleTimeDoubleSpinBox.setMinimum(0.0)
+        self.bubbleTimeDoubleSpinBox.setValue(5.00)
         self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 9, 1, 1, 1)
 
         # Create the motor position layout
@@ -783,6 +789,19 @@ class Ui_MainWindow(object):
         self.editMotorMacroAction.setText(
             _translate("MainWindow", "Edit Motor Macros"))
         self.savePathEdit.setText(_translate("MainWindow", "C:/NMR Results"))
+        self.resetButton.setText(_translate("MainWindow", "Reset"))
+        self.valveMacro1Button.setText(
+            _translate("MainWindow", "Valve Macro 1"))
+        self.valveMacro2Button.setText(
+            _translate("MainWindow", "Valve Macro 2"))
+        self.valveMacro3Button.setText(
+            _translate("MainWindow", "Valve Macro 3"))
+        self.valveMacro4Button.setText(
+            _translate("MainWindow", "Valve Macro 4"))
+        self.valveMacro5Button.setText(
+            _translate("MainWindow", "Valve Macro 5"))
+        self.valveMacro6Button.setText(
+            _translate("MainWindow", "Valve Macro 6"))
 
     def on_ardConnectButton_clicked(self):
 
@@ -951,7 +970,7 @@ class Ui_MainWindow(object):
     def on_Valve5Button_clicked(self):
         logging.info("Valve 5 button clicked")
         self.Valve5Button.setChecked(False)
-        self.controller.get_valve_states()  # type: ignore
+        # self.controller.get_valve_states()  # type: ignore
         if self.ardConnected:
             if self.controller.valve_states[4] == 0:    # type: ignore
                 logging.info("Turning on valve 5")
@@ -986,11 +1005,13 @@ class Ui_MainWindow(object):
             if self.monitoring:
                 self.monitoring = False
                 self.pressureMonitorButton.setText("Begin Pressure Monitor")
-                self.controller.send_command("DISABLE_PRESSURE_LOG") # type: ignore
+                self.controller.send_command(
+                    "DISABLE_PRESSURE_LOG") # type: ignore
             else:
                 self.monitoring = True
                 self.pressureMonitorButton.setText("Stop Pressure Monitor")
-                self.controller.send_command("ENABLE_PRESSURE_LOG") # type: ignore
+                self.controller.send_command(
+                    "ENABLE_PRESSURE_LOG") # type: ignore
         else:
             if self.monitoring:
                 self.monitoring = False
@@ -1009,31 +1030,26 @@ class Ui_MainWindow(object):
                 self.sc.axes.clear()
                 # Extract timestamps
                 timestamps = [reading[0]
-                              # type: ignore
                               for reading in self.controller.readings]
 
                 # Extract the specific pressure readings
                 if self.pressure1RadioButton.isChecked():
                     pressure_readings = [
-                        # type: ignore
                         reading[1] for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)  # type: ignore
                 if self.pressure2RadioButton.isChecked():
                     pressure_readings = [
-                        # type: ignore
                         reading[2] for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
                 if self.pressure3RadioButton.isChecked():
                     pressure_readings = [
-                        # type: ignore
                         reading[3] for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
                 if self.pressure4RadioButton.isChecked():
                     pressure_readings = [
-                        # type: ignore
                         reading[4] for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
@@ -1060,36 +1076,36 @@ class Ui_MainWindow(object):
         self.savePathEdit.setText(os.path.join(
             self.save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
 
+    def on_resetButton_clicked(self):
+        logging.info("Reset button clicked")
+        if self.ardConnected:
+            self.controller.send_command("RESET")  # type: ignore
 
-class QTextBrowserHandler(logging.Handler):
-    def __init__(self, text_browser: QtWidgets.QTextBrowser):
+    def on_quickVentButton_clicked(self):
+        logging.info("Quick vent button clicked")
+        if self.ardConnected:
+            self.controller.send_command("DEPRESSURISE")  # type: ignore
+
+
+class QTextEditLogger(logging.Handler, QtCore.QObject):
+    appendPlainText = QtCore.pyqtSignal(str)
+
+    def __init__(self, parent):
         super().__init__()
-        self.text_browser = text_browser
-        self.max_lines = 1
+        QtCore.QObject.__init__(self)
+        self.widget = parent
+        self.widget.setReadOnly(True)
+        self.appendPlainText.connect(self.widget.insertPlainText)
+        self.appendPlainText.connect(self.scroll_to_bottom)
 
     def emit(self, record):
-        msg = self.format(record)
-        # Determine the color based on the log level
-        if record.levelno == logging.INFO:
-            color = 'blue'
-        elif record.levelno == logging.ERROR:
-            color = 'red'
-        else:
-            color = 'black'
-        # Wrap the message in HTML tags to set the font color
-        html_msg = f'<span style="color: {color};">{msg}</span>'
-        self.text_browser.append(html_msg)
+        msg = self.format(record) + '\n'
+        self.appendPlainText.emit(msg)
 
-        # Limit the number of lines in the text browser
-        while self.text_browser.document().blockCount() > self.max_lines:   # type: ignore
-            self.text_browser.setText("")
-
-        cursor = self.text_browser.textCursor()
-        cursor.MoveOperation.End
-        self.text_browser.setTextCursor(cursor)
-        self.text_browser.ensureCursorVisible()
-
-        print(record)
+    @QtCore.pyqtSlot()
+    def scroll_to_bottom(self):
+        self.widget.verticalScrollBar().setValue(
+            self.widget.verticalScrollBar().maximum())
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -1105,30 +1121,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.sc.draw()
 
     def setup_logging(self):
-        # Create a QTextBrowserHandler and set the logging level
-        text_browser_handler = QTextBrowserHandler(self.textBrowser)
-        text_browser_handler.setLevel(logging.INFO)
+        # Initialize the logger
+        self.logTextBox = QTextEditLogger(self.textBrowser)
+        self.logTextBox.setFormatter(logging.Formatter('%(message)s'))
+        # %(asctime)s %(levelname)s %(module)s %(funcName)s
 
-        # Create a logging format
-        formatter = logging.Formatter(
-            '%(levelname)s - %(message)s')
-        text_browser_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.DEBUG)
 
-        # Get the root logger and set its level
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
-
-        # Debug: Print existing handlers before adding the new one
-        print("Handlers before adding QTextBrowserHandler:", logger.handlers)
-
-        # Add the QTextBrowserHandler to the logger if not already added
-        if text_browser_handler not in logger.handlers:
-            logger.addHandler(text_browser_handler)
-
-        # Debug: Print existing handlers after adding the new one
-        print("Handlers after adding QTextBrowserHandler:", logger.handlers)
-
-        logger.propagate = True
+        # Log to file
+        fh = logging.FileHandler('my-log.log')
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s %(module)s %(funcName)s %(message)s'))
+        logging.getLogger().addHandler(fh)
 
     def closeEvent(self, event):
         if self.ardConnected or self.controller is not None:
@@ -1143,6 +1149,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print("Controller stopped")
         if self.verbosity:
             print("Application is closing...")
+
+        logging.getLogger().removeHandler(self.logTextBox)
+        self.logTextBox.close()
         # Call the base class method to ensure the window closes
         event.accept()
 
