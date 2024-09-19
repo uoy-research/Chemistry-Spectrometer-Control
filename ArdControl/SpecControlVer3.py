@@ -1296,6 +1296,8 @@ class ValveMacroEditor(QtWidgets.QDialog):
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
 
+        self.table
+
     def load_data(self):
         json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
         #print(json_path)
@@ -1304,10 +1306,12 @@ class ValveMacroEditor(QtWidgets.QDialog):
                 with open(json_path, 'r') as f:
                     data = json.load(f)
                 for i, macro in enumerate(data):
-                    self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(macro["Macro No."]))
+                    item = QtWidgets.QTableWidgetItem(macro["Macro No."])
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)  # Make the item read-only
+                    self.table.setItem(i, 0, item)
                     for j, state in enumerate(macro["Valves"], start=1):
                         combo = QtWidgets.QComboBox()
-                        combo.addItems(["Open", "Closed"])
+                        combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
                         self.table.setCellWidget(i, j, combo)
             except (json.JSONDecodeError, KeyError, IndexError):
@@ -1317,7 +1321,9 @@ class ValveMacroEditor(QtWidgets.QDialog):
 
     def set_default_values(self):
         for i in range(6):
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(f"Macro {i+1}"))
+            item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)  # Make the item read-only
+            self.table.setItem(i, 0, item)
             for j in range(1, 9):
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed"])
