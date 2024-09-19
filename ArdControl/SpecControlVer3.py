@@ -9,6 +9,7 @@ import logging
 import matplotlib
 import time
 import threading
+import json
 matplotlib.use('QtAgg')
 
 
@@ -30,7 +31,9 @@ class Ui_MainWindow(object):
         self.controller = None
         self.connection_in_progress = False
         self.monitoring = False
-        self.max_lines = 100
+        self.saving = False
+        self.plot_thread = None
+        self.default_save_path = os.path.join("C:\\", "NMR Results")
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
@@ -660,6 +663,9 @@ class Ui_MainWindow(object):
         self.editMotorMacroAction = QtGui.QAction(parent=MainWindow)
         self.editMotorMacroAction.setObjectName("editMotorMacroAction")
         self.motorMacroMenu.addAction(self.editMotorMacroAction)
+        self.editValveMacroAction = QtGui.QAction(parent=MainWindow)
+        self.editValveMacroAction.setObjectName("editValveMacroAction")
+        self.motorMacroMenu.addAction(self.editValveMacroAction)
         self.menuBar.addAction(self.motorMacroMenu.menuAction())
 
         # Create the graph widgets container
@@ -685,7 +691,7 @@ class Ui_MainWindow(object):
         self.toolbar = NavigationToolbar(self.sc, self)
         self.graphLayout.addWidget(self.toolbar)
 
-        self.retranslateUi(MainWindow)
+        
         # QtCore.QMetaObject.connectSlotsByName(MainWindow)
         self.ardConnectButton.clicked.connect(self.on_ardConnectButton_clicked)
         self.manualRadioButton.clicked.connect(
@@ -712,6 +718,16 @@ class Ui_MainWindow(object):
             self.on_pressure4RadioButton_clicked)
         self.selectSavePathButton.clicked.connect(
             self.on_selectSavePathButton_clicked)
+        self.resetButton.clicked.connect(self.on_resetButton_clicked)
+        self.beginSaveButton.clicked.connect(self.on_beginSaveButton_clicked)
+        self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
+
+        # Connect menu actions to their slots
+        self.editMotorMacroAction.triggered.connect(self.edit_motor_macro)
+        self.editValveMacroAction.triggered.connect(self.edit_valve_macro)
+
+        self.retranslateUi(MainWindow)
+        self.update_controls()
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -788,6 +804,8 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Edit Macros"))
         self.editMotorMacroAction.setText(
             _translate("MainWindow", "Edit Motor Macros"))
+        self.editValveMacroAction.setText(_translate(
+            "MainWindow", "Edit Valve Macros"))
         self.savePathEdit.setText(_translate("MainWindow", "C:/NMR Results"))
         self.resetButton.setText(_translate("MainWindow", "Reset"))
         self.valveMacro1Button.setText(
@@ -902,6 +920,7 @@ class Ui_MainWindow(object):
             self.manualRadioButton.setEnabled(False)
             self.ardWarningLabel.setText("Connected")
             self.ardWarningLabel.setStyleSheet("color: green")
+        self.update_controls()
 
     def on_Valve1Button_clicked(self):
         logging.info("Valve 1 button clicked")
@@ -1037,7 +1056,7 @@ class Ui_MainWindow(object):
                     pressure_readings = [
                         reading[1] for reading in self.controller.readings]
                     self.sc.axes.plot(
-                        timestamps, pressure_readings)  # type: ignore
+                        timestamps, pressure_readings) 
                 if self.pressure2RadioButton.isChecked():
                     pressure_readings = [
                         reading[2] for reading in self.controller.readings]
@@ -1056,6 +1075,10 @@ class Ui_MainWindow(object):
 
                 # Plot pressure against time
                 self.sc.draw()
+        
+    def stop_plotting(self):
+        self.monitoring = False
+        self.plot_thread.join()
 
     def on_pressure1RadioButton_clicked(self):
         pass
@@ -1070,11 +1093,25 @@ class Ui_MainWindow(object):
         pass
 
     def on_selectSavePathButton_clicked(self):
+        """
         logging.info("Select save path button clicked")
         self.save_path = QtWidgets.QFileDialog.getExistingDirectory(
             directory=self.savePathEdit.text())
         self.savePathEdit.setText(os.path.join(
             self.save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+        """
+        self.save_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self.savePathEdit,
+            "Select CSV File",
+            self.savePathEdit.text(),
+            "CSV Files (*.csv)"
+        )
+
+        if self.save_path:
+            self.savePathEdit.setText(self.save_path)  # Optionally update the text field with the selected path
+        else:
+            self.savePathEdit.setText(os.path.join(
+                self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
 
     def on_resetButton_clicked(self):
         logging.info("Reset button clicked")
@@ -1085,6 +1122,126 @@ class Ui_MainWindow(object):
         logging.info("Quick vent button clicked")
         if self.ardConnected:
             self.controller.send_command("DEPRESSURISE")  # type: ignore
+
+    def on_beginSaveButton_clicked(self):
+        logging.info("Begin save button clicked")
+        if self.ardConnected:
+            if self.saving:
+                self.saving = False
+                self.beginSaveButton.setText("Begin Saving")
+                self.controller.save_pressure_data(False, self.savePathEdit.text()) # type: ignore
+            else:
+                self.saving = True
+                self.beginSaveButton.setText("Stop Saving")
+                self.controller.save_pressure_data(True, self.savePathEdit.text()) # type: ignore
+
+    def edit_motor_macro(self):
+        pass
+
+    def edit_valve_macro(self):
+        dialog = ValveMacroEditor(self)
+        dialog.exec()
+
+    def update_controls(self):
+        if self.ardConnected:
+            # Toggle connection controls
+            self.manualRadioButton.setEnabled(False)
+            self.autoConnectRadioButton.setEnabled(False)
+            self.TTLRadioButton.setEnabled(False)
+            self.ardCOMPortSpinBox.setEnabled(False)
+            # Toggle graphing controls
+            self.pressure1RadioButton.setEnabled(True)
+            self.pressure2RadioButton.setEnabled(True)
+            self.pressure3RadioButton.setEnabled(True)
+            self.pressure4RadioButton.setEnabled(True)
+            # Toggle save controls
+            self.beginSaveButton.setEnabled(True)
+            #self.savePathEdit.setEnabled(True)
+            #self.selectSavePathButton.setEnabled(True)
+            if self.selectedMode == 0:
+                # Toggle valve controls
+                self.Valve1Button.setEnabled(True)
+                self.Valve2Button.setEnabled(True)
+                self.Valve3Button.setEnabled(True)
+                self.Valve4Button.setEnabled(True)
+                self.Valve5Button.setEnabled(True)
+                # self.Valve6Button.setEnabled(True)
+                # self.Valve7Button.setEnabled(True)
+                # self.Valve8Button.setEnabled(True)
+                # self.pressureMonitorButton.setEnabled(True)
+                self.quickVentButton.setEnabled(True)
+                self.slowVentButton.setEnabled(True)
+                self.valveMacro1Button.setEnabled(True)
+                self.valveMacro2Button.setEnabled(True)
+                self.valveMacro3Button.setEnabled(True)
+                self.valveMacro4Button.setEnabled(True)
+                self.valveMacro5Button.setEnabled(True)
+                self.valveMacro6Button.setEnabled(True)
+                self.quickBubbleButton.setEnabled(True)
+                self.bubbleTimeDoubleSpinBox.setEnabled(True)
+            elif self.selectedMode == 1 or self.selectedMode == 2:
+                # Toggle valve controls
+                self.Valve1Button.setEnabled(False)
+                self.Valve2Button.setEnabled(False)
+                self.Valve3Button.setEnabled(False)
+                self.Valve4Button.setEnabled(False)
+                self.Valve5Button.setEnabled(False)
+                # self.Valve6Button.setEnabled(False)
+                # self.Valve7Button.setEnabled(False)
+                # self.Valve8Button.setEnabled(False)
+                # self.pressureMonitorButton.setEnabled(False)
+                self.quickVentButton.setEnabled(False)
+                self.slowVentButton.setEnabled(False)
+                self.valveMacro1Button.setEnabled(False)
+                self.valveMacro2Button.setEnabled(False)
+                self.valveMacro3Button.setEnabled(False)
+                self.valveMacro4Button.setEnabled(False)
+                self.valveMacro5Button.setEnabled(False)
+                self.valveMacro6Button.setEnabled(False)
+                self.quickBubbleButton.setEnabled(False)
+                self.bubbleTimeDoubleSpinBox.setEnabled(False)
+        else:
+            # Toggle connection controls
+            self.manualRadioButton.setEnabled(True)
+            self.autoConnectRadioButton.setEnabled(True)
+            self.TTLRadioButton.setEnabled(True)
+            self.ardCOMPortSpinBox.setEnabled(True)
+            # Toggle valve controls
+            self.Valve1Button.setEnabled(False)
+            self.Valve2Button.setEnabled(False)
+            self.Valve3Button.setEnabled(False)
+            self.Valve4Button.setEnabled(False)
+            self.Valve5Button.setEnabled(False)
+            # self.Valve6Button.setEnabled(False)
+            # self.Valve7Button.setEnabled(False)
+            # self.Valve8Button.setEnabled(False)
+            # self.pressureMonitorButton.setEnabled(False)
+            self.quickVentButton.setEnabled(False)
+            self.slowVentButton.setEnabled(False)
+            self.valveMacro1Button.setEnabled(False)
+            self.valveMacro2Button.setEnabled(False)
+            self.valveMacro3Button.setEnabled(False)
+            self.valveMacro4Button.setEnabled(False)
+            self.valveMacro5Button.setEnabled(False)
+            self.valveMacro6Button.setEnabled(False)
+            self.quickBubbleButton.setEnabled(False)
+            self.bubbleTimeDoubleSpinBox.setEnabled(False)
+            # Toggle graphing controls
+            self.pressure1RadioButton.setEnabled(False)
+            self.pressure2RadioButton.setEnabled(False)
+            self.pressure3RadioButton.setEnabled(False)
+            self.pressure4RadioButton.setEnabled(False)
+            # Toggle save controls
+            self.beginSaveButton.setEnabled(False)
+            #self.savePathEdit.setEnabled(False)
+            #self.selectSavePathButton.setEnabled(False)
+        if self.saving:
+            self.savePathEdit.setEnabled(False)
+            self.selectSavePathButton.setEnabled(False)
+        else:
+            self.savePathEdit.setEnabled(True)
+            self.selectSavePathButton.setEnabled(True)
+        
 
 
 class QTextEditLogger(logging.Handler, QtCore.QObject):
@@ -1106,7 +1263,82 @@ class QTextEditLogger(logging.Handler, QtCore.QObject):
     def scroll_to_bottom(self):
         self.widget.verticalScrollBar().setValue(
             self.widget.verticalScrollBar().maximum())
+    
+    def close(self):
+        self.widget.clear()
+        super().close()
 
+class ValveMacroEditor(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Valve Macro Editor")
+        self.setGeometry(100, 100, 650, 260)
+        self.setFixedSize(620, 250)
+
+        # Create a table widget
+        self.table = QtWidgets.QTableWidget(self)
+        self.table.setRowCount(6)
+        self.table.setColumnCount(9)
+        self.table.setHorizontalHeaderLabels(
+            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"])        
+        
+        # Set layout
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(self.table)
+        self.setLayout(self.mainLayout)
+
+                # Determine the directory of the executable
+        self.executable_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+        # Load data from JSON file if it exists
+        self.load_data()
+
+        # Resize all columns to fit
+        self.table.resizeColumnsToContents()
+
+    def load_data(self):
+        json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
+        #print(json_path)
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                for i, macro in enumerate(data):
+                    self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(macro["Macro No."]))
+                    for j, state in enumerate(macro["Valves"], start=1):
+                        combo = QtWidgets.QComboBox()
+                        combo.addItems(["Open", "Closed"])
+                        combo.setCurrentText(state)
+                        self.table.setCellWidget(i, j, combo)
+            except (json.JSONDecodeError, KeyError, IndexError):
+                self.set_default_values()
+        else:
+            self.set_default_values()
+
+    def set_default_values(self):
+        for i in range(6):
+            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(f"Macro {i+1}"))
+            for j in range(1, 9):
+                combo = QtWidgets.QComboBox()
+                combo.addItems(["Open", "Closed"])
+                combo.setCurrentIndex(1)  # Default to "Closed"
+                self.table.setCellWidget(i, j, combo)
+    
+    def get_macro_data(self):
+        data = []
+        for row in range(self.table.rowCount()):
+            macro_number = self.table.item(row, 0).text()
+            valve_states = [self.table.cellWidget(row, col).currentText() for col in range(1, 9)]
+            data.append({"Macro No.": macro_number, "Valves": valve_states})
+        return data
+    
+    def closeEvent(self, event):
+        data = self.get_macro_data()
+        json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
+        print(json_path)
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        super().closeEvent(event)
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -1129,14 +1361,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(logging.DEBUG)
 
+        """
         # Log to file
         fh = logging.FileHandler('my-log.log')
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter(
             '%(asctime)s %(levelname)s %(module)s %(funcName)s %(message)s'))
         logging.getLogger().addHandler(fh)
+        """
 
     def closeEvent(self, event):
+        if self.plot_thread is not None:
+            self.stop_plotting()
+
         if self.ardConnected or self.controller is not None:
             if self.verbosity:
                 print("Arduino is still connected, stopping controller...")
@@ -1150,8 +1387,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.verbosity:
             print("Application is closing...")
 
-        logging.getLogger().removeHandler(self.logTextBox)
-        self.logTextBox.close()
+        """       
+        # Remove and close logging handlers
+        logger = logging.getLogger()
+        handlers = logger.handlers[:]
+        for handler in handlers:
+            handler.close()
+            logger.removeHandler(handler)
+
+        # Ensure QTextEditLogger is properly closed
+        if hasattr(self, 'logTextBox'):
+            self.logTextBox.close()
+        """     
         # Call the base class method to ensure the window closes
         event.accept()
 
@@ -1178,5 +1425,4 @@ if __name__ == "__main__":
 
     window = MainWindow()
     window.show()
-    window.plot()
     sys.exit(app.exec())

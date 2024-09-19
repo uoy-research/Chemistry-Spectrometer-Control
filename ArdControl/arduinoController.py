@@ -302,12 +302,14 @@ class ArduinoController:
 
     # Sequence e.g. b100n200d300b300 -- current max 9 "steps" in sequence
     def send_sequence(self, sequence):
+        """
         if not self.get_auto_control():
             logging.error("Cannot send sequence in manual mode")
             return
         if self.mode == 2:
             logging.error("Cannot send sequence in TTL mode")
             return
+        """
         if self.serial_connected and self.arduino != None:
             try:
                 self.arduino.write(b'i')
@@ -317,3 +319,23 @@ class ArduinoController:
             except serial.SerialException as e:
                 logging.error(f"Failed to send sequence: {e}")
                 self.serial_connected = False
+
+    def execute_sequence(self):
+        """
+        if not self.get_auto_control():
+            logging.error("Cannot execute sequence in manual mode")
+            return
+        if self.mode == 2:
+            logging.error("Cannot execute sequence in TTL mode")
+            return
+        """
+        if self.serial_connected and self.arduino != None:
+            if self.sequence_loaded:
+                try:
+                    self.arduino.write(b'R')
+                    logging.info("Sent execute sequence command")
+                except serial.SerialException as e:
+                    logging.error(f"Failed to execute sequence: {e}")
+                    self.serial_connected = False
+            else:
+                logging.error("No sequence loaded")
