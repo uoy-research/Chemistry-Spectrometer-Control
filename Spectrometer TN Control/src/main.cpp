@@ -29,7 +29,7 @@ const int maxLength = 9; //maximum number of steps in a sequence
 
 //VARIABLES
 bool TNcontrol = 0; //TerraNova control - allows valves to be controlled by TTL signals or sequences
-bool pressureLog = 0; //log pressure values
+bool pressureLog = 1; //log pressure values
 bool TTLControl = 0; //TTL control toggle
 bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence

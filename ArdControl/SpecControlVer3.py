@@ -34,6 +34,8 @@ class Ui_MainWindow(object):
         self.saving = False
         self.plot_thread = None
         self.default_save_path = os.path.join("C:\\", "NMR Results")
+        self.motorConnectd = False
+        self.motorController = None
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
@@ -845,7 +847,7 @@ class Ui_MainWindow(object):
                 self.ardConnected = False
                 self.UIUpdateArdConnection()
                 return
-            if self.selectedMode != None:
+            elif self.selectedMode != None:
                 try:
                     self.controller = ArduinoController(
                         port=self.ardCOMPortSpinBox.value(), verbose=self.verbosity, mode=self.selectedMode)
@@ -853,6 +855,7 @@ class Ui_MainWindow(object):
                         self.controller.start()
                         if self.controller.serial_connected:
                             self.ardConnected = True
+                            self.start_plotting()
                             self.UIUpdateArdConnection()
                         else:
                             self.ardWarningLabel.setText(
@@ -1038,6 +1041,7 @@ class Ui_MainWindow(object):
     """
 
     def start_plotting(self):
+        self.monitoring = True
         self.plot_thread = threading.Thread(target=self.update_plot)
         self.plot_thread.daemon = True
         self.plot_thread.start()
@@ -1048,28 +1052,29 @@ class Ui_MainWindow(object):
                 self.controller.new_plot = False  # type: ignore
                 self.sc.axes.clear()
                 # Extract timestamps
-                timestamps = [reading[0]
-                              for reading in self.controller.readings]
+                # timestamps = [float(reading[0]) for reading in self.controller.readings]
+                num_readings = len(self.controller.readings)
+                timestamps = list(range(1, num_readings + 1))
 
                 # Extract the specific pressure readings
                 if self.pressure1RadioButton.isChecked():
                     pressure_readings = [
-                        reading[1] for reading in self.controller.readings]
+                        float(reading[1]) for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings) 
                 if self.pressure2RadioButton.isChecked():
                     pressure_readings = [
-                        reading[2] for reading in self.controller.readings]
+                        float(reading[2]) for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
                 if self.pressure3RadioButton.isChecked():
                     pressure_readings = [
-                        reading[3] for reading in self.controller.readings]
+                        float(reading[3]) for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
                 if self.pressure4RadioButton.isChecked():
                     pressure_readings = [
-                        reading[4] for reading in self.controller.readings]
+                        float(reading[4]) for reading in self.controller.readings]
                     self.sc.axes.plot(
                         timestamps, pressure_readings)
 
@@ -1134,6 +1139,54 @@ class Ui_MainWindow(object):
                 self.saving = True
                 self.beginSaveButton.setText("Stop Saving")
                 self.controller.save_pressure_data(True, self.savePathEdit.text()) # type: ignore
+
+    def on_connectMotorButton_clicked(self):
+        logging.info("Connect motor button clicked")
+        if self.motorConnected:
+            self.motorConnected = False
+            self.UIUpdateMotorConnection()
+            if self.motorController != None:
+                self.motorController.serial_connected = False
+                self.motorController.stop()
+                self.motorController = None    
+        else:
+            self.motorController = MotorController(port = self.ardCOMPortSpinBox.value())
+            try:
+                self.motorController.start()
+                if self.motorController.serial_connected:
+                    self.motorConnected = True
+                    logging.info("Motor connected")
+                    self.UIUpdateMotorConnection()
+                else:
+                    logging.info("Motor failed to connect")
+                    self.motorConnected = False
+                    self.motorController.stop()
+                    self.motorController = None
+                    self.UIUpdateMotorConnection()
+            except Exception as e:
+                logging.error(e)
+                self.motorConnected = False
+                self.motorController.stop()
+                self.motorController = None
+                self.UIUpdateMotorConnection()
+    
+    def on_calibrateMotorButton_clicked(self):
+        logging.info("Calibrate motor button clicked")
+        if self.motorConnected:
+            self.motorController.calibrate()
+
+    def on_stopMotorButton_clicked(self):
+        logging.info("Stop motor button clicked")
+        if self.motorConnected:
+            self.motorController.stop_motor()
+
+    def on_moveToTargetButton_clicked(self):
+        logging.info("Move to target button clicked")
+        if self.motorConnected:
+            targetpos = float(self.targetMotorPosEdit.text())
+            self.motorController.move_to_target(float(self.targetMotorPosEdit.text()))
+
+        
 
     def edit_motor_macro(self):
         pass
