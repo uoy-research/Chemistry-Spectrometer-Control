@@ -77,9 +77,14 @@ class ArduinoController:
     def start(self):
         logging.info("Starting server...")
         self.connect_arduino()
+        # logging.info("Arduino is connected? " + str(self.serial_connected))
         if self.serial_connected:
-            self.last_heartbeat_time = time.time()
+            time.sleep(1.2)  # Wait for Arduino to initialise
+           
             self.send_command("START")
+            #time.sleep(2.2)  # Wait for Arduino to initialise
+            logging.info("Arduino started") 
+            self.last_heartbeat_time = time.time()
             self.start_heartbeat()
             self.start_reading()
             if self.mode == 0:
@@ -164,7 +169,7 @@ class ArduinoController:
         # Heartbeat response - "HEARTBEAT_ACK"
         elif response == "HEARTBEAT_ACK":
             self.last_heartbeat_time = time.time()  # Update heartbeat time
-            logging.info("Received HEARTBEAT_ACK")
+            # logging.info("Received HEARTBEAT_ACK")
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
         # Pressure values are in mbar, valve states are 0 or 1
         # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C

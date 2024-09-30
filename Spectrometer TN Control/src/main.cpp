@@ -101,14 +101,16 @@ void setup() {
 }
 
 void loop() {
-  while (started == 0){
-    //wait for the system to be started
-    if (Serial.available()){
+  while (started == 0) {
+    // Wait for the system to be started
+    if (Serial.available() > 0) {
       char input = Serial.read();
-      if (input == 'S'){
+      Serial.print("LOG: Received input: ");
+      Serial.println(input);
+      if (input == 'S') {
         started = 1;
         Serial.println("LOG: System started");
-        heartBeat = millis(); //update the heartbeat time
+        heartBeat = millis(); // Update the heartbeat time
       }
     }
   }
@@ -128,7 +130,11 @@ void loop() {
 
   if((long)(tNow - tStart) >= (long)pollTime){readPressure(); tStart = tNow;}
 
+  //Serial.println((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime);
+
   if((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime) {reset();} //reset if no heartbeat for 5 seconds
+
+}
 
 void declarePins()
 {
@@ -172,12 +178,13 @@ void initOutput(){
   }
 
   //flash status LEDs to show that the system is ready
+  /*
   for (int i = 0; i < 8; i++)
   {
     setLED(i, 1);
   }
-
-  delay(200);
+  */
+  // delay(200);
 
   //set all status LEDs to off
   for (int i = 0; i < 8; i++)
