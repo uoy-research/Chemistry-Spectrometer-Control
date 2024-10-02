@@ -21,6 +21,7 @@ class MotorController:
             "GOTOPOS": 'p',  # Go to position
             "GETPOS": 'g',   # Get current position
             "GETSTATUS": 't',  # Get status
+            "CALIBRATE": 'c',  # Calibrate
         }
 
     def connect_arduino(self):
