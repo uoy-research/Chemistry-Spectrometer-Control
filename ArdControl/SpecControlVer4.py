@@ -10,7 +10,10 @@ import logging
 import matplotlib
 import time
 import threading
+import random
 import json
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 matplotlib.use('QtAgg')
 
 
@@ -687,7 +690,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets
         self.figure = Figure()
-        self.sc = MplCanvas(self, width=5, height=4, dpi=100)
+        self.sc = RealTimePlot(controller=self)
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.graphWidget.setGeometry(QtCore.QRect(91, 325, 651, 294))
@@ -1526,18 +1529,88 @@ class ValveMacroEditor(QtWidgets.QDialog):
             json.dump(data, f, indent=4)
         super().closeEvent(event)
 
+class RealTimePlot(FigureCanvasQTAgg):
+    def __init__(self, controller, parent=None):
+        self.fig, self.ax = plt.subplots()
+        super().__init__(self.fig)
+        self.setParent(parent)
+        self.controller = controller.controller
+
+        # Initialize data
+        self.p1_data = []
+        self.p2_data = []
+        self.p3_data = []
+        self.p4_data = []
+        self.x_data = []
+        self.line1, = self.ax.plot([], [], lw=2, color = "red")  # Initialize an empty plot
+        self.line2, = self.ax.plot([], [], lw=2, color = "blue")  # Initialize an empty plot
+        self.line3, = self.ax.plot([], [], lw=2, color = "green")  # Initialize an empty plot
+        self.line4, = self.ax.plot([], [], lw=2, color = "purple")  # Initialize an empty plot
+
+        # Set plot limits and labels
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 10)
+        self.ax.set_xlabel('Time')
+        self.ax.set_ylabel('mBar')
+
+    def update_plot(self):
+        logging.info(self.controller == True)
+        if self.controller:  # Check if the controller is available
+            pressure_values = self.controller.get_recent_readings()  # Get pressure data
+            if pressure_values:
+                new_values = float(pressure_values[0])  # Example: using the first pressure value
+                # print(f"New pressure value: {new_value}")
+
+                # Update x_data and y_data with the newest value
+                self.x_data.append(len(self.x_data))  # Append new x (time) point
+                self.p1_data.append(pressure_values[0][-1])         # Append new y (pressure) point
+                self.p2_data.append(pressure_values[1][-1])         # Append new y (pressure) point
+                self.p3_data.append(pressure_values[2][-1])         # Append new y (pressure) point
+                self.p4_data.append(pressure_values[3][-1])         # Append new y (pressure) point
+
+                # Update the plot's data without clearing
+                self.line1.set_data(self.x_data, self.y_data)
+                self.line2.set_data(self.x_data, self.y_data)
+                self.line3.set_data(self.x_data, self.y_data)
+                self.line4.set_data(self.x_data, self.y_data)
+
+                # Adjust limits if necessary
+                if len(self.x_data) > 100:
+                    self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
+                
+                # Redraw the canvas with the new data
+                self.draw()
+
+class PlotUpdater(QtCore.QThread):
+    """This thread emits new random data points to update the plot"""
+    new_data_signal = QtCore.pyqtSignal()
+
+    def run(self):
+        """Simulate incoming data points"""
+        while True:
+            new_value = random.uniform(0, 10)  # Generate random value
+            self.new_data_signal.emit()
+            time.sleep(1)  # Simulate data arrival every second
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+
+        self.button = QtWidgets.QPushButton("Start Data Simulation", self)
+        self.button.clicked.connect(self.start_simulation)
+        self.sequenceLayout.addWidget(self.button)
+
         self.setup_logging()
         # Example plot
         # self.plot()
+        self.plot_updater = PlotUpdater()
+        self.plot_updater.new_data_signal.connect(self.sc.update_plot)
+        #self.plot_updater.run()
 
-    def plot(self):
-        self.sc.axes.plot([0, 1, 2, 3], [10, 1, 20, 3])
-        self.sc.draw()
+    def start_simulation(self):
+        """Start the data simulation in the background"""
+        self.plot_updater.start()
 
     def setup_logging(self):
         # Initialize the logger

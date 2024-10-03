@@ -310,7 +310,7 @@ void handleSerial()
             decodeFlag = true;
           }
           else{
-            Serial.println("ERROR: Not ready for a new step yet");
+            Serial.print("WAITSEQ"); //send a wait sequence response
           }
         }
         else{

@@ -31,6 +31,8 @@ class ArduinoController:
         self.last_heartbeat_time = time.time()
         self.heartbeat_time = 5  # Time in seconds between heartbeats
         self.auto_control = False
+        self.steps = []
+        self.prev_step = None
 
         self.pressure_data_thread = threading.Thread(
             target=self.read_pressure_data)
@@ -175,6 +177,14 @@ class ArduinoController:
         elif response == "HEARTBEAT_ACK":
             self.last_heartbeat_time = time.time()  # Update heartbeat time
             # logging.info("Received HEARTBEAT_ACK")
+        elif response == "NEWSEQ":  # next step requested by arduino
+            if self.steps != []:
+                self.send_step(self.steps[0])
+                self.prev_step = self.steps[0]
+                self.steps.pop(0)
+        elif response == "WAITSEQ":  # step sent too early, attempt to resend later
+            if self.prev_step:
+                self.steps.insert(0, self.prev_step)
         # Pressure reading - "P <pressure1> ... <valveState1> ... C"
         # Pressure values are in mbar, valve states are 0 or 1
         # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
@@ -349,3 +359,15 @@ class ArduinoController:
                     self.serial_connected = False
             else:
                 logging.error("No sequence loaded")
+
+    def send_step(self, step):
+        if self.serial_connected and self.arduino != None:
+            try:
+                self.arduino.write(b'l')
+                self.arduino.write(step.step_type.encode())
+                self.arduino.write(str(step.time_length).encode())
+                self.arduino.write(b'\n')
+                logging.info(f"Sent step: {step.step_type} {step.time_length}")
+            except serial.SerialException as e:
+                logging.error(f"Failed to send step: {e}")
+                self.serial_connected = False
