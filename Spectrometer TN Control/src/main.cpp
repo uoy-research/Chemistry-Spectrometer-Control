@@ -34,6 +34,7 @@ bool TTLControl = 0; //TTL control toggle
 bool decodeFlag = 0; //flag to decode a sequence
 bool execFlag = 0; //flag to execute a sequence
 bool simpleTTL = 0; //simple TTL control toggle - unused
+bool newStepFlag = 0; //flag to indicate a new step needs loading
 
 float pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
@@ -42,7 +43,7 @@ unsigned long pressureTime = DEFPressureTime; //time required to build pressure 
 size_t currentStepIndex = 0; //current step in the sequence
 
 unsigned long tNow = 0; //current time
-unsigned long tStart = 0; //start time
+unsigned long tPoll = 0; //start time
 unsigned long tStepStart = 0; //start time of a step
 unsigned long heartBeat = 0; //time of last heartbeat
 
@@ -55,7 +56,13 @@ struct Step {
 
 Step sequenceSteps[maxLength]; //array to hold the steps in the sequence
 
-char validTypes[3] = {'b', 'd', 'n'};
+Step currentStep = {'e', 1}; //current step in the sequence
+
+Step nextStep = {'e', 1}; //next step in the sequence
+
+bool stepRunning = false; //flag to indicate if a step is currently running
+
+char validTypes[4] = {'b', 'd', 'n', 'e'}; //valid step types
 
 bool started = 0; //flag to indicate if the system has been started
 
@@ -78,9 +85,7 @@ void setLED(int led, int state);
 
 void decodeSequence();
 
-void processStoredSequence();
-
-void processStep(char stepType);
+//void processStep(char stepType);
 
 void closeValves();
 
@@ -90,11 +95,17 @@ void depressurise();
 
 bool isValidType(char type);
 
+bool loadStep();
+
+int convertToBar(int pressure);
+
+void processStep(Step step);
+
 void setup() {
   // put your setup code here, to run once:
   declarePins();
   initOutput(); //set all valves and LEDs to off & flash status LEDs
-  tStart = millis();  //begin polling timer
+  tPoll = millis();  //begin polling timer
   heartBeat = millis();
   Serial.begin(9600); //Open serial communication
   started = 0; //set the started flag to false
@@ -122,13 +133,30 @@ void loop() {
 
   if(Serial.available()){handleSerial();}
 
-  if(decodeFlag == 1){decodeSequence();}
+  //if(decodeFlag == 1){decodeSequence();}
 
-  if(execFlag == 1){processStoredSequence();}
+  if(execFlag == 1) {
+    if (!(currentStep.type == 'e')) {  //if a sequence is running, and is not at the end
+      if ((long)tNow - (long)tStepStart >= (long)currentStep.length) { // Check if the current step has been processed
+        currentStep = nextStep; // Move the next step to the current step
+        processStep(currentStep);
+        tStepStart = millis(); // Reset the start time for the next step
+        newStepFlag = true; // Set the flag to indicate a new step needs loading
+        Serial.println("NEWSEQ"); // Send a new sequence response
+      }
+    } else {
+      execFlag = 0; // Set the machine ready flag to false after processing all steps
+      currentStep = {'e', 1}; // Reset the current step
+      nextStep = {'e', 1}; // Reset the next step
+      Serial.println("ENDSEQ"); // Send an end sequence response
+    }
+  }
+
+  //if(execFlag == 1){processStoredSequence();}
 
   if(TTLControl == 1){handleTTL();}
 
-  if((long)(tNow - tStart) >= (long)pollTime){readPressure(); tStart = tNow;}
+  if((long)(tNow - tPoll) >= (long)pollTime){readPressure(); tPoll = tNow;}
 
   //Serial.println((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime);
 
@@ -213,117 +241,116 @@ void handleSerial()
   char input = Serial.read();
   if (isAlpha(input))
   {
-    if (TNcontrol == 1)     //If TN control is enabled
-    {
-      switch(input){
-        case 'y': 
-          Serial.println("HEARTBEAT_ACK");  //Heartbeat response
-          heartBeat = millis(); //update the heartbeat time
-          break;
-        case 'i':   //Decode a sequence input
-          decodeFlag = 1; // Set the flag to indicate a new sequence is ready to be decoded
-          break;
-        case 'R':   //Execute the current loaded sequence
-          execFlag = 1; // Set the machine ready flag to true
-          pressureLog = 1; // Enable pressure logging when a sequence is running
-          break;
-        case 'm':   //Switch to manual control (TN = 0)
-          TNcontrol = 0;
-          break;
-        case 'M':   //Switch to manual control (TN = 0)
-          Serial.println("LOG: Already in auto control mode");
-          break;
-        case 'K':   //Enable pressure logging
-          pressureLog = 1;
-          break;
-        case 'k':   //Disable pressure logging
-          pressureLog = 0; 
-          break;
-        case 'T':   //Enable TTL control
-          simpleTTL = 1;
-          pressureLog = 1;  //Enable pressure logging when TTL control is enabled
-          break;
-        case 't':   //Disable TTL control
-          simpleTTL = 0;
-          break;
-        case 's':   //Reset the system
-          reset();
-          break;
-        case 'd':   //Depressurise the system
-          depressurise();
-          break;
-        default:
-          Serial.println("LOG: Invalid input");  //Invalid input
-          break;
-      }
-    }
-    else                    //If TN control is disabled
-    {
-      switch(input){
-        case 'y': 
-          Serial.println("HEARTBEAT_ACK");  //Heartbeat response
-          heartBeat = millis(); //update the heartbeat time
-          break;
-        //enable sequence processing in manual mode for quick bubble
-        case 'i':   //Decode a sequence input
-          decodeFlag = 1; // Set the flag to indicate a new sequence is ready to be decoded
-          break;
-        case 'R':   //Execute the current loaded sequence
-          execFlag = 1; // Set the machine ready flag to true
-          pressureLog = 1; // Enable pressure logging when a sequence is running
-          break;
-        case 'K':   //Enable pressure logging
-          pressureLog = 1;
-          break;
-        case 'k':   //Disable pressure logging
-          pressureLog = 0; 
-          break;
-        case 'M':   //Switch to spec'r control (TN = 1)
+    switch(input){
+      case 'y': 
+        Serial.println("HEARTBEAT_ACK");  //Heartbeat response
+        heartBeat = millis(); //update the heartbeat time
+        break;
+      case 'i':   //Decode a sequence input
+        // decodeFlag = 1; // Set the flag to indicate a new sequence is ready to be decoded
+        break;
+      case 'R':   //Execute the current loaded sequence
+        if (TNcontrol == 1){
+          if (decodeFlag == 1){
+            execFlag = 1; // Set the machine ready flag to true
+            tStepStart = millis(); // Set the start time for the first step
+            currentStep = nextStep; // Move the next step to the current step
+            processStep(currentStep); // Process the first step
+            Serial.println("NEWSEQ"); // Send a new sequence response
+          }
+          else{
+            Serial.println("LOG: No steps loaded yet");
+          }
+        }
+        else{
+          Serial.println("LOG: Auto control not enabled");
+        }
+        break;
+      case 'M':   //Switch to manual control (TN = 0)
+        if(TNcontrol == 0){
           TNcontrol = 1;
-          break;
-        case 'm':   //Switch to manual control (TN = 0)
-          Serial.println("LOG: Already in manual control mode");
-          break;
-        case 'Z':   //Turn on short valve
-          setValve(SHORT, 1);
-          break;
-        case 'z':   //Turn off short valve
-          setValve(SHORT, 0);
-          break;
-        case 'C':   //Turn on INLET valve
-          setValve(IN, 1);
-          break;
-        case 'c':   //Turn off INLET valve
-          setValve(IN, 0);
-          break;
-        case 'V':   //Turn on OUTLET valve
-          setValve(OUT, 1);
-          break;
-        case 'v':   //Turn off OUTLET valve
-          setValve(OUT, 0);
-          break;
-        case 'X':   //Turn on VENT valve
-          setValve(VENT, 1);
-          break;
-        case 'x':   //Turn off VENT valve
-          setValve(VENT, 0);
-          break;
-        case 'H':   //Turn on SWITCH valve
-          setValve(SWITCH, 1);
-          break;
-        case 'h':   //Turn off SWITCH valve
-          setValve(SWITCH, 0);
-          break;
-        case 's':   //Reset the system
-          reset();
-          break;
-        case 'd':   //Depressurise the system
-          depressurise();
-          break;
-        default:
-          Serial.println("LOG: Invalid input");  //Invalid input
-          break;
-      }
+          Serial.println("LOG: Switching to Auto control");
+        }
+        else{
+          Serial.println("LOG: Already in Auto control mode");
+        }
+        break;
+      case 'm':   //Switch to manual control (TN = 0)
+        if (TNcontrol == 1){
+          TNcontrol = 0;
+          Serial.println("LOG: Switching to Manual control");
+        }
+        else{
+          Serial.println("LOG: Already in Manual control mode");
+        }
+        break;
+      case 'K':   //Enable pressure logging
+        // pressureLog = 1;
+        break;
+      case 'k':   //Disable pressure logging
+        // pressureLog = 0; 
+        break;
+      case 'T':   //Enable TTL control
+        simpleTTL = 1;
+        // pressureLog = 1;  //Enable pressure logging when TTL control is enabled
+        break;
+      case 't':   //Disable TTL control
+        simpleTTL = 0;
+        break;
+      case 's':   //Reset the system
+        reset();
+        break;
+      case 'd':   //Depressurise the system
+        depressurise();
+        break;
+      case 'l':   //Load a step
+        if(loadStep()){
+          if(newStepFlag == true){
+            newStepFlag = false;
+            decodeFlag = true;
+          }
+          else{
+            Serial.println("ERROR: Not ready for a new step yet");
+          }
+        }
+        else{
+          Serial.println("ERROR: Failed to load step");
+          decodeFlag = 0;
+        }
+        break;
+      case 'Z':   //Turn on short valve
+        setValve(SHORT, 1);
+        break;
+      case 'z':   //Turn off short valve
+        setValve(SHORT, 0);
+        break;
+      case 'C':   //Turn on INLET valve
+        setValve(IN, 1);
+        break;
+      case 'c':   //Turn off INLET valve
+        setValve(IN, 0);
+        break;
+      case 'V':   //Turn on OUTLET valve
+        setValve(OUT, 1);
+        break;
+      case 'v':   //Turn off OUTLET valve
+        setValve(OUT, 0);
+        break;
+      case 'X':   //Turn on VENT valve
+        setValve(VENT, 1);
+        break;
+      case 'x':   //Turn off VENT valve
+        setValve(VENT, 0);
+        break;
+      case 'H':   //Turn on SWITCH valve
+        setValve(SWITCH, 1);
+        break;
+      case 'h':   //Turn off SWITCH valve
+        setValve(SWITCH, 0);
+        break;
+      default:
+        Serial.println("LOG: Invalid input");  //Invalid input
+        break;
     }
   }
   else
@@ -339,7 +366,7 @@ void decodeSequence() //decode the sequence input
     Serial.println("SEQ: False"); //send a false sequence response
     Serial.println("LOG: Sequence already running, please wait for current sequence to end before loading a new one");
     decodeFlag = 0;
-    return; //exit the function to avoid loadning new sequence
+    return; //exit the function to avoid loading new sequence
 
     /* //ALTERNATE CODE, load new sequence anyway and overwrite the current one
     Serial.println("Sequence already running, cancelling current sequence and loading new one");
@@ -394,64 +421,13 @@ void decodeSequence() //decode the sequence input
   }
 }
 
-void processStoredSequence() {  // Process the loaded sequence
-  if (sequenceSteps[0].length == 0) { // Check if the sequence is empty
-    Serial.println("LOG: Sequence is empty, nothing to process.");
-    execFlag = false; // Set the machine ready flag to false due to an empty sequence
-    return; // Exit the function if the sequence is empty
-  }
-  pressureLog = 1; // Ensure pressure logging enabled when a sequence is running
-  if (currentStepIndex < sizeof(sequenceSteps) / sizeof(sequenceSteps[0]) && sequenceSteps[currentStepIndex].length > 0) {
-    Step& step = sequenceSteps[currentStepIndex];
-    if (tNow - tStepStart >= step.length) { // Check if the current step has been processed
-      processStep(step.type);
-      tStepStart = tNow; // Reset the start time for the next step
-      currentStepIndex++; // Move to the next step
-    }
-  } else {
-    // All steps processed, reinitialise the state
-    closeValves();  // Close all valves for safety
-    memset(sequenceSteps, 0, sizeof(sequenceSteps));
-    currentStepIndex = 0;
-    execFlag = false; // Set the machine ready flag to false after processing all steps
-  }
-}
-
-void processStep(char stepType) { // Process a step based on the type
-  switch (stepType) {
-    case 'b':
-      // Handle bubble step
-      setValve(SWITCH, 0);
-      setValve(IN, 1);
-      setValve(OUT, 1);
-      setValve(VENT, 1);
-      setValve(SHORT, 0);
-      break;
-    case 'd':
-      // Handle delay step
-      setValve(IN, 0);
-      setValve(OUT, 0);
-      setValve(VENT, 0);
-      setValve(SHORT, 0);
-      break;
-    case 'n':
-      // Handle alt bubble step
-      Serial.println("LOG: Alt bubble step not implemented");
-      break;
-    // Add more cases as needed
-    default:
-      Serial.println("LOG: Unknown step type");
-      break;
-  }
-}
-
 void readPressure() //read pressure values from the analog pins
 {
   //read pressure values
-  pressureInputs[0] = (analogRead(Pressure1)-203.53)/0.8248/100; //pressure1 is external
-  pressureInputs[1] = (analogRead(Pressure2)-203.53)/0.8248/100;
-  pressureInputs[2] = (analogRead(Pressure3)-203.53)/0.8248/100;
-  pressureInputs[3] = (analogRead(Pressure4)-203.53)/0.8248/100;
+  pressureInputs[0] = convertToBar(analogRead(Pressure1)); //pressure1 is external
+  pressureInputs[1] = convertToBar(analogRead(Pressure2));
+  pressureInputs[2] = convertToBar(analogRead(Pressure3));
+  pressureInputs[3] = convertToBar(analogRead(Pressure4));
 
   if (pressureLog == 1){
     //build the pressure return string the way James has been using so far
@@ -517,10 +493,10 @@ void reset(){
   decodeFlag = 0;
   simpleTTL = 0;
   TNcontrol = 0;
-  pressureLog = 0;
+  // pressureLog = 0;
   //depressurise();
   closeValves();
-  tStart = millis();
+  tPoll = millis();
   started = 0;
 }
 
@@ -545,16 +521,86 @@ bool isValidType(char type) { // Check if the step type is valid
 void depressurise(){
   //depressurise the system
   Serial.println("LOG: Depressurising system");
-  if(((analogRead(Pressure3)-203.53)/0.8248/100) > 0.1){
-    setValve(SWITCH,0);
+  if(convertToBar(analogRead(Pressure3)) > 0.1){
+    setValve(SWITCH, 0);
     setValve(IN, 0);
     setValve(OUT, 1);
     setValve(VENT, 0);
     setValve(SHORT, 1);
-    while (((analogRead(Pressure3)-203.53)/0.8248/100) > 0.1){
+    while (convertToBar(analogRead(Pressure3)) > 0.1){
       delay(50);
     }
     setValve(SHORT, 0);
     setValve(OUT, 0);
+  }
+  else{
+    Serial.println("LOG: System already depressurised");
+  }
+}
+
+int convertToBar(int pressure){
+  return (pressure-203.53)/0.8248/100;
+}
+
+bool loadstep() {
+  if (Serial.available() > 0) {
+    char input = Serial.read();
+    if (input == -1) {
+      Serial.println("Failed to read from Serial");
+      return false;
+    }
+    else if (!isValidType(input)) {
+      Serial.println("LOG: Invalid step type");
+      return false;
+    }
+    else{
+      nextStep.type = input;
+    }
+    int length = Serial.parseInt();
+    if (length == 0 && Serial.peek() != '0') {
+      Serial.println("Failed to parse integer from Serial");
+      return false;
+    }
+    else{
+      nextStep.length = length;
+    }
+
+    Serial.println("LOG: Loaded step type " + String(nextStep.type) + " with length " + String(nextStep.length));
+    return true;
+  } else {
+    Serial.println("LOG: Expected input, but none received");
+    return false;
+  }
+}
+
+void processStep(Step step){
+    switch (step.type) {
+    case 'b':
+      // Handle bubble step
+      setValve(SWITCH, 0);
+      setValve(IN, 1);
+      setValve(OUT, 1);
+      setValve(VENT, 1);
+      setValve(SHORT, 0);
+      break;
+    case 'd':
+      // Handle delay step
+      setValve(IN, 0);
+      setValve(OUT, 0);
+      setValve(VENT, 0);
+      setValve(SHORT, 0);
+      break;
+    case 'n':
+      // Handle alt bubble step
+      Serial.println("LOG: Alt bubble step not implemented");
+      break;
+    case 'e':
+      // Handle end step
+      Serial.println("LOG: End of sequence reached");
+      break;
+    // Add more cases as needed
+    default:
+      Serial.println("LOG: Unknown step type");
+      break;
   }
 }

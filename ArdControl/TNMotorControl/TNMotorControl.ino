@@ -8,6 +8,10 @@
 #include "utils/dropin.h"
 #include <UstepperS32.h>
 
+#define SLOW 0
+#define MEDIUM 1
+#define FAST 2
+
 const unsigned long DEFHeartBeatTime = 5000;
 const int maxRPM = 500;
 const int maxAcc = 2000;
@@ -16,6 +20,7 @@ const int inverted = 0;
 int topPosition = 0;
 bool calibrationFlag = false;
 bool moveFlag = false;
+bool calibrated = false;
 UstepperS32 motor;
 
 void setup(){
@@ -50,6 +55,8 @@ void loop(){
 
   if(calibrationFlag == true && motor.getState(STANDSTILL) == true) {setHome();} //set the home position when calibration is finished
 
+  if(moveFlag == true && motor.getState(POSITION_REACHED) == true) {moveFlag = false; Serial.println("LOG: Reached position");} //reset moveFlag when move is finished
+
   if((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime) {reset();} //reset if no heartbeat for 5 seconds
 }
 
@@ -59,22 +66,34 @@ void handleSerial(){
   {
     switch(input)
     {
-      case 's':
+      case 's': //stop
         Serial.println("LOG: Shutting down motor");
         reset();
         break;
-      case 'y':
+      case 'y': //heartbeat
         Serial.println("HEARTBEATACK");
         heartBeat = millis();
         break;
-      case 'u':
-        Serial.println("LOG: Moving continusously up");
-        break;
-      case 'c':
+      case 'p': //move to position
+        if (moveFlag == true) {Serial.println("LOG: Motor is already moving"); break;}
+        else if (calibrationFlag == true) {Serial.println("LOG: Motor is calibrating"); break;}
+        else if (calibrated == false) {Serial.println("LOG: Motor is not calibrated"); break;}
+        else {Serial.println("LOG: Moving to position"); goToPos(); break;}
+      case 'c': //calibrate
         Serial.println("LOG: Calibrating");
+        setSpeedProfile(SLOW);
         motor.checkOritentation(10);
         motor.moveToEnd(dir=CW, rpm=50, threshold=4, timeOut=100000);
         calibrationFlag = true;
+        break;
+      case 'g': //get position
+        Serial.println(motor.getPosition());
+        break;
+      case 't': //get status
+        if (motor.getState(STANDSTILL) == true) {Serial.println("LOG: Motor is stopped");}
+        else {Serial.println("LOG: Motor is moving");}
+        if (motor.getState(POSITION_REACHED) == true) {Serial.println("LOG: Motor is at position");}
+        else {Serial.println("LOG: Motor is not at position or position not set");}
         break;
       default:
         Serial.println("LOG: Invalid input");
@@ -86,9 +105,46 @@ void handleSerial(){
 void reset(){ //called when error - stop hard
   motor.stop(HARD);
   started = 0;
+  calibrated = 0;
 }
 
 void setHome(){
   calibrationFlag = false;
+  calibrated = true;
   topPosition = motor.getPosition();
+  setSpeedProfile(FAST);
+}
+
+void goToPos(){
+  if(Serial.available()){
+    String positionStr = Serial.readStringUntil('\n');
+    int position = (topPosition + positionStr.toInt());
+    Serial.print("LOG: Moving to position: ");
+    Serial.println(position);
+    motor.movePosition(position);
+    moveFlag = true;
+  }
+  else{
+    Serial.println("LOG: No position given");
+  }
+}
+
+void setSpeedProfile(int speed){
+  if (speed == 0){  //slow setting
+    motor.setRPM(200);
+    motor.setMaxAcceleration(1500);
+  }
+  else if (speed == 1){ //medium setting
+    motor.setRPM(350);
+    motor.setMaxAcceleration(1750);
+  }
+  else if (speed == 2){ //fast setting
+    motor.setRPM(500);
+    motor.setMaxAcceleration(2000);
+  }
+  else{
+    Serial.println("LOG: Invalid speed setting, defaulting to slow");
+    motor.setRPM(200);
+    motor.setMaxAcceleration(1500);
+  }
 }

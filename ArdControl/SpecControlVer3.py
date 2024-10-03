@@ -1,4 +1,5 @@
 from arduinoController import ArduinoController
+from motorController import MotorController
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
@@ -14,12 +15,15 @@ matplotlib.use('QtAgg')
 
 
 class MplCanvas(FigureCanvasQTAgg):
-
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
         super(MplCanvas, self).__init__(fig)
 
+class Step:
+    def __init__(self, step_type, time_length):
+        self.step_type = step_type
+        self.time_length = time_length
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -28,19 +32,23 @@ class Ui_MainWindow(object):
         self.verbosity = True
         self.ardConnected = False
         self.selectedMode = None
-        self.controller = None
         self.connection_in_progress = False
         self.monitoring = False
         self.saving = False
         self.plot_thread = None
         self.default_save_path = os.path.join("C:\\", "NMR Results")
         self.motorConnectd = False
+        self.steps = []
+        self.controller = None
         self.motorController = None
+        self.sequenceLoaded = False
+        self.sequenceReady = False
+        self.sequenceRunning = False
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1029, 680)
-        MainWindow.setFixedSize(1029, 680)
+        MainWindow.resize(1259, 680)
+        MainWindow.setFixedSize(1259, 680)
 
         # Create the central widget
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
@@ -147,7 +155,7 @@ class Ui_MainWindow(object):
 
         # Create a dividing line
         self.line = QtWidgets.QFrame(parent=self.centralwidget)
-        self.line.setGeometry(QtCore.QRect(10, 300, 1041, 20))
+        self.line.setGeometry(QtCore.QRect(10, 300, 1000, 20))
         self.line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.line.setObjectName("line")
@@ -693,7 +701,107 @@ class Ui_MainWindow(object):
         self.toolbar = NavigationToolbar(self.sc, self)
         self.graphLayout.addWidget(self.toolbar)
 
-        
+        # Create a vertical dividing line
+        self.line_2 = QtWidgets.QFrame(parent=self.centralwidget)
+        self.line_2.setGeometry(QtCore.QRect(1020, 15, 20, 620))
+        self.line_2.setFrameShape(QtWidgets.QFrame.Shape.VLine)
+        self.line_2.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+        self.line_2.setObjectName("line_2")
+
+        # Create sequence layout
+        self.sequenceLayoutWidget = QtWidgets.QWidget(parent=self.centralwidget)
+        self.sequenceLayoutWidget.setGeometry(QtCore.QRect(1040, 10, 200, 500))
+        self.sequenceLayoutWidget.setObjectName("sequenceLayoutWidget")
+        self.sequenceLayout = QtWidgets.QGridLayout(self.sequenceLayoutWidget)
+        self.sequenceLayout.setContentsMargins(0, 0, 0, 0)
+        self.sequenceLayout.setObjectName("sequenceLayout")
+
+        # Create the sequence label
+        self.sequenceLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.sequenceLabel.setFont(font)
+        self.sequenceLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.sequenceLabel.setObjectName("sequenceLabel")
+        self.sequenceLayout.addWidget(self.sequenceLabel, 0, 0, 1, 1)
+
+        # Create the sequence controls
+        self.sequenceLoadButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceLoadButton.setMinimumSize(QtCore.QSize(0, 60))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.sequenceLoadButton.setFont(font)
+        self.sequenceLoadButton.setObjectName("sequenceLoadButton")
+        self.sequenceLayout.addWidget(self.sequenceLoadButton, 1, 0, 1, 1)
+
+        self.sequenceExecuteButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceExecuteButton.setMinimumSize(QtCore.QSize(0, 60))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.sequenceExecuteButton.setFont(font)
+        self.sequenceExecuteButton.setObjectName("sequenceExecuteButton")
+        self.sequenceLayout.addWidget(self.sequenceExecuteButton, 2, 0, 1, 1)
+
+        self.currentStepTypeLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.currentStepTypeLabel.setFont(font)
+        self.currentStepTypeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTypeLabel.setObjectName("currentStepLabel")
+        self.sequenceLayout.addWidget(self.currentStepTypeLabel, 3, 0, 1, 1)
+
+        self.currentStepTypeEdit = QtWidgets.QLineEdit(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.currentStepTypeEdit.setFont(font)
+        self.currentStepTypeEdit.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.currentStepTypeEdit.setObjectName("currentStepTypeEdit")
+        self.currentStepTypeEdit.setReadOnly(True)
+        self.sequenceLayout.addWidget(self.currentStepTypeEdit, 4, 0, 1, 1)
+
+        self.currentStepTimeLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.currentStepTimeLabel.setFont(font)
+        self.currentStepTimeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTimeLabel.setObjectName("currentStepTimeLabel")
+        self.sequenceLayout.addWidget(self.currentStepTimeLabel, 5, 0, 1, 1)
+
+        self.currentStepTimeEdit = QtWidgets.QLineEdit(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.currentStepTimeEdit.setFont(font)
+        self.currentStepTimeEdit.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.currentStepTimeEdit.setObjectName("currentStepTimeEdit")
+        self.currentStepTimeEdit.setReadOnly(True)
+        self.sequenceLayout.addWidget(self.currentStepTimeEdit, 6, 0, 1, 1)
+
+        self.stepsRemainingLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.stepsRemainingLabel.setFont(font)
+        self.stepsRemainingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsRemainingLabel.setObjectName("stepsRemainingLabel")
+        self.sequenceLayout.addWidget(self.stepsRemainingLabel, 7, 0, 1, 1)
+
+        self.stepsTimeRemainingLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.stepsTimeRemainingLabel.setFont(font)
+        self.stepsTimeRemainingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsTimeRemainingLabel.setObjectName("stepsTimeRemainingLabel")
+        self.sequenceLayout.addWidget(self.stepsTimeRemainingLabel, 8, 0, 1, 1)
+
+        self.sequenceStopButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceStopButton.setMinimumSize(QtCore.QSize(0, 60))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.sequenceStopButton.setFont(font)
+        self.sequenceStopButton.setObjectName("sequenceStopButton")
+        self.sequenceLayout.addWidget(self.sequenceStopButton, 9, 0, 1, 1)
+
+
+        # Connect the buttons to their slots
         # QtCore.QMetaObject.connectSlotsByName(MainWindow)
         self.ardConnectButton.clicked.connect(self.on_ardConnectButton_clicked)
         self.manualRadioButton.clicked.connect(
@@ -822,6 +930,15 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Valve Macro 5"))
         self.valveMacro6Button.setText(
             _translate("MainWindow", "Valve Macro 6"))
+        self.sequenceLabel.setText(_translate("MainWindow", "Sequence\nControls"))
+        self.sequenceLoadButton.setText(_translate("MainWindow", "Load Sequence"))
+        self.sequenceExecuteButton.setText(_translate("MainWindow", "Execute Sequence"))
+        self.sequenceStopButton.setText(_translate("MainWindow", "Stop Sequence"))
+        self.currentStepTypeLabel.setText(_translate("MainWindow", "Current Step Type"))
+        self.currentStepTimeLabel.setText(_translate("MainWindow", "Current Step Time"))
+        self.stepsRemainingLabel.setText(_translate("MainWindow", "Steps Remaining: "))
+        self.stepsTimeRemainingLabel.setText(_translate("MainWindow", "Time Remaining: "))
+
 
     def on_ardConnectButton_clicked(self):
 
@@ -1148,7 +1265,7 @@ class Ui_MainWindow(object):
             if self.motorController != None:
                 self.motorController.serial_connected = False
                 self.motorController.stop()
-                self.motorController = None    
+                # self.motorController = None    
         else:
             self.motorController = MotorController(port = self.ardCOMPortSpinBox.value())
             try:
@@ -1186,7 +1303,17 @@ class Ui_MainWindow(object):
             targetpos = float(self.targetMotorPosEdit.text())
             self.motorController.move_to_target(float(self.targetMotorPosEdit.text()))
 
-        
+    def add_step(self, step_type, time_length):
+        step = Step(step_type, time_length)
+        self.steps.append(step)
+
+    def remove_step(self, index):
+        if 0 <= index < len(self.steps):
+            del self.steps[index]
+
+    def list_steps(self):
+        for step in self.steps:
+            print(f"Step Type: {step.step_type}, Time Length: {step.time_length}")
 
     def edit_motor_macro(self):
         pass

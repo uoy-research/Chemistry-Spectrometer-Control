@@ -5,6 +5,10 @@ import time
 import csv
 import os
 
+class Step:
+    def __init__(self, step_type, time_length):
+        self.step_type = step_type
+        self.time_length = time_length
 
 class ArduinoController:
     def __init__(self, port, verbose, mode):
@@ -53,7 +57,8 @@ class ArduinoController:
             "TURN_OFF_SWITCH_VALVE": 'h',  # Turn off SWITCH valve
             "RESET": 's',    # Reset the Arduino
             "START": 'S',    # Start the Arduino
-            "DEPRESSURISE": 'd'    # Depressurise the system
+            "DEPRESSURISE": 'd',    # Depressurise the system
+            "LOAD_STEP": 'l'    # Load a step into the sequence
         }
 
         if verbose:
