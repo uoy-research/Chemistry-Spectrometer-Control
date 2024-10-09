@@ -13,20 +13,8 @@ import threading
 import random
 import json
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 matplotlib.use('QtAgg')
 
-
-class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
-        super(MplCanvas, self).__init__(fig)
-
-class Step:
-    def __init__(self, step_type, time_length):
-        self.step_type = step_type
-        self.time_length = time_length
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -38,7 +26,6 @@ class Ui_MainWindow(object):
         self.connection_in_progress = False
         self.monitoring = False
         self.saving = False
-        self.plot_thread = None
         self.default_save_path = os.path.join("C:\\", "NMR Results")
         self.motorConnectd = False
         self.steps = []
@@ -690,7 +677,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets
         self.figure = Figure()
-        self.sc = RealTimePlot(controller=self)
+        self.sc = RealTimePlot()
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.graphWidget.setGeometry(QtCore.QRect(91, 325, 651, 294))
@@ -712,7 +699,8 @@ class Ui_MainWindow(object):
         self.line_2.setObjectName("line_2")
 
         # Create sequence layout
-        self.sequenceLayoutWidget = QtWidgets.QWidget(parent=self.centralwidget)
+        self.sequenceLayoutWidget = QtWidgets.QWidget(
+            parent=self.centralwidget)
         self.sequenceLayoutWidget.setGeometry(QtCore.QRect(1040, 10, 200, 500))
         self.sequenceLayoutWidget.setObjectName("sequenceLayoutWidget")
         self.sequenceLayout = QtWidgets.QGridLayout(self.sequenceLayoutWidget)
@@ -729,7 +717,8 @@ class Ui_MainWindow(object):
         self.sequenceLayout.addWidget(self.sequenceLabel, 0, 0, 1, 1)
 
         # Create the sequence controls
-        self.sequenceLoadButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceLoadButton = QtWidgets.QPushButton(
+            parent=self.sequenceLayoutWidget)
         self.sequenceLoadButton.setMinimumSize(QtCore.QSize(0, 60))
         font = QtGui.QFont()
         font.setPointSize(12)
@@ -737,7 +726,8 @@ class Ui_MainWindow(object):
         self.sequenceLoadButton.setObjectName("sequenceLoadButton")
         self.sequenceLayout.addWidget(self.sequenceLoadButton, 1, 0, 1, 1)
 
-        self.sequenceExecuteButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceExecuteButton = QtWidgets.QPushButton(
+            parent=self.sequenceLayoutWidget)
         self.sequenceExecuteButton.setMinimumSize(QtCore.QSize(0, 60))
         font = QtGui.QFont()
         font.setPointSize(12)
@@ -745,64 +735,76 @@ class Ui_MainWindow(object):
         self.sequenceExecuteButton.setObjectName("sequenceExecuteButton")
         self.sequenceLayout.addWidget(self.sequenceExecuteButton, 2, 0, 1, 1)
 
-        self.currentStepTypeLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        self.currentStepTypeLabel = QtWidgets.QLabel(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.currentStepTypeLabel.setFont(font)
-        self.currentStepTypeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTypeLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
         self.currentStepTypeLabel.setObjectName("currentStepLabel")
         self.sequenceLayout.addWidget(self.currentStepTypeLabel, 3, 0, 1, 1)
 
-        self.currentStepTypeEdit = QtWidgets.QLineEdit(parent=self.sequenceLayoutWidget)
+        self.currentStepTypeEdit = QtWidgets.QLineEdit(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.currentStepTypeEdit.setFont(font)
-        self.currentStepTypeEdit.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.currentStepTypeEdit.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight)
         self.currentStepTypeEdit.setObjectName("currentStepTypeEdit")
         self.currentStepTypeEdit.setReadOnly(True)
         self.sequenceLayout.addWidget(self.currentStepTypeEdit, 4, 0, 1, 1)
 
-        self.currentStepTimeLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        self.currentStepTimeLabel = QtWidgets.QLabel(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.currentStepTimeLabel.setFont(font)
-        self.currentStepTimeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTimeLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
         self.currentStepTimeLabel.setObjectName("currentStepTimeLabel")
         self.sequenceLayout.addWidget(self.currentStepTimeLabel, 5, 0, 1, 1)
 
-        self.currentStepTimeEdit = QtWidgets.QLineEdit(parent=self.sequenceLayoutWidget)
+        self.currentStepTimeEdit = QtWidgets.QLineEdit(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.currentStepTimeEdit.setFont(font)
-        self.currentStepTimeEdit.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.currentStepTimeEdit.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight)
         self.currentStepTimeEdit.setObjectName("currentStepTimeEdit")
         self.currentStepTimeEdit.setReadOnly(True)
         self.sequenceLayout.addWidget(self.currentStepTimeEdit, 6, 0, 1, 1)
 
-        self.stepsRemainingLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        self.stepsRemainingLabel = QtWidgets.QLabel(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.stepsRemainingLabel.setFont(font)
-        self.stepsRemainingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsRemainingLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
         self.stepsRemainingLabel.setObjectName("stepsRemainingLabel")
         self.sequenceLayout.addWidget(self.stepsRemainingLabel, 7, 0, 1, 1)
 
-        self.stepsTimeRemainingLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
+        self.stepsTimeRemainingLabel = QtWidgets.QLabel(
+            parent=self.sequenceLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.stepsTimeRemainingLabel.setFont(font)
-        self.stepsTimeRemainingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsTimeRemainingLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
         self.stepsTimeRemainingLabel.setObjectName("stepsTimeRemainingLabel")
         self.sequenceLayout.addWidget(self.stepsTimeRemainingLabel, 8, 0, 1, 1)
 
-        self.sequenceStopButton = QtWidgets.QPushButton(parent=self.sequenceLayoutWidget)
+        self.sequenceStopButton = QtWidgets.QPushButton(
+            parent=self.sequenceLayoutWidget)
         self.sequenceStopButton.setMinimumSize(QtCore.QSize(0, 60))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.sequenceStopButton.setFont(font)
         self.sequenceStopButton.setObjectName("sequenceStopButton")
         self.sequenceLayout.addWidget(self.sequenceStopButton, 9, 0, 1, 1)
-
 
         # Connect the buttons to their slots
         # QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -933,89 +935,48 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Valve Macro 5"))
         self.valveMacro6Button.setText(
             _translate("MainWindow", "Valve Macro 6"))
-        self.sequenceLabel.setText(_translate("MainWindow", "Sequence\nControls"))
-        self.sequenceLoadButton.setText(_translate("MainWindow", "Load Sequence"))
-        self.sequenceExecuteButton.setText(_translate("MainWindow", "Execute Sequence"))
-        self.sequenceStopButton.setText(_translate("MainWindow", "Stop Sequence"))
-        self.currentStepTypeLabel.setText(_translate("MainWindow", "Current Step Type"))
-        self.currentStepTimeLabel.setText(_translate("MainWindow", "Current Step Time"))
-        self.stepsRemainingLabel.setText(_translate("MainWindow", "Steps Remaining: "))
-        self.stepsTimeRemainingLabel.setText(_translate("MainWindow", "Time Remaining: "))
-
+        self.sequenceLabel.setText(_translate(
+            "MainWindow", "Sequence\nControls"))
+        self.sequenceLoadButton.setText(
+            _translate("MainWindow", "Load Sequence"))
+        self.sequenceExecuteButton.setText(
+            _translate("MainWindow", "Execute Sequence"))
+        self.sequenceStopButton.setText(
+            _translate("MainWindow", "Stop Sequence"))
+        self.currentStepTypeLabel.setText(
+            _translate("MainWindow", "Current Step Type"))
+        self.currentStepTimeLabel.setText(
+            _translate("MainWindow", "Current Step Time"))
+        self.stepsRemainingLabel.setText(
+            _translate("MainWindow", "Steps Remaining: "))
+        self.stepsTimeRemainingLabel.setText(
+            _translate("MainWindow", "Time Remaining: "))
 
     def on_ardConnectButton_clicked(self):
-
-        if self.connection_in_progress:
-            return  # Ignore subsequent clicks if connection is in progress
-
-        # Set the flag to indicate connection in progress
-        self.connection_in_progress = True
-        # Disable the button to prevent multiple clicks
-        self.ardConnectButton.setEnabled(False)
-
-        if self.ardConnected == True:
+        """Handle Arduino connection/disconnection."""
+        if self.ardConnected:
+            # If Arduino is already connected, stop the worker and disconnect
+            self.arduino_worker.stop()
             self.ardConnected = False
             self.UIUpdateArdConnection()
-            self.controller.serial_connected = False    # type: ignore
-            if self.controller != None:
-                self.controller.stop()  # type: ignore
-
         else:
-            if self.ardCOMPortSpinBox.value() == None:
-                self.ardWarningLabel.setText("No COM Port Selected")
-                self.ardWarningLabel.setStyleSheet("color: red")
-                self.ardConnected = False
-                self.UIUpdateArdConnection()
-                return
-            elif self.selectedMode != None:
-                try:
-                    self.controller = ArduinoController(
-                        port=self.ardCOMPortSpinBox.value(), verbose=self.verbosity, mode=self.selectedMode)
-                    try:
-                        self.controller.start()
-                        if self.controller.serial_connected:
-                            self.ardConnected = True
-                            self.start_plotting()
-                            self.UIUpdateArdConnection()
-                        else:
-                            self.ardWarningLabel.setText(
-                                "Controller Failed to Start")
-                            self.ardWarningLabel.setStyleSheet("color: red")
-                            self.ardConnected = False
-                            self.controller.stop()
-                            self.controller = None
-                            self.UIUpdateArdConnection()
-                    except Exception as e:
-                        if self.verbosity:
-                            print(e)
-                        self.ardWarningLabel.setText(
-                            "Controller Failed to Start")
-                        self.ardWarningLabel.setStyleSheet("color: red")
-                        self.ardConnected = False
-                        self.controller.stop()  # type: ignore
-                        self.controller = None
-                        self.UIUpdateArdConnection()
-                        return
-                except Exception as e:
-                    if self.verbosity:
-                        print(e)
-                    self.ardWarningLabel.setText("Connection Failed")
-                    self.ardWarningLabel.setStyleSheet("color: red")
-                    self.ardConnected = False
-                    if self.controller != None:
-                        try:
-                            self.controller.stop()
-                        except Exception as e:
-                            if self.verbosity:
-                                print(e)
-                        self.controller = None
-                    self.UIUpdateArdConnection()
-                    return
+            # Create the worker and start the Arduino communication
+            port = self.ardCOMPortSpinBox.value()
+            self.arduino_worker = ArduinoWorker(
+                port=port, mode=self.selectedMode, verbose=self.verbosity)
+
+            # Connect the worker signals to appropriate slots
+            self.arduino_worker.data_signal.connect(
+                self.sc.update_plot)  # To update the plot
+            self.arduino_worker.error_signal.connect(
+                self.handle_error)  # To handle errors
+            self.arduino_worker.start()
+            if self.arduino_worker.isRunning():
+                self.ardConnected = True
             else:
-                self.ardWarningLabel.setText("No Mode Selected")
-                self.ardWarningLabel.setStyleSheet("color: red")
                 self.ardConnected = False
-                self.UIUpdateArdConnection()
+                self.arduino_worker.stop()
+            self.UIUpdateArdConnection()
 
     def on_autoConnectRadioButton_clicked(self):
         self.selectedMode = 1
@@ -1160,51 +1121,6 @@ class Ui_MainWindow(object):
                 self.pressureMonitorButton.setText("Begin Pressure Monitor")
     """
 
-    def start_plotting(self):
-        self.monitoring = True
-        self.plot_thread = threading.Thread(target=self.update_plot)
-        self.plot_thread.daemon = True
-        self.plot_thread.start()
-
-    def update_plot(self):
-        while self.monitoring:
-            if self.ardConnected and self.controller.new_plot:  # type: ignore
-                self.controller.new_plot = False  # type: ignore
-                self.sc.axes.clear()
-                # Extract timestamps
-                # timestamps = [float(reading[0]) for reading in self.controller.readings]
-                num_readings = len(self.controller.readings)
-                timestamps = list(range(1, num_readings + 1))
-
-                # Extract the specific pressure readings
-                if self.pressure1RadioButton.isChecked():
-                    pressure_readings = [
-                        float(reading[1]) for reading in self.controller.readings]
-                    self.sc.axes.plot(
-                        timestamps, pressure_readings) 
-                if self.pressure2RadioButton.isChecked():
-                    pressure_readings = [
-                        float(reading[2]) for reading in self.controller.readings]
-                    self.sc.axes.plot(
-                        timestamps, pressure_readings)
-                if self.pressure3RadioButton.isChecked():
-                    pressure_readings = [
-                        float(reading[3]) for reading in self.controller.readings]
-                    self.sc.axes.plot(
-                        timestamps, pressure_readings)
-                if self.pressure4RadioButton.isChecked():
-                    pressure_readings = [
-                        float(reading[4]) for reading in self.controller.readings]
-                    self.sc.axes.plot(
-                        timestamps, pressure_readings)
-
-                # Plot pressure against time
-                self.sc.draw()
-        
-    def stop_plotting(self):
-        self.monitoring = False
-        self.plot_thread.join()
-
     def on_pressure1RadioButton_clicked(self):
         pass
 
@@ -1233,7 +1149,8 @@ class Ui_MainWindow(object):
         )
 
         if self.save_path:
-            self.savePathEdit.setText(self.save_path)  # Optionally update the text field with the selected path
+            # Optionally update the text field with the selected path
+            self.savePathEdit.setText(self.save_path)
         else:
             self.savePathEdit.setText(os.path.join(
                 self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
@@ -1254,11 +1171,13 @@ class Ui_MainWindow(object):
             if self.saving:
                 self.saving = False
                 self.beginSaveButton.setText("Begin Saving")
-                self.controller.save_pressure_data(False, self.savePathEdit.text()) # type: ignore
+                self.controller.save_pressure_data(
+                    False, self.savePathEdit.text())  # type: ignore
             else:
                 self.saving = True
                 self.beginSaveButton.setText("Stop Saving")
-                self.controller.save_pressure_data(True, self.savePathEdit.text()) # type: ignore
+                self.controller.save_pressure_data(
+                    True, self.savePathEdit.text())  # type: ignore
 
     def on_connectMotorButton_clicked(self):
         logging.info("Connect motor button clicked")
@@ -1268,9 +1187,10 @@ class Ui_MainWindow(object):
             if self.motorController != None:
                 self.motorController.serial_connected = False
                 self.motorController.stop()
-                # self.motorController = None    
+                # self.motorController = None
         else:
-            self.motorController = MotorController(port = self.ardCOMPortSpinBox.value())
+            self.motorController = MotorController(
+                port=self.ardCOMPortSpinBox.value())
             try:
                 self.motorController.start()
                 if self.motorController.serial_connected:
@@ -1289,7 +1209,7 @@ class Ui_MainWindow(object):
                 self.motorController.stop()
                 self.motorController = None
                 self.UIUpdateMotorConnection()
-    
+
     def on_calibrateMotorButton_clicked(self):
         logging.info("Calibrate motor button clicked")
         if self.motorConnected:
@@ -1304,7 +1224,8 @@ class Ui_MainWindow(object):
         logging.info("Move to target button clicked")
         if self.motorConnected:
             targetpos = float(self.targetMotorPosEdit.text())
-            self.motorController.move_to_target(float(self.targetMotorPosEdit.text()))
+            self.motorController.move_to_target(
+                float(self.targetMotorPosEdit.text()))
 
     def add_step(self, step_type, time_length):
         step = Step(step_type, time_length)
@@ -1316,7 +1237,8 @@ class Ui_MainWindow(object):
 
     def list_steps(self):
         for step in self.steps:
-            print(f"Step Type: {step.step_type}, Time Length: {step.time_length}")
+            print(f"Step Type: {step.step_type}, Time Length: {
+                  step.time_length}")
 
     def edit_motor_macro(self):
         pass
@@ -1324,6 +1246,11 @@ class Ui_MainWindow(object):
     def edit_valve_macro(self):
         dialog = ValveMacroEditor(self)
         dialog.exec()
+
+    def handle_error(self, error_message):
+        """Handle errors from the Arduino worker."""
+        self.ardWarningLabel.setText(f"Error: {error_message}")
+        self.ardWarningLabel.setStyleSheet("color: red")
 
     def update_controls(self):
         if self.ardConnected:
@@ -1339,8 +1266,8 @@ class Ui_MainWindow(object):
             self.pressure4RadioButton.setEnabled(True)
             # Toggle save controls
             self.beginSaveButton.setEnabled(True)
-            #self.savePathEdit.setEnabled(True)
-            #self.selectSavePathButton.setEnabled(True)
+            # self.savePathEdit.setEnabled(True)
+            # self.selectSavePathButton.setEnabled(True)
             if self.selectedMode == 0:
                 # Toggle valve controls
                 self.Valve1Button.setEnabled(True)
@@ -1416,18 +1343,23 @@ class Ui_MainWindow(object):
             self.pressure4RadioButton.setEnabled(False)
             # Toggle save controls
             self.beginSaveButton.setEnabled(False)
-            #self.savePathEdit.setEnabled(False)
-            #self.selectSavePathButton.setEnabled(False)
+            # self.savePathEdit.setEnabled(False)
+            # self.selectSavePathButton.setEnabled(False)
         if self.saving:
             self.savePathEdit.setEnabled(False)
             self.selectSavePathButton.setEnabled(False)
         else:
             self.savePathEdit.setEnabled(True)
             self.selectSavePathButton.setEnabled(True)
-        
 
 
-class QTextEditLogger(logging.Handler, QtCore.QObject):
+class Step:
+    def __init__(self, step_type, time_length):
+        self.step_type = step_type
+        self.time_length = time_length
+
+
+class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
     appendPlainText = QtCore.pyqtSignal(str)
 
     def __init__(self, parent):
@@ -1446,12 +1378,13 @@ class QTextEditLogger(logging.Handler, QtCore.QObject):
     def scroll_to_bottom(self):
         self.widget.verticalScrollBar().setValue(
             self.widget.verticalScrollBar().maximum())
-    
+
     def close(self):
         self.widget.clear()
         super().close()
 
-class ValveMacroEditor(QtWidgets.QDialog):
+
+class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Valve Macro Editor")
@@ -1463,15 +1396,16 @@ class ValveMacroEditor(QtWidgets.QDialog):
         self.table.setRowCount(6)
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(
-            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"])        
-        
+            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"])
+
         # Set layout
         self.mainLayout = QtWidgets.QVBoxLayout()
         self.mainLayout.addWidget(self.table)
         self.setLayout(self.mainLayout)
 
-                # Determine the directory of the executable
-        self.executable_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        # Determine the directory of the executable
+        self.executable_dir = os.path.dirname(sys.executable) if getattr(
+            sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
         # Load data from JSON file if it exists
         self.load_data()
@@ -1483,14 +1417,16 @@ class ValveMacroEditor(QtWidgets.QDialog):
 
     def load_data(self):
         json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
-        #print(json_path)
+        # print(json_path)
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r') as f:
                     data = json.load(f)
                 for i, macro in enumerate(data):
                     item = QtWidgets.QTableWidgetItem(macro["Macro No."])
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)  # Make the item read-only
+                    # Make the item read-only
+                    item.setFlags(item.flags() & ~
+                                  QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
                     for j, state in enumerate(macro["Valves"], start=1):
                         combo = QtWidgets.QComboBox()
@@ -1505,22 +1441,24 @@ class ValveMacroEditor(QtWidgets.QDialog):
     def set_default_values(self):
         for i in range(6):
             item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
-            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)  # Make the item read-only
+            # Make the item read-only
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 0, item)
             for j in range(1, 9):
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed"])
                 combo.setCurrentIndex(1)  # Default to "Closed"
                 self.table.setCellWidget(i, j, combo)
-    
+
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()
-            valve_states = [self.table.cellWidget(row, col).currentText() for col in range(1, 9)]
+            valve_states = [self.table.cellWidget(
+                row, col).currentText() for col in range(1, 9)]
             data.append({"Macro No.": macro_number, "Valves": valve_states})
         return data
-    
+
     def closeEvent(self, event):
         data = self.get_macro_data()
         json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
@@ -1529,12 +1467,12 @@ class ValveMacroEditor(QtWidgets.QDialog):
             json.dump(data, f, indent=4)
         super().closeEvent(event)
 
+
 class RealTimePlot(FigureCanvasQTAgg):
-    def __init__(self, controller, parent=None):
+    def __init__(self, parent=None):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
         self.setParent(parent)
-        self.controller = controller.controller
 
         # Initialize data
         self.p1_data = []
@@ -1542,10 +1480,14 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.p3_data = []
         self.p4_data = []
         self.x_data = []
-        self.line1, = self.ax.plot([], [], lw=2, color = "red")  # Initialize an empty plot
-        self.line2, = self.ax.plot([], [], lw=2, color = "blue")  # Initialize an empty plot
-        self.line3, = self.ax.plot([], [], lw=2, color = "green")  # Initialize an empty plot
-        self.line4, = self.ax.plot([], [], lw=2, color = "purple")  # Initialize an empty plot
+        # Initialize an empty plot
+        self.line1, = self.ax.plot([], [], lw=2, color="red")
+        # Initialize an empty plot
+        self.line2, = self.ax.plot([], [], lw=2, color="blue")
+        # Initialize an empty plot
+        self.line3, = self.ax.plot([], [], lw=2, color="green")
+        # Initialize an empty plot
+        self.line4, = self.ax.plot([], [], lw=2, color="purple")
 
         # Set plot limits and labels
         self.ax.set_xlim(0, 100)
@@ -1553,64 +1495,81 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.ax.set_xlabel('Time')
         self.ax.set_ylabel('mBar')
 
-    def update_plot(self):
-        logging.info(self.controller == True)
-        if self.controller:  # Check if the controller is available
-            pressure_values = self.controller.get_recent_readings()  # Get pressure data
-            if pressure_values:
-                new_values = float(pressure_values[0])  # Example: using the first pressure value
-                # print(f"New pressure value: {new_value}")
+    @QtCore.pyqtSlot(list)
+    def update_plot(self, pressure_values):
+        if pressure_values:
+            # Update x_data and y_data with the newest value
+            # Append new x (time) point
+            self.x_data.append(len(self.x_data))
+            # Append new y (pressure) point
+            self.p1_data.append(pressure_values[0][-1])
+            # Append new y (pressure) point
+            self.p2_data.append(pressure_values[1][-1])
+            # Append new y (pressure) point
+            self.p3_data.append(pressure_values[2][-1])
+            # Append new y (pressure) point
+            self.p4_data.append(pressure_values[3][-1])
 
-                # Update x_data and y_data with the newest value
-                self.x_data.append(len(self.x_data))  # Append new x (time) point
-                self.p1_data.append(pressure_values[0][-1])         # Append new y (pressure) point
-                self.p2_data.append(pressure_values[1][-1])         # Append new y (pressure) point
-                self.p3_data.append(pressure_values[2][-1])         # Append new y (pressure) point
-                self.p4_data.append(pressure_values[3][-1])         # Append new y (pressure) point
+            # Update the plot's data without clearing
+            self.line1.set_data(self.x_data, self.y_data)
+            self.line2.set_data(self.x_data, self.y_data)
+            self.line3.set_data(self.x_data, self.y_data)
+            self.line4.set_data(self.x_data, self.y_data)
 
-                # Update the plot's data without clearing
-                self.line1.set_data(self.x_data, self.y_data)
-                self.line2.set_data(self.x_data, self.y_data)
-                self.line3.set_data(self.x_data, self.y_data)
-                self.line4.set_data(self.x_data, self.y_data)
+            # Adjust limits if necessary
+            if len(self.x_data) > 100:
+                self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
 
-                # Adjust limits if necessary
-                if len(self.x_data) > 100:
-                    self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
-                
-                # Redraw the canvas with the new data
-                self.draw()
+            # Redraw the canvas with the new data
+            self.draw()
 
-class PlotUpdater(QtCore.QThread):
-    """This thread emits new random data points to update the plot"""
-    new_data_signal = QtCore.pyqtSignal()
+
+class ArduinoWorker(QtCore.QThread):
+    # Signal to send data to the main thread
+    data_signal = QtCore.pyqtSignal(list)
+    # Signal to handle commands (e.g., turning valves on/off)
+    command_signal = QtCore.pyqtSignal(str)
+    error_signal = QtCore.pyqtSignal(str)  # Signal to send errors
+
+    def __init__(self, port, mode, verbose):
+        super().__init__()
+        self.controller = ArduinoController(
+            port=port, mode=mode, verbose=verbose)
+        self.running = True
 
     def run(self):
-        """Simulate incoming data points"""
-        while True:
-            new_value = random.uniform(0, 10)  # Generate random value
-            self.new_data_signal.emit()
-            time.sleep(1)  # Simulate data arrival every second
+        """Run the Arduino controller in a background thread."""
+        self.controller.start()
+        while self.running:
+            if self.controller.serial_connected:
+                if self.controller.new_plot:
+                    data = self.controller.readings  # Get new readings from Arduino
+                    # Emit signal with data to update the graph
+                    self.data_signal.emit(data)
+                time.sleep(0.5)  # Adjust polling interval as needed
+
+    def stop(self):
+        """Stop the worker and the Arduino controller."""
+        self.running = False
+        self.controller.stop()
+        self.quit()
+        self.wait()
+
+    @QtCore.pyqtSlot(str)
+    def handle_command(self, command):
+        """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
+        if self.controller.serial_connected:
+            self.controller.send_command(command)
+
+    def isRunning(self):
+        return self.controller.serial_connected
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
-        self.button = QtWidgets.QPushButton("Start Data Simulation", self)
-        self.button.clicked.connect(self.start_simulation)
-        self.sequenceLayout.addWidget(self.button)
-
         self.setup_logging()
-        # Example plot
-        # self.plot()
-        self.plot_updater = PlotUpdater()
-        self.plot_updater.new_data_signal.connect(self.sc.update_plot)
-        #self.plot_updater.run()
-
-    def start_simulation(self):
-        """Start the data simulation in the background"""
-        self.plot_updater.start()
 
     def setup_logging(self):
         # Initialize the logger
@@ -1631,8 +1590,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """
 
     def closeEvent(self, event):
-        if self.plot_thread is not None:
-            self.stop_plotting()
+
+        if self.arduino_worker:
+            self.arduino_worker.stop()
 
         if self.ardConnected or self.controller is not None:
             if self.verbosity:
@@ -1658,7 +1618,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # Ensure QTextEditLogger is properly closed
         if hasattr(self, 'logTextBox'):
             self.logTextBox.close()
-        """     
+        """
         # Call the base class method to ensure the window closes
         event.accept()
 
