@@ -4,6 +4,7 @@ import time
 import os
 import csv
 from arduinoController import ArduinoController
+from motorController import MotorController
 
 
 def parse_arguments():
@@ -42,19 +43,23 @@ def main():
     # Create and start the server
 
     # Test to manually switch a valve on and off
-    server = ArduinoController(4, True, 0)
-    server.start()
-    time.sleep(2)
-    server.send_command("SWITCH_TO_MANUAL")
-    time.sleep(1)
-    server.send_command("TURN_ON_INLET_VALVE")
-    time.sleep(4)
-    # print("writing to file")
+    # server = ArduinoController(4, True, 0)
+    # server.start()
+    # time.sleep(2)
+    # server.send_command("SWITCH_TO_MANUAL")
+    # time.sleep(1)
+    # server.send_command("TURN_ON_INLET_VALVE")
+    # time.sleep(4)
+    # print("writing to file")40
     # Wait for user input and send command if it exists in commands_dict values
     # Open a CSV file to record data
-    server.send_command("RESET")
+    motor = MotorController(5)
+    print("Starting motor")
+    motor.start()
+    time.sleep(2)
     while True:
         time.sleep(1)
+    
 
 
 

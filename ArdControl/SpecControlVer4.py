@@ -966,11 +966,13 @@ class Ui_MainWindow(object):
                 port=port, mode=self.selectedMode, verbose=self.verbosity)
 
             # Connect the worker signals to appropriate slots
+            self.arduino_worker.start()
+            time.sleep(1)
             self.arduino_worker.data_signal.connect(
                 self.sc.update_plot)  # To update the plot
             self.arduino_worker.error_signal.connect(
                 self.handle_error)  # To handle errors
-            self.arduino_worker.start()
+            
             if self.arduino_worker.isRunning():
                 self.ardConnected = True
             else:
@@ -1502,19 +1504,19 @@ class RealTimePlot(FigureCanvasQTAgg):
             # Append new x (time) point
             self.x_data.append(len(self.x_data))
             # Append new y (pressure) point
-            self.p1_data.append(pressure_values[0][-1])
+            self.p1_data.append(float(pressure_values[-1][1]))
             # Append new y (pressure) point
-            self.p2_data.append(pressure_values[1][-1])
+            self.p2_data.append(float(pressure_values[-1][2]))
             # Append new y (pressure) point
-            self.p3_data.append(pressure_values[2][-1])
+            self.p3_data.append(float(pressure_values[-1][3]))
             # Append new y (pressure) point
-            self.p4_data.append(pressure_values[3][-1])
+            self.p4_data.append(float(pressure_values[-1][4]))
 
             # Update the plot's data without clearing
-            self.line1.set_data(self.x_data, self.y_data)
-            self.line2.set_data(self.x_data, self.y_data)
-            self.line3.set_data(self.x_data, self.y_data)
-            self.line4.set_data(self.x_data, self.y_data)
+            self.line1.set_data(self.x_data, self.p1_data)
+            self.line2.set_data(self.x_data, self.p2_data)
+            self.line3.set_data(self.x_data, self.p3_data)
+            self.line4.set_data(self.x_data, self.p4_data)
 
             # Adjust limits if necessary
             if len(self.x_data) > 100:

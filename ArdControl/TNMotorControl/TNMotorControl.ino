@@ -1,41 +1,54 @@
 #include <Arduino.h>
-#include "HAL/spi.h"
-#include "HAL/gpio.h"
-#include "peripherals/TMC5130.h"
-#include "peripherals/TLE5012B.h"
-#include "HAL/timer.h"
 #include "callbacks.h"
-#include "utils/dropin.h"
+
 #include <UstepperS32.h>
 
 #define SLOW 0
 #define MEDIUM 1
 #define FAST 2
 
+const int stepMult = 25600;
 const unsigned long DEFHeartBeatTime = 5000;
-const int maxRPM = 500;
+const int maxRPM = 50;
 const int maxAcc = 2000;
+const int maxVel = 50;
 const int inverted = 0;
+const int UP = 1;
+const int DOWN = -1;
 
 int topPosition = 0;
+bool started = false;
 bool calibrationFlag = false;
 bool moveFlag = false;
 bool calibrated = false;
+unsigned long tNow = 0;
+unsigned long heartBeat = 0;
+unsigned long tStart = 0;
+unsigned long tStall = 0;
 UstepperS32 motor;
+int dir = 0;
+int stallVal = 0;
+bool doOnce = true;
 
 void setup(){
     Serial.begin(9600);
-    motor.setup(mode = NORMAL, stepsPerRevolution = 200, pTerm = 10, iTerm = 0.2, dTerm = 0, dropinStepSize = 16, setHome = true, invert = inverted, runCurrent = 50, holdCurrent = 30);
+    motor.setup(NORMAL, 200, 10, 0.2, 0.0, 16, true, 0, 80, 40);
     motor.setBrakeMode(COOLBRAKE);
     motor.setMaxAcceleration(maxAcc); //use an acceleration of 2000 fullsteps/s^2
     motor.setRPM(maxRPM);
+    motor.setMaxVelocity(maxVel);
+    //motor.encoder.encoderStallDetectEnable = 1;
     tStart = millis();  //begin polling timer
     heartBeat = millis();
     started = 0;
+    dir = 0;
+    motor.stop();
 }
 
 void loop(){
+  //motor.stop();
   while (started == 0) {
+    calibrationFlag = false;
     // Wait for the system to be started
     if (Serial.available() > 0) {
       char input = Serial.read();
@@ -49,15 +62,46 @@ void loop(){
     }
   }
 
+  if (doOnce = true){
+    int steps = 10000;
+    motor.moveSteps(steps * DOWN);
+    doOnce = false;
+  }
+
   tNow = millis();
 
   if(Serial.available()){handleSerial();}
 
-  if(calibrationFlag == true && motor.getState(STANDSTILL) == true) {setHome();} //set the home position when calibration is finished
+  //if(calibrationFlag == true && motor.getMotorState(STALLGUARD2) == true) {setHome();} //set the home position when calibration is finished
 
-  if(moveFlag == true && motor.getState(POSITION_REACHED) == true) {moveFlag = false; Serial.println("LOG: Reached position");} //reset moveFlag when move is finished
+  //if(moveFlag == true && motor.getMotorState(POSITION_REACHED) == true) {moveFlag = false; Serial.println("LOG: Reached position");} //reset moveFlag when move is finished
 
-  if((long)(tNow - heartBeat) >= (long)DEFHeartbeatTime) {reset();} //reset if no heartbeat for 5 seconds
+  if((long)(tNow - heartBeat) >= (long)DEFHeartBeatTime) {reset();} //reset if no heartbeat for 5 seconds
+  //motor.disableStallguard();
+  if((long)(tNow - tStall) >= (long)1000){
+    tStall = millis();
+    stallVal += 1;
+    //motor.disableStallguard();
+    if(motor.driver.getVelocity() < 0.01){
+      Serial.print("LOG: Stall detected at sens ");
+      Serial.println(stallVal);
+    }
+    else{  
+      motor.enableStallguard(stallVal, true, maxRPM);
+      Serial.print("LOG: STALLVAL IS NOW ");
+      Serial.println(stallVal);
+      int steps = 10000;
+      motor.moveSteps(steps * UP);
+    }    
+  }
+  
+  
+  /*
+  if (motor.driver.getVelocity() < 0){
+    Serial.println("LOG: Velocity too low");
+    reset();
+  }
+  */
 }
 
 void handleSerial(){
@@ -75,25 +119,35 @@ void handleSerial(){
         heartBeat = millis();
         break;
       case 'p': //move to position
+      /*
         if (moveFlag == true) {Serial.println("LOG: Motor is already moving"); break;}
         else if (calibrationFlag == true) {Serial.println("LOG: Motor is calibrating"); break;}
         else if (calibrated == false) {Serial.println("LOG: Motor is not calibrated"); break;}
         else {Serial.println("LOG: Moving to position"); goToPos(); break;}
+        */
+        Serial.println("LOG: Moving to position"); 
+        goToPos();
+        break;
       case 'c': //calibrate
         Serial.println("LOG: Calibrating");
-        setSpeedProfile(SLOW);
-        motor.checkOritentation(10);
-        motor.moveToEnd(dir=CW, rpm=50, threshold=4, timeOut=100000);
+        Serial.println("yes");
+        //setSpeedProfile(MEDIUM);
+        motor.checkOrientation(10);
+        motor.enableStallguard(4, true, maxVel);
+        motor.runContinous(1);
+        Serial.println("LOG: Got past calibr");
         calibrationFlag = true;
         break;
       case 'g': //get position
-        Serial.println(motor.getPosition());
+        Serial.println(motor.driver.getPosition());
         break;
       case 't': //get status
-        if (motor.getState(STANDSTILL) == true) {Serial.println("LOG: Motor is stopped");}
+        if (motor.getMotorState(STANDSTILL) == true) {Serial.println("LOG: Motor is stopped");}
         else {Serial.println("LOG: Motor is moving");}
-        if (motor.getState(POSITION_REACHED) == true) {Serial.println("LOG: Motor is at position");}
+        if (motor.getMotorState(POSITION_REACHED) == true) {Serial.println("LOG: Motor is at position");}
         else {Serial.println("LOG: Motor is not at position or position not set");}
+        //Serial.println(motor.driver.readRegister(STANDSTILL));
+        //Serial.println(motor.driver.readRegister(POSITION_REACHED));
         break;
       default:
         Serial.println("LOG: Invalid input");
@@ -109,19 +163,27 @@ void reset(){ //called when error - stop hard
 }
 
 void setHome(){
+  Serial.println("Set home");
   calibrationFlag = false;
   calibrated = true;
-  topPosition = motor.getPosition();
+  topPosition = motor.driver.getPosition();
   setSpeedProfile(FAST);
+  //motor.clearStall();
+  //motor.disableStallguard();
 }
 
 void goToPos(){
-  if(Serial.available()){
-    String positionStr = Serial.readStringUntil('\n');
-    int position = (topPosition + positionStr.toInt());
+  String positionStr = Serial.readStringUntil('\n');
+  if (positionStr.length() > 0){
+    float position = (positionStr.toInt());
     Serial.print("LOG: Moving to position: ");
     Serial.println(position);
-    motor.movePosition(position);
+    motor.moveSteps(position);
+    // motor.driver.setDeceleration((uint16_t)(2000));
+  	// motor.driver.setAcceleration((uint16_t)(2000));
+	  // motor.driver.setVelocity((uint32_t)(50));
+
+    // motor.driver.setPosition(position);
     moveFlag = true;
   }
   else{
@@ -147,4 +209,8 @@ void setSpeedProfile(int speed){
     motor.setRPM(200);
     motor.setMaxAcceleration(1500);
   }
+}
+
+void stop(){
+  motor.stop(HARD);
 }

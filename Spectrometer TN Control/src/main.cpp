@@ -542,7 +542,7 @@ int convertToBar(int pressure){
   return (pressure-203.53)/0.8248/100;
 }
 
-bool loadstep() {
+bool loadStep() {
   if (Serial.available() > 0) {
     char input = Serial.read();
     if (input == -1) {

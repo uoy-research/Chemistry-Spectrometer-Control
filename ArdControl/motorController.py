@@ -13,6 +13,11 @@ class MotorController:
         self.baudrate = 9600
         # self.arduino = None
         self.shutdown_flag = False
+        self.last_heartbeat_time = 0
+        self.heartbeat_time = 5
+        self.serial_connected = False
+        self.heartbeat_thread = None
+        self.reading_thread = None
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
             "START": 'S',    # Start the Arduino
@@ -36,35 +41,99 @@ class MotorController:
             self.serial_connected = False
 
     def start(self):
+        print("starting")
         logging.info("Starting server...")
         self.connect_arduino()
         # logging.info("Arduino is connected? " + str(self.serial_connected))
         if self.serial_connected:
             time.sleep(1.2)  # Wait for Arduino to initialise
-            self.send_command('START'.encode())
+            self.send_command("START")
             # time.sleep(2.2)  # Wait for Arduino to initialise
             logging.info("Arduino started")
             self.last_heartbeat_time = time.time()
             self.start_heartbeat()
+            self.start_reading()
         else:
             pass
 
     def start_heartbeat(self):
-        self.heartbeat_thread = threading.Thread(target=self.heartbeat)
+        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
         self.heartbeat_thread.daemon = True
         self.heartbeat_thread.start()
 
-    def heartbeat(self):
+    def send_heartbeat(self):
         while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
-                    self.arduino.write('HEARTBEAT'.encode())
+                    self.arduino.write(
+                        self.commands_dict["HEARTBEAT"].encode())
                     logging.info("Sent HEARTBEAT")
                     # self.last_heartbeat_time = time.time()
                 time.sleep(3)  # Send heartbeat every 3 seconds
             except serial.SerialException as e:
                 logging.error(f"Failed to send heartbeat: {e}")
                 self.serial_connected = False
+
+    def start_reading(self):
+        self.reading_thread = threading.Thread(target=self.read_responses)
+        self.reading_thread.daemon = True
+        self.reading_thread.start()
+
+    def read_responses(self):
+        while not self.shutdown_flag and self.arduino != None:
+
+            if self.serial_connected and self.arduino.in_waiting > 0:
+                try:
+                    response = self.arduino.readline().decode('utf-8').strip()
+                    logging.info(f"Received: {response}")
+                    self.process_response(response)
+                except serial.SerialException as e:
+                    logging.error(f"Failed to read from Arduino: {e}")
+                    try:
+                        self.start_reading()
+                    except Exception as e:
+                        logging.error(f"Failed to restart reading thread: {e}")
+                        self.serial_connected = False
+            if self.last_heartbeat_time + self.heartbeat_time < time.time():
+                logging.error(
+                    "No heartbeat received from Arduino. Stopping server.")
+                self.stop()
+
+    def process_response(self, response):
+        if isinstance(response, bytes):
+            response = response.decode('utf-8').strip()
+        else:
+            response = response.strip()  # Already a string, just strip whitespace
+        # Process the response from Arduino
+        if response == "RESET":
+            logging.info("Arduino reset")
+            self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]
+        # Heartbeat response - "HEARTBEAT_ACK"
+        elif response == "HEARTBEATACK":
+            self.last_heartbeat_time = time.time()  # Update heartbeat time
+            # logging.info("Received HEARTBEAT_ACK")
+        elif response == "yes":
+            self.last_heartbeat_time = time.time() + 10 # Update heartbeat time
+        # Pressure reading - "P <pressure1> ... <valveState1> ... C"
+        # Pressure values are in mbar, valve states are 0 or 1
+        # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
+        # Sequence loaded - "SEQ: <sequence>"
+        elif response.startswith("SEQ: "):
+            if response.endswith("False"):
+                self.sequence_loaded = False
+                logging.info(f"Sequence loaded: {
+                             response.replace('SEQ: ', '')}")
+            else:
+                self.sequence_loaded = True
+                logging.info(f"Sequence loaded: {
+                             response.replace('SEQ: ', '')}")
+        elif response.startswith("LOG: "):  # Log message - "LOG <message>"
+            log_message = response.replace("LOG: ", "")
+            print(log_message)
+            logging.info(f"Ard: {log_message}")
+        else:
+            logging.warning(f"Unknown response: {response}")
+
 
     def send_command(self, command):
         if command in self.commands_dict:
@@ -82,6 +151,7 @@ class MotorController:
                     return False  # Failed to send command
             else:
                 logging.error("Invalid command - not a recognised command")
+                logging.error(f"Command: {command}")
                 return False  # Invalid command
         else:
             logging.error("Cannot send command - not connected to Arduino")
@@ -95,9 +165,12 @@ class MotorController:
         logging.info("Closed serial connection")
 
     def move_to_target(self, target):
-        if(self.send_command('GOTOPOS')):
-            self.arduino.write(str(target).encode())
-            self.arduino.write('\n'.encode())
-        else:
-            logging.error("Failed to send GOTOPOS command")
-        
+        self.arduino.write('p'.encode())
+        #time.sleep(0.1)
+        self.arduino.write(str(target).encode())
+        self.arduino.write('\n'.encode())
+        self.arduino.flush()
+  
+    def calibrate(self):
+        self.send_command('CALIBRATE')
+        logging.info("Sent CALIBRATE command")
