@@ -29,7 +29,7 @@ class Ui_MainWindow(object):
         self.default_save_path = os.path.join("C:\\", "NMR Results")
         self.motorConnectd = False
         self.steps = []
-        self.controller = None
+        # self.controller = None
         self.motorController = None
         self.sequenceLoaded = False
         self.sequenceReady = False
@@ -677,7 +677,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets
         self.figure = Figure()
-        self.sc = RealTimePlot()
+        self.sc = RealTimePlot(parent=self)
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.graphWidget.setGeometry(QtCore.QRect(91, 325, 651, 294))
@@ -968,11 +968,7 @@ class Ui_MainWindow(object):
             # Connect the worker signals to appropriate slots
             self.arduino_worker.start()
             time.sleep(1)
-            self.arduino_worker.data_signal.connect(
-                self.sc.update_plot)  # To update the plot
-            self.arduino_worker.error_signal.connect(
-                self.handle_error)  # To handle errors
-            
+            self.connect_arduino_signals()
             if self.arduino_worker.isRunning():
                 self.ardConnected = True
             else:
@@ -1011,80 +1007,80 @@ class Ui_MainWindow(object):
     def on_Valve1Button_clicked(self):
         logging.info("Valve 1 button clicked")
         self.Valve1Button.setChecked(False)
-        if self.ardConnected:
-            self.controller.get_valve_states()  # type: ignore
-            if self.controller.valve_states[0] == 0:    # type: ignore
+        if self.arduino_worker.isRunning():
+            valve_states = self.arduino_worker.get_states()  # type: ignore
+            if valve_states[0] == 0:    # type: ignore
                 logging.info("Turning on valve 1")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_SWITCH_VALVE")  # type: ignore
                 self.Valve1Button.setChecked(True)
             else:
                 logging.info("Turning off valve 1")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_OFF_SWITCH_VALVE")  # type: ignore
                 self.Valve1Button.setChecked(False)
 
     def on_Valve2Button_clicked(self):
         logging.info("Valve 2 button clicked")
         self.Valve2Button.setChecked(False)
-        if self.ardConnected:
-            self.controller.get_valve_states()  # type: ignore
-            if self.controller.valve_states[1] == 0:    # type: ignore
+        if self.arduino_worker.isRunning():
+            valve_states = self.arduino_worker.get_states()  # type: ignore
+            if valve_states[1] == 0:
                 logging.info("Turning on valve 2")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_INLET_VALVE")  # type: ignore
                 self.Valve2Button.setChecked(True)
             else:
                 logging.info("Turning off valve 2")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_OFF_INLET_VALVE")  # type: ignore
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
         logging.info("Valve 3 button clicked")
         self.Valve3Button.setChecked(False)
-        if self.ardConnected:
-            self.controller.get_valve_states()  # type: ignore
-            if self.controller.valve_states[2] == 0:    # type: ignore
+        if self.arduino_worker.isRunning():
+            valve_states = self.arduino_worker.get_states()
+            if valve_states[2] == 0:
                 logging.info("Turning on valve 3")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_OUTPUT_VALVE")  # type: ignore
                 self.Valve3Button.setChecked(True)
             else:
                 logging.info("Turning off valve 3")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_OFF_OUTPUT_VALVE")  # type: ignore
                 self.Valve3Button.setChecked(False)
 
     def on_Valve4Button_clicked(self):
         logging.info("Valve 4 button clicked")
         self.Valve4Button.setChecked(False)
-        if self.ardConnected:
-            self.controller.get_valve_states()  # type: ignore
-            if self.controller.valve_states[3] == 0:    # type: ignore
+        if self.arduino_worker.isRunning():
+            valve_states = self.arduino_worker.get_states()
+            if valve_states[3] == 0:
                 logging.info("Turning on valve 4")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_VENT_VALVE")  # type: ignore
                 self.Valve4Button.setChecked(True)
             else:
                 logging.info("Turning off valve 4")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_OFF_VENT_VALVE")   # type: ignore
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
         logging.info("Valve 5 button clicked")
         self.Valve5Button.setChecked(False)
-        # self.controller.get_valve_states()  # type: ignore
-        if self.ardConnected:
-            if self.controller.valve_states[4] == 0:    # type: ignore
+        if self.arduino_worker.isRunning():
+            valve_states = self.arduino_worker.get_states()
+            if valve_states[4] == 0:    # type: ignore
                 logging.info("Turning on valve 5")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_SHORT_VALVE")  # type: ignore
                 self.Valve5Button.setChecked(True)
             else:
                 logging.info("Turning off valve 5")
-                self.controller.send_command(   # type: ignore
+                self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_OFF_SHORT_VALVE")   # type: ignore
                 self.Valve5Button.setChecked(False)
     '''
@@ -1157,28 +1153,32 @@ class Ui_MainWindow(object):
             self.savePathEdit.setText(os.path.join(
                 self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
 
+    @QtCore.pyqtSlot()
     def on_resetButton_clicked(self):
         logging.info("Reset button clicked")
         if self.ardConnected:
-            self.controller.send_command("RESET")  # type: ignore
+            self.arduino_worker.command_signal.emit("RESET")  # type: ignore
 
+    @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.info("Quick vent button clicked")
         if self.ardConnected:
-            self.controller.send_command("DEPRESSURISE")  # type: ignore
+            self.arduino_worker.command_signal.emit(
+                "QUICK_VENT")  # type: ignore
 
+    @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
         logging.info("Begin save button clicked")
         if self.ardConnected:
             if self.saving:
                 self.saving = False
                 self.beginSaveButton.setText("Begin Saving")
-                self.controller.save_pressure_data(
+                self.arduino_worker.save_signal.emit(
                     False, self.savePathEdit.text())  # type: ignore
             else:
                 self.saving = True
                 self.beginSaveButton.setText("Stop Saving")
-                self.controller.save_pressure_data(
+                self.arduino_worker.save_signal.emit(
                     True, self.savePathEdit.text())  # type: ignore
 
     def on_connectMotorButton_clicked(self):
@@ -1220,7 +1220,7 @@ class Ui_MainWindow(object):
     def on_stopMotorButton_clicked(self):
         logging.info("Stop motor button clicked")
         if self.motorConnected:
-            self.motorController.stop_motor()
+            self.motorController.stop()
 
     def on_moveToTargetButton_clicked(self):
         logging.info("Move to target button clicked")
@@ -1248,11 +1248,6 @@ class Ui_MainWindow(object):
     def edit_valve_macro(self):
         dialog = ValveMacroEditor(self)
         dialog.exec()
-
-    def handle_error(self, error_message):
-        """Handle errors from the Arduino worker."""
-        self.ardWarningLabel.setText(f"Error: {error_message}")
-        self.ardWarningLabel.setStyleSheet("color: red")
 
     def update_controls(self):
         if self.ardConnected:
@@ -1353,6 +1348,17 @@ class Ui_MainWindow(object):
         else:
             self.savePathEdit.setEnabled(True)
             self.selectSavePathButton.setEnabled(True)
+
+    def UIUpdateMotorConnection(self):
+        pass
+
+    def connect_arduino_signals(self):
+        self.arduino_worker.data_signal.connect(
+            self.sc.update_plot)  # To update the plot
+        self.arduino_worker.save_signal.connect(
+            self.arduino_worker.save_data)  # To toggle saving data
+        self.arduino_worker.command_signal.connect(
+            self.arduino_worker.send_command)  # To send commands
 
 
 class Step:
@@ -1471,10 +1477,9 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
 
 class RealTimePlot(FigureCanvasQTAgg):
-    def __init__(self, parent=None):
+    def __init__(self, parent):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
-        self.setParent(parent)
 
         # Initialize data
         self.p1_data = []
@@ -1503,14 +1508,15 @@ class RealTimePlot(FigureCanvasQTAgg):
             # Update x_data and y_data with the newest value
             # Append new x (time) point
             self.x_data.append(len(self.x_data))
-            # Append new y (pressure) point
-            self.p1_data.append(float(pressure_values[-1][1]))
-            # Append new y (pressure) point
-            self.p2_data.append(float(pressure_values[-1][2]))
-            # Append new y (pressure) point
-            self.p3_data.append(float(pressure_values[-1][3]))
-            # Append new y (pressure) point
-            self.p4_data.append(float(pressure_values[-1][4]))
+
+            if self.parent.pressure1RadioButton.isChecked():
+                self.p1_data.append(float(pressure_values[-1][1]))
+            if self.parent.pressure2RadioButton.isChecked():
+                self.p2_data.append(float(pressure_values[-1][2]))
+            if self.parent.pressure3RadioButton.isChecked():
+                self.p3_data.append(float(pressure_values[-1][3]))
+            if self.parent.pressure4RadioButton.isChecked():
+                self.p4_data.append(float(pressure_values[-1][4]))
 
             # Update the plot's data without clearing
             self.line1.set_data(self.x_data, self.p1_data)
@@ -1531,7 +1537,8 @@ class ArduinoWorker(QtCore.QThread):
     data_signal = QtCore.pyqtSignal(list)
     # Signal to handle commands (e.g., turning valves on/off)
     command_signal = QtCore.pyqtSignal(str)
-    error_signal = QtCore.pyqtSignal(str)  # Signal to send errors
+    save_signal = QtCore.pyqtSignal(bool, str)  # Signal to save data
+    step_signal = QtCore.pyqtSignal(Step)  # Signal to update step info
 
     def __init__(self, port, mode, verbose):
         super().__init__()
@@ -1566,6 +1573,24 @@ class ArduinoWorker(QtCore.QThread):
     def isRunning(self):
         return self.controller.serial_connected
 
+    @QtCore.pyqtSlot(bool, str)
+    def save_data(self, save, path):
+        if save:
+            self.controller.save_pressure_data(save, path)
+        else:
+            self.controller.save_pressure_data(save, path)
+
+    @QtCore.pyqtSlot(str)
+    def send_command(self, command):
+        self.controller.send_command(command)
+
+    @QtCore.pyqtSlot(Step)
+    def update_step(self, step):
+        self.controller.send_step(step)
+
+    def get_states(self):
+        return self.controller.get_valve_states()
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -1595,15 +1620,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if self.arduino_worker:
             self.arduino_worker.stop()
-
-        if self.ardConnected or self.controller is not None:
-            if self.verbosity:
-                print("Arduino is still connected, stopping controller...")
-            try:
-                self.controller.stop()  # type: ignore
-            except Exception as e:
-                if self.verbosity:
-                    print(e)
             if self.verbosity:
                 print("Controller stopped")
         if self.verbosity:
