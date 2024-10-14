@@ -34,6 +34,7 @@ class Ui_MainWindow(object):
         self.sequenceLoaded = False
         self.sequenceReady = False
         self.sequenceRunning = False
+        self.watchdog = None
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
@@ -78,6 +79,9 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.ardCOMPortSpinBox.setObjectName("ardCOMPortSpinBox")
         self.ardConnectLayout.addWidget(self.ardCOMPortSpinBox)
+        self.ardCOMPortSpinBox.setMaximum(255)
+        self.ardCOMPortSpinBox.setMinimum(0)
+        self.ardCOMPortSpinBox.setValue(6)
 
         # Create the warning label
         self.ardWarningLabel = QtWidgets.QLabel(
@@ -956,7 +960,19 @@ class Ui_MainWindow(object):
         """Handle Arduino connection/disconnection."""
         if self.ardConnected:
             # If Arduino is already connected, stop the worker and disconnect
-            self.arduino_worker.stop()
+            try:
+                if self.arduino_worker.isRunning():
+                    self.arduino_worker.stop()
+            except AttributeError:
+                pass
+            if self.watchdog != None:
+                self.watchdog.stop()
+            self.ardConnected = False
+            self.UIUpdateArdConnection()
+
+        elif self.selectedMode == None:
+            self.ardWarningLabel.setText("Please select a mode")
+            self.ardWarningLabel.setStyleSheet("color: red")
             self.ardConnected = False
             self.UIUpdateArdConnection()
         else:
@@ -964,6 +980,7 @@ class Ui_MainWindow(object):
             port = self.ardCOMPortSpinBox.value()
             self.arduino_worker = ArduinoWorker(
                 port=port, mode=self.selectedMode, verbose=self.verbosity)
+            self.setup_watchdog()
 
             # Connect the worker signals to appropriate slots
             self.arduino_worker.start()
@@ -1009,7 +1026,7 @@ class Ui_MainWindow(object):
         self.Valve1Button.setChecked(False)
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()  # type: ignore
-            if valve_states[0] == 0:    # type: ignore
+            if int(valve_states[0]) == 0:    # type: ignore
                 logging.info("Turning on valve 1")
                 self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_SWITCH_VALVE")  # type: ignore
@@ -1025,7 +1042,7 @@ class Ui_MainWindow(object):
         self.Valve2Button.setChecked(False)
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()  # type: ignore
-            if valve_states[1] == 0:
+            if int(valve_states[1]) == 0:
                 logging.info("Turning on valve 2")
                 self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_INLET_VALVE")  # type: ignore
@@ -1041,15 +1058,15 @@ class Ui_MainWindow(object):
         self.Valve3Button.setChecked(False)
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()
-            if valve_states[2] == 0:
+            if int(valve_states[2]) == 0:
                 logging.info("Turning on valve 3")
                 self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_OUTPUT_VALVE")  # type: ignore
+                    "TURN_ON_OUTLET_VALVE")  # type: ignore
                 self.Valve3Button.setChecked(True)
             else:
                 logging.info("Turning off valve 3")
                 self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_OUTPUT_VALVE")  # type: ignore
+                    "TURN_OFF_OUTLET_VALVE")  # type: ignore
                 self.Valve3Button.setChecked(False)
 
     def on_Valve4Button_clicked(self):
@@ -1057,7 +1074,7 @@ class Ui_MainWindow(object):
         self.Valve4Button.setChecked(False)
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()
-            if valve_states[3] == 0:
+            if int(valve_states[3]) == 0:
                 logging.info("Turning on valve 4")
                 self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_VENT_VALVE")  # type: ignore
@@ -1073,7 +1090,8 @@ class Ui_MainWindow(object):
         self.Valve5Button.setChecked(False)
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()
-            if valve_states[4] == 0:    # type: ignore
+            #logging.info("States: " + str(valve_states))
+            if int(valve_states[4]) == 0:    # type: ignore
                 logging.info("Turning on valve 5")
                 self.arduino_worker.command_signal.emit(   # type: ignore
                     "TURN_ON_SHORT_VALVE")  # type: ignore
@@ -1164,7 +1182,7 @@ class Ui_MainWindow(object):
         logging.info("Quick vent button clicked")
         if self.ardConnected:
             self.arduino_worker.command_signal.emit(
-                "QUICK_VENT")  # type: ignore
+                "DEPRESSURISE")  # type: ignore
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
@@ -1180,6 +1198,18 @@ class Ui_MainWindow(object):
                 self.beginSaveButton.setText("Stop Saving")
                 self.arduino_worker.save_signal.emit(
                     True, self.savePathEdit.text())  # type: ignore
+                
+    def setup_watchdog(self):
+        self.watchdog = QtCore.QTimer()
+        self.watchdog.timeout.connect(self.check_arduino_state)
+        self.watchdog.start(1000)
+
+    def check_arduino_state(self):
+        if not self.arduino_worker.isRunning():
+            self.ardConnected = False
+            self.ardWarningLabel.setText("Connection Closed")
+            self.ardWarningLabel.setStyleSheet("color: red")
+            self.UIUpdateArdConnection()
 
     def on_connectMotorButton_clicked(self):
         logging.info("Connect motor button clicked")
@@ -1487,6 +1517,7 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.p3_data = []
         self.p4_data = []
         self.x_data = []
+        self.parent = parent
         # Initialize an empty plot
         self.line1, = self.ax.plot([], [], lw=2, color="red")
         # Initialize an empty plot
@@ -1509,20 +1540,30 @@ class RealTimePlot(FigureCanvasQTAgg):
             # Append new x (time) point
             self.x_data.append(len(self.x_data))
 
-            if self.parent.pressure1RadioButton.isChecked():
-                self.p1_data.append(float(pressure_values[-1][1]))
-            if self.parent.pressure2RadioButton.isChecked():
-                self.p2_data.append(float(pressure_values[-1][2]))
-            if self.parent.pressure3RadioButton.isChecked():
-                self.p3_data.append(float(pressure_values[-1][3]))
-            if self.parent.pressure4RadioButton.isChecked():
-                self.p4_data.append(float(pressure_values[-1][4]))
+
+            # Append new y (pressure) point
+            self.p1_data.append(float(pressure_values[-1][1]))
+            self.p2_data.append(float(pressure_values[-1][2]))
+            self.p3_data.append(float(pressure_values[-1][3]))
+            self.p4_data.append(float(pressure_values[-1][4]))
 
             # Update the plot's data without clearing
-            self.line1.set_data(self.x_data, self.p1_data)
-            self.line2.set_data(self.x_data, self.p2_data)
-            self.line3.set_data(self.x_data, self.p3_data)
-            self.line4.set_data(self.x_data, self.p4_data)
+            if self.parent.pressure1RadioButton.isChecked():
+                self.line1.set_data(self.x_data, self.p1_data)
+            else:
+                self.line1.set_data([], [])
+            if self.parent.pressure2RadioButton.isChecked():
+                self.line2.set_data(self.x_data, self.p2_data)
+            else:
+                self.line2.set_data([], [])
+            if self.parent.pressure3RadioButton.isChecked():
+                self.line3.set_data(self.x_data, self.p3_data)
+            else:
+                self.line3.set_data([], [])
+            if self.parent.pressure4RadioButton.isChecked():
+                self.line4.set_data(self.x_data, self.p4_data)
+            else:
+                self.line4.set_data([], [])
 
             # Adjust limits if necessary
             if len(self.x_data) > 100:
@@ -1571,6 +1612,7 @@ class ArduinoWorker(QtCore.QThread):
             self.controller.send_command(command)
 
     def isRunning(self):
+        logging.info(self.controller.serial_connected)
         return self.controller.serial_connected
 
     @QtCore.pyqtSlot(bool, str)
@@ -1639,6 +1681,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """
         # Call the base class method to ensure the window closes
         event.accept()
+
 
 
 if __name__ == "__main__":

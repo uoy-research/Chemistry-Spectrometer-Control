@@ -150,7 +150,7 @@ class ArduinoController:
             if self.serial_connected and self.arduino.in_waiting > 0:
                 try:
                     response = self.arduino.readline().decode('utf-8').strip()
-                    logging.info(f"Received: {response}")
+                    #logging.info(f"Received: {response}")
                     self.process_response(response)
                 except serial.SerialException as e:
                     logging.error(f"Failed to read from Arduino: {e}")
@@ -191,10 +191,10 @@ class ArduinoController:
         elif response.startswith("P "):
             self.pressure_values = response.split(
                 " ")[1:5]  # Currently only 4 pressure values
-            logging.info(f"Pressure reading: {self.pressure_values}")
+            #logging.info(f"Pressure reading: {self.pressure_values}")
             self.valve_states = response.split(
                 " ")[5:-1]   # Currently only 8 valve states
-            logging.info(f"Valve states: {self.valve_states}")
+            #logging.info(f"Valve states: {self.valve_states}")
 
             self.readings.append(
                 [time.time(), *self.pressure_values, *self.valve_states])
@@ -221,7 +221,7 @@ class ArduinoController:
             logging.warning(f"Unknown response: {response}")
 
     def stop(self):
-
+        self.serial_connected = False
         if self.arduino != None:
             self.send_command("RESET")
             self.arduino.close()
@@ -232,7 +232,8 @@ class ArduinoController:
 
         # Join the reading thread to ensure it has finished
         if hasattr(self, 'reading_thread') and self.reading_thread.is_alive():
-            self.reading_thread.join()
+            if threading.current_thread() is not self.reading_thread:
+                self.reading_thread.join()
 
         # Join the heartbeat thread to ensure it has finished
         if hasattr(self, 'heartbeat_thread') and self.heartbeat_thread.is_alive():
