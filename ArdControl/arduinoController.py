@@ -33,6 +33,7 @@ class ArduinoController:
         self.auto_control = False
         self.steps = []
         self.prev_step = None
+        self.lock = threading.Lock()
 
         self.pressure_data_thread = threading.Thread(
             target=self.read_pressure_data)
@@ -130,8 +131,10 @@ class ArduinoController:
         while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
-                    self.arduino.write(
-                        self.commands_dict["HEARTBEAT"].encode())
+                    with self.lock:
+                        self.arduino.write(
+                            self.commands_dict["HEARTBEAT"].encode())
+                        self.arduino.flush()
                     logging.info("Sent HEARTBEAT")
                     # self.last_heartbeat_time = time.time()
                 time.sleep(3)  # Send heartbeat every 3 seconds
@@ -311,7 +314,9 @@ class ArduinoController:
         if self.serial_connected and self.arduino != None:
             if command in self.commands_dict.values():
                 try:
-                    self.arduino.write(command.encode())
+                    with self.lock:
+                        self.arduino.write(command.encode())
+                        self.arduino.flush()
                     logging.info(f"Sent command: {command}")
                 except serial.SerialException as e:
                     logging.error(f"Failed to send command: {e}")
@@ -353,7 +358,9 @@ class ArduinoController:
         if self.serial_connected and self.arduino != None:
             if self.sequence_loaded:
                 try:
-                    self.arduino.write(b'R')
+                    with self.lock:
+                        self.arduino.write(b'R')
+                        self.arduino.flush()
                     logging.info("Sent execute sequence command")
                 except serial.SerialException as e:
                     logging.error(f"Failed to execute sequence: {e}")
@@ -364,10 +371,12 @@ class ArduinoController:
     def send_step(self, step):
         if self.serial_connected and self.arduino != None:
             try:
-                self.arduino.write(b'l')
-                self.arduino.write(step.step_type.encode())
-                self.arduino.write(str(step.time_length).encode())
-                self.arduino.write(b'\n')
+                with self.lock:
+                    self.arduino.write(b'l')
+                    self.arduino.write(step.step_type.encode())
+                    self.arduino.write(str(step.time_length).encode())
+                    self.arduino.write(b'\n')
+                    self.arduino.flush()
                 logging.info(f"Sent step: {step.step_type} {step.time_length}")
             except serial.SerialException as e:
                 logging.error(f"Failed to send step: {e}")

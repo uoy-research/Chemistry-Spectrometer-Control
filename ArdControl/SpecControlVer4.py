@@ -36,6 +36,11 @@ class Ui_MainWindow(object):
         self.sequenceRunning = False
         self.watchdog = None
 
+        self.validTypes = ['b', 'd', 'n', 'e']
+
+        # Ensure the prospa file is removed
+        self.delete_prospa_file()
+
         # Create the main window
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1259, 680)
@@ -993,6 +998,64 @@ class Ui_MainWindow(object):
                 self.arduino_worker.stop()
             self.UIUpdateArdConnection()
 
+            if self.selectedMode == 1:
+                if self.load_sequence():
+                    self.write_to_prospa(True)               
+                    logging.info("Sequence loaded successfully")
+                    logging.info("Starting sequence")
+                else:
+                    self.write_to_prospa(False)
+                    self.ardWarningLabel.setText(
+                        "Error loading sequence file")
+                    self.ardWarningLabel.setStyleSheet("color: red")
+                    self.ardConnected = False
+                    if self.arduino_worker.isRunning():
+                        self.arduino_worker.stop()
+                    self.UIUpdateArdConnection()
+
+    def load_sequence(self):
+        """Load a sequence from a file."""
+        # Get the file path
+        with open(r"C:\NMR Results\sequence.txt", "r") as f:
+            # sequence format is a long string e.g. d100e200f400
+            raw_sequence = f.readlines()
+            raw_sequence = raw_sequence[0].strip()
+            i=0
+            step = Step(step_type='e', time_length = 100)
+            while i < len(raw_sequence):
+                if raw_sequence[i] in self.validTypes:
+                    step.step_type = raw_sequence[i]
+                else:
+                    logging.error("Invalid step type in sequence file")
+                    return False
+                i += 1
+                time_length = ""
+                while i < len(raw_sequence) and raw_sequence[i].isdigit():
+                    time_length += raw_sequence[i]
+                    i += 1
+                step.time_length = int(time_length)
+                if step.time_length <= 0:
+                    logging.error("Invalid time length in sequence file")
+                    return False
+                self.steps.append(step)
+        return True
+
+    def write_to_prospa(self, start):
+        """Write to the Prospa file."""
+        if start:
+            with open("C:/NMR Results/prospa.txt", "w") as f:
+                f.write("1")
+        else:
+            with open("C:/NMR Results/prospa.txt", "w") as f:
+                f.write("0")
+
+    def delete_prospa_file(self):
+        """Delete the Prospa file."""
+        try:
+            os.remove("C:/NMR Results/prospa.txt")
+        except FileNotFoundError:
+            pass
+
     def on_autoConnectRadioButton_clicked(self):
         self.selectedMode = 1
 
@@ -1632,6 +1695,27 @@ class ArduinoWorker(QtCore.QThread):
 
     def get_states(self):
         return self.controller.get_valve_states()
+    
+class MotorWorker(QtCore.QThread):
+    command_signal = QtCore.pyqtSignal(str)
+
+    def __init__(self, port):
+        super().__init__()
+        self.motor = MotorController(port=port)
+        self.serial_connected = False
+
+    def stop(self):
+        """Stop the worker and the Arduino controller."""
+        self.running = False
+        self.motor.stop()
+        self.quit()
+        self.wait()
+
+    @QtCore.pyqtSlot(str)
+    def handle_command(self, command):
+        """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
+        if self.motor.serial_connected:
+            self.motor.send_command(command)
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):

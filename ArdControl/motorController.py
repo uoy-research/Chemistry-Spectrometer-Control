@@ -18,6 +18,7 @@ class MotorController:
         self.serial_connected = False
         self.heartbeat_thread = None
         self.reading_thread = None
+        self.lock = threading.Lock()
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
             "START": 'S',    # Start the Arduino
@@ -65,8 +66,10 @@ class MotorController:
         while not self.shutdown_flag and self.arduino != None:
             try:
                 if self.serial_connected:
-                    self.arduino.write(
-                        self.commands_dict["HEARTBEAT"].encode())
+                    with self.lock:
+                        self.arduino.write(
+                            self.commands_dict["HEARTBEAT"].encode())
+                        self.arduino.flush()
                     logging.info("Sent HEARTBEAT")
                     # self.last_heartbeat_time = time.time()
                 time.sleep(3)  # Send heartbeat every 3 seconds
@@ -142,7 +145,9 @@ class MotorController:
         if self.serial_connected and self.arduino is not None:
             if command in self.commands_dict.values():
                 try:
-                    self.arduino.write(command.encode())
+                    with self.lock:
+                        self.arduino.write(command.encode())
+                        self.arduino.flush()
                     logging.info(f"Sent command: {command}")
                     return True  # Command sent successfully
                 except serial.SerialException as e:
@@ -165,11 +170,11 @@ class MotorController:
         logging.info("Closed serial connection")
 
     def move_to_target(self, target):
-        self.arduino.write('p'.encode())
-        #time.sleep(0.1)
-        self.arduino.write(str(target).encode())
-        self.arduino.write('\n'.encode())
-        self.arduino.flush()
+        with self.lock:
+            self.arduino.write('p'.encode())
+            self.arduino.write(str(target).encode())
+            self.arduino.write('\n'.encode())
+            self.arduino.flush()
   
     def calibrate(self):
         self.send_command('CALIBRATE')

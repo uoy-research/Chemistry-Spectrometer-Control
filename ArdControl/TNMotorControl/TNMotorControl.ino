@@ -25,12 +25,13 @@ unsigned long tNow = 0;
 unsigned long heartBeat = 0;
 unsigned long tStart = 0;
 unsigned long tStall = 0;
-UstepperS32 motor;
+//UstepperS32 motor;
 int dir = 0;
 int stallVal = 0;
 bool doOnce = true;
 
 void setup(){
+    motor = UstepperS32(2000, 200);
     Serial.begin(9600);
     motor.setup(NORMAL, 200, 10, 0.2, 0.0, 16, true, 0, 80, 40);
     motor.setBrakeMode(COOLBRAKE);
@@ -64,7 +65,7 @@ void loop(){
 
   if (doOnce = true){
     int steps = 10000;
-    motor.moveSteps(steps * DOWN);
+    motor.moveSteps(steps * UP);
     doOnce = false;
   }
 
