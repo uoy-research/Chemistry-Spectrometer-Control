@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Pymodbus asynchronous client example.
+"""Pymodbus synchronous client example.
 
 An example of a single threaded synchronous client.
 
-usage: simple_async_client.py
+usage: simple_sync_client.py
 
 All options must be adapted in the code
 The corresponding server must be started before e.g. as:
     python3 server_sync.py
 """
-import asyncio
 
+# --------------------------------------------------------------------------- #
+# import the various client implementations
+# --------------------------------------------------------------------------- #
 import pymodbus.client as ModbusClient
 from pymodbus import (
     ExceptionResponse,
@@ -18,37 +20,16 @@ from pymodbus import (
     ModbusException,
     pymodbus_apply_logging_config,
 )
+import time
 
-# Define the coil address for the LED
-LED_COIL_ADDRESS = 0
-
-async def blink_led(client):
-    """Blink an LED on and off."""
-    while True:        
-        try:
-            # Turn the LED on
-            await client.write_coil(0, True, slave=10)
-            print("LED ON")
-            await asyncio.sleep(1)  # Wait for 1 second
-
-            # Turn the LED off
-            await client.write_coil(0, False, slave=10)
-            print("LED OFF")
-            await asyncio.sleep(1)  # Wait for 1 second
-
-        except ModbusException as e:
-            print(f"Modbus error: {e}")
-            break
-
-
-async def run_async_simple_client(comm, host, port, framer=FramerType.SOCKET):
-    """Run async client."""
+def run_sync_simple_client(comm, host, port, framer=FramerType.SOCKET):
+    """Run sync client."""
     # activate debugging
     pymodbus_apply_logging_config("DEBUG")
 
     print("get client")
     if comm == "tcp":
-        client = ModbusClient.AsyncModbusTcpClient(
+        client = ModbusClient.ModbusTcpClient(
             host,
             port=port,
             framer=framer,
@@ -57,7 +38,7 @@ async def run_async_simple_client(comm, host, port, framer=FramerType.SOCKET):
             # source_address=("localhost", 0),
         )
     elif comm == "udp":
-        client = ModbusClient.AsyncModbusUdpClient(
+        client = ModbusClient.ModbusUdpClient(
             host,
             port=port,
             framer=framer,
@@ -66,10 +47,10 @@ async def run_async_simple_client(comm, host, port, framer=FramerType.SOCKET):
             # source_address=None,
         )
     elif comm == "serial":
-        client = ModbusClient.AsyncModbusSerialClient(
+        client = ModbusClient.ModbusSerialClient(
             port,
             framer=framer,
-            # timeout=10,
+            timeout=3,
             retries=0,
             baudrate=9600,
             bytesize=8,
@@ -82,16 +63,31 @@ async def run_async_simple_client(comm, host, port, framer=FramerType.SOCKET):
         return
 
     print("connect to server")
-    await client.connect()
-    # test client is connected
-    assert client.connected
+    client.connect()
 
-    # Start blinking the LED
-    await blink_led(client)
+    time.sleep(5)
+
+
+    print("get and verify data")
+    try:
+        client.write_coil(0, True, slave=10)
+        rr = client.read_coils(0, 1, slave=10)
+    except ModbusException as exc:
+        print(f"Received ModbusException({exc}) from library")
+        client.close()
+        return
+    if rr.isError():
+        print(f"Received Modbus library error({rr})")
+        client.close()
+        return
+    if isinstance(rr, ExceptionResponse):
+        print(f"Received Modbus library exception ({rr})")
+        # THIS IS NOT A PYTHON EXCEPTION, but a valid modbus message
+        client.close()
+
+    print("close connection")
+    client.close()
 
 
 if __name__ == "__main__":
-    print("Start async client")
-    asyncio.run(
-        run_async_simple_client("serial", "", "COM6"), debug=False
-    )
+    run_sync_simple_client("serial", "127.0.0.1", "COM6")

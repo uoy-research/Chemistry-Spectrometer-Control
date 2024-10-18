@@ -10,9 +10,10 @@
             "includePath": [
                 "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/include",
                 "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/src",
+                "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Modbus-Serial/src",
+                "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Modbus-Arduino/src",
                 "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/cores/arduino",
                 "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/variants/mega",
-                "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Vector/src",
                 "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                 "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                 "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
@@ -25,9 +26,10 @@
                 "path": [
                     "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/include",
                     "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/src",
+                    "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Modbus-Serial/src",
+                    "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Modbus-Arduino/src",
                     "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/cores/arduino",
                     "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/variants/mega",
-                    "C:/Users/gnw510/Spectro Proj/Spectrometer TN Control/.pio/libdeps/megaatmega2560/Vector/src",
                     "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                     "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                     "C:/Users/gnw510/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
