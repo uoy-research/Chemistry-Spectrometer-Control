@@ -9,6 +9,8 @@ const byte SlaveId = 10;
 const int TTLCoil = 16;
 const int testCoil = 17;
 const int timeoutToggle = 18;
+const int depressuriseStatus = 0;
+const int resetStatus = 1;
 
 const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
 const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
@@ -53,7 +55,7 @@ unsigned long tNow = 0; //current time
 unsigned long tPoll = 0; //start time
 unsigned long tStart = 0; //start time of system
 unsigned long heartBeat = 0; //time of last heartbeat
-unsigned long mbTimeout = 5000; //timeout length for modbus commands
+unsigned long mbTimeout = 2000; //timeout length for modbus commands
 unsigned long mbLast = 0; //time of last modbus command
 
 String sequence = ""; //sequence to be decoded
@@ -73,6 +75,8 @@ char validTypes[4] = {'b', 'd', 'n', 'e'}; //valid step types
 
 bool started = 0; //flag to indicate if the system has been started
 
+volatile bool resetFlag = 0; //flag to indicate a reset is required - triggered when no serial activity for a set time
+
 #define MySerial Serial // define serial port used, Serial most of the time, or Serial1, Serial2 ... if available
 const unsigned long Baudrate = 9600;
 
@@ -88,6 +92,8 @@ void setValves();
 void setValve(int valve, int state);
 void readPressure();
 void updatePressureRegisters();
+void depressurise();
+float convertToBar(float pressure);
 
 void setup() {
 
@@ -109,31 +115,46 @@ void setup() {
 
 void loop() {
     
+    if(TTLState == false){  //only run the timer when not in TTL mode
+        if(MySerial.available()>0){ //if there is serial activity and system is not in TTL mode
+            //digitalWrite(test_led, HIGH);
+            mbLast = millis(); //update mbLast
+        }
+        else{
+            //digitalWrite(test_led, LOW);
+            if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset();}    //If no serial activity for longer than mbTimeout, declare disconnection
+        }
+    }
+
     // Call once inside loop() - all magic here
     mb.task();
+
     // Attach LedPin to Lamp1Coil register
     // digitalWrite (13, mb.Coil (Lamp1Coil));
-
 
     if (mb.coil(TTLCoil) == true){
         handleTTL();
         TTLState = true;
     }
     else{
-        if (TTLState == true){mbLast = millis();TTLState = false;}  //If system was in TTL mode, update mbLast
-
-        if (prevState != mb.coil(timeoutToggle)){prevState = mb.coil(timeoutToggle);mbLast = millis();} //If timeoutToggle changes, update mbLast
-
-        if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset();} //If timeoutToggle not switched for longer than mbTimeout, declare disconnection
+        if (TTLState == true){mbLast = millis();TTLState = false;}  //If system was in TTL mode, update mbLast and TTLState
             
-        setValves(); //set valves based on coil values
+        setValves(); //set valves based on coil values  
 
-        if((long)(millis() - tPoll) > (long)pollTime){ //if it's time to poll the pressure sensors
-            tPoll = millis(); //update tPoll
-            //read pressure sensors
-            readPressure();
-            updatePressureRegisters();
-        }
+        //check for depressurise command
+        if(mb.ists(depressuriseStatus) == 1){depressurise();} //check for depressurise command
+
+        //check for reset command   
+        if(mb.ists(resetStatus) == 1){reset();} //check for reset command   
+    }
+
+    if((long)(millis() - tPoll) > (long)pollTime){ //if it's time to poll the pressure sensors
+        tPoll = millis(); //update tPoll
+        //read pressure sensors
+        readPressure();
+        updatePressureRegisters();
+
+        //if(pressureInputs[2] > 1000){depressurise();} //if pressure is too high, vent
     }
 }
 
@@ -200,8 +221,12 @@ void addCoils(){
     mb.addCoil(TTLCoil, true);
     mb.addCoil(testCoil, false);
     mb.addCoil(timeoutToggle, false);
+    mb.addIsts(resetStatus, 0);
+    mb.addIsts(depressuriseStatus, 0);
 
-    mb.addIreg
+    for (int i = 0; i < 4; i++){
+        mb.addIreg(i, 0);
+    }
 }
 
 void handleTTL(){
@@ -262,4 +287,44 @@ void readPressure(){
     pressureInputs[1] = analogRead(Pressure2);
     pressureInputs[2] = analogRead(Pressure3);
     pressureInputs[3] = analogRead(Pressure4);
+}
+
+void updatePressureRegisters(){
+    mb.setIreg(0, pressureInputs[0]);
+    mb.setIreg(1, pressureInputs[1]);
+    mb.setIreg(2, pressureInputs[2]);
+    mb.setIreg(3, pressureInputs[3]);
+}
+
+void depressurise(){
+    //depressurise the system
+    Serial.println("LOG: Depressurising system");
+    if(convertToBar(analogRead(Pressure3)) > 0.1){
+        setValve(SWITCH, 0);
+        setValve(IN, 0);
+        setValve(OUT, 1);
+        setValve(VENT, 0);
+        setValve(SHORT, 1);
+        unsigned long startTime = millis();
+        while (convertToBar(analogRead(Pressure3)) > 0.1) {
+            if (millis() - startTime > 5000) {      //timeout, break loop
+                break;
+            }
+            delay(50);
+        }
+        setValve(SHORT, 0);
+        setValve(OUT, 0);
+    }
+    else{
+        setValve(SWITCH, 0);
+        setValve(IN, 0);
+        setValve(OUT, 0);
+        setValve(VENT, 0);
+        setValve(SHORT, 0);
+    }
+    mb.setIsts(depressuriseStatus, 0);  
+}
+
+float convertToBar(float pressure){
+    return (pressure-203.53)/0.8248/100;
 }
