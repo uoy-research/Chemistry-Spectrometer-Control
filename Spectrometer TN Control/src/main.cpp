@@ -7,26 +7,22 @@ const byte SlaveId = 10;
 // Modbus Registers Offsets (0-9999)
 // const int Lamp1Coil = 0;
 const int TTLCoil = 16;
-const int testCoil = 17;
-const int timeoutToggle = 18;
-const int depressuriseStatus = 0;
-const int resetStatus = 1;
+const int testCoil = 19;
+const int depressuriseCoil = 17;
+const int resetCoil = 18;
 
 const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
 const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
 const int VALVES[] = {8, 9, 10, 22, 52, 26, 28, 30};
 const int test_led = 12;
 
-const int valveCoil[] = {0, 1, 2, 3, 4, 5, 6, 7};
-const int LEDCoil[] = {8, 9, 10, 11, 12, 13, 14, 15}; 
+const int valveCoil[] = {0, 1, 2, 3, 4, 5, 6, 7}; //coil addresses for valves
 
 // status LEDs
 const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
 
 //default timings
-const unsigned long DEFPollTime = 500; //default time between pressure readings
-const unsigned long DEFPressureTime = 3000; //default time required to build pressure before bubbling
-const unsigned long DEFHeartbeatTime = 5000; //default time between heartbeats
+const unsigned long pollTime = 500; //default time between pressure readings
 
 //TTL Pins, T4 and T5 not working??
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
@@ -35,53 +31,33 @@ const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const i
 const int Pressure1 = A1; const int Pressure2 = A2; const int Pressure3 = A3; const int Pressure4 = A4;
 
 //VARIABLES
-bool TNcontrol = 0; //TerraNova control - allows valves to be controlled by TTL signals or sequences
-bool pressureLog = 1; //log pressure values
-bool TTLControl = 1; //TTL control toggle
 bool TTLState = 1; //TTL state
-bool decodeFlag = 0; //flag to decode a sequence
-bool execFlag = 0; //flag to execute a sequence
-bool simpleTTL = 0; //simple TTL control toggle - unused
-bool newStepFlag = 0; //flag to indicate a new step needs loading
-bool prevState = 0; //previous state of TTL inputs
+bool simpleTTL = 0; //simple TTL control, currently unreachable
+bool serialConnected = 0; //serial connection state
 
 float pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
-unsigned long pollTime = DEFPollTime; //time between pressure readings
-unsigned long pressureTime = DEFPressureTime; //time required to build pressure before bubbling
-size_t currentStepIndex = 0; //current step in the sequence
-
-unsigned long tNow = 0; //current time
 unsigned long tPoll = 0; //start time
-unsigned long tStart = 0; //start time of system
-unsigned long heartBeat = 0; //time of last heartbeat
 unsigned long mbTimeout = 2000; //timeout length for modbus commands
 unsigned long mbLast = 0; //time of last modbus command
-
-String sequence = ""; //sequence to be decoded
-
-struct Step {
-  char type; //type of step - 'b' for bubble, 'd' for delay, 'n' for alt bubble
-  unsigned long length; //length of step in ms
-};
-
-Step currentStep = {'e', 1}; //current step in the sequence
-
-Step nextStep = {'e', 1}; //next step in the sequence
-
-bool stepRunning = false; //flag to indicate if a step is currently running
-
-char validTypes[4] = {'b', 'd', 'n', 'e'}; //valid step types
-
-bool started = 0; //flag to indicate if the system has been started
-
-volatile bool resetFlag = 0; //flag to indicate a reset is required - triggered when no serial activity for a set time
 
 #define MySerial Serial // define serial port used, Serial most of the time, or Serial1, Serial2 ... if available
 const unsigned long Baudrate = 9600;
 
 // ModbusSerial object
 ModbusSerial mb (MySerial, SlaveId, TxenPin);
+
+// # +--------------------------+---------+-----------------------------------------+
+// # |         Coil/reg         | Address |                 Purpose                 |
+// # +--------------------------+---------+-----------------------------------------+
+// # | Valve coils              | 0-7     | 8 digital valve states (only 5 in use)  |
+// # | Pressure Gauge Registers | 0-3     | Input registers for the pressure gauges |
+// # | ,                        | ,       | Must be read with func code 4           |
+// # | ,                        | ,       | Values not converted to bar             |
+// # | TTL Coil                 | 16      | Used to enable/disable TTL control      |
+// # | Reset Coil               | 17      | Used to reset the system from GUI       |
+// # | depressurise Coil        | 18      | Used to depressurise system from GUI    |
+// # +--------------------------+---------+-----------------------------------------+
 
 void declarePins();
 void initLEDs();
@@ -94,6 +70,8 @@ void readPressure();
 void updatePressureRegisters();
 void depressurise();
 float convertToBar(float pressure);
+void setLED(int led, bool state);
+void updateStatus();
 
 void setup() {
 
@@ -110,21 +88,23 @@ void setup() {
     // Add Lamp1Coil register - Use addCoil() for digital outputs
     // mb.addCoil(Lamp1Coil);
     pinMode(test_led, OUTPUT);
-    tStart = millis();
 }
 
 void loop() {
     
+    //check for timeout
     if(TTLState == false){  //only run the timer when not in TTL mode
         if(MySerial.available()>0){ //if there is serial activity and system is not in TTL mode
             //digitalWrite(test_led, HIGH);
             mbLast = millis(); //update mbLast
+            serialConnected = true; //update serial connection state
         }
         else{
             //digitalWrite(test_led, LOW);
-            if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset();}    //If no serial activity for longer than mbTimeout, declare disconnection
+            if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset(); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
         }
     }
+    
 
     // Call once inside loop() - all magic here
     mb.task();
@@ -137,15 +117,15 @@ void loop() {
         TTLState = true;
     }
     else{
-        if (TTLState == true){mbLast = millis();TTLState = false;}  //If system was in TTL mode, update mbLast and TTLState
+        if (TTLState == true){mbLast = millis();TTLState = false;serialConnected = false;}  //If system was in TTL mode, update mbLast and TTLState
             
         setValves(); //set valves based on coil values  
 
         //check for depressurise command
-        if(mb.ists(depressuriseStatus) == 1){depressurise();} //check for depressurise command
+        if(mb.coil(depressuriseCoil) == 1){depressurise();} //check for depressurise command
 
         //check for reset command   
-        if(mb.ists(resetStatus) == 1){reset();} //check for reset command   
+        if(mb.coil(resetCoil) == 1){reset();} //check for reset command   
     }
 
     if((long)(millis() - tPoll) > (long)pollTime){ //if it's time to poll the pressure sensors
@@ -154,8 +134,10 @@ void loop() {
         readPressure();
         updatePressureRegisters();
 
-        //if(pressureInputs[2] > 1000){depressurise();} //if pressure is too high, vent
+        //if(convertToBar(pressureInputs[2]) > 1000){depressurise();} //if pressure is too high, vent
     }
+
+    updateStatus(); //update status LEDs
 }
 
 void declarePins(){
@@ -195,13 +177,7 @@ void initLEDs(){
     //set all valves to off
     for (int i = 0; i < 8; i++)
     {
-        //setValve(i, 0);
-    }
-
-    //set all status LEDs to off
-    for (int i = 0; i < 8; i++)
-    {
-        //setLED(i, 0);
+        setValve(i, 0);
     }
 }
 
@@ -209,20 +185,13 @@ void addCoils(){
     //add coils for valves
     for (int i = 0; i < 8; i++)
     {
-        mb.addCoil(valveCoil[i]);
-    }
-
-    //add coils for status LEDs
-    for (int i = 0; i < 8; i++)
-    {
-        mb.addCoil(LEDCoil[i]);
+        mb.addCoil(valveCoil[i], false);
     }
 
     mb.addCoil(TTLCoil, true);
     mb.addCoil(testCoil, false);
-    mb.addCoil(timeoutToggle, false);
-    mb.addIsts(resetStatus, 0);
-    mb.addIsts(depressuriseStatus, 0);
+    mb.addCoil(resetCoil, 0);
+    mb.addCoil(depressuriseCoil, 0);
 
     for (int i = 0; i < 4; i++){
         mb.addIreg(i, 0);
@@ -268,10 +237,7 @@ void reset(){
     //default to TTL control
     TTLState = true;
     mb.setCoil(TTLCoil, true);
-
-    //reset prevState checker
-    prevState = 0;
-    mb.setCoil(timeoutToggle, false);
+    mb.setCoil(resetCoil, 0);
 }
 
 void setValves(){
@@ -307,7 +273,7 @@ void depressurise(){
         setValve(SHORT, 1);
         unsigned long startTime = millis();
         while (convertToBar(analogRead(Pressure3)) > 0.1) {
-            if (millis() - startTime > 5000) {      //timeout, break loop
+            if ((long)(millis() - startTime) > 5000) {      //timeout, break loop
                 break;
             }
             delay(50);
@@ -322,9 +288,21 @@ void depressurise(){
         setValve(VENT, 0);
         setValve(SHORT, 0);
     }
-    mb.setIsts(depressuriseStatus, 0);  
+    mb.setCoil(depressuriseCoil, 0);  
 }
 
 float convertToBar(float pressure){
     return (pressure-203.53)/0.8248/100;
+}
+
+void updateStatus(){
+  //update status LEDs
+  setLED(0, Serial); //LED 1 indicates serial communication
+  setLED(1, TTLState); //LED 2 indicates TN control
+  setLED(2, digitalRead(VALVES[SHORT])); //LED 4 indicates NN valve state - venting???
+  //expand with more LEDs when they have a purpose
+}
+
+void setLED(int led, bool state){
+  digitalWrite(STATUS_LEDS[led], state);
 }
