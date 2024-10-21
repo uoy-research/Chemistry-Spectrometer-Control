@@ -11,6 +11,7 @@ import matplotlib
 import time
 import threading
 import random
+import csv
 import json
 import matplotlib.pyplot as plt
 matplotlib.use('QtAgg')
@@ -37,6 +38,8 @@ class Ui_MainWindow(object):
         self.watchdog = None
 
         self.validTypes = ['b', 'd', 'n', 'e']
+
+        self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
 
         # Ensure the prospa file is removed
         self.delete_prospa_file()
@@ -985,14 +988,13 @@ class Ui_MainWindow(object):
             port = self.ardCOMPortSpinBox.value()
             self.arduino_worker = ArduinoWorker(
                 port=port, mode=self.selectedMode, verbose=self.verbosity)
-            self.setup_watchdog()
 
-            # Connect the worker signals to appropriate slots
             self.arduino_worker.start()
             time.sleep(1)
-            self.connect_arduino_signals()
+            self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
             if self.arduino_worker.isRunning():
                 self.ardConnected = True
+                self.setup_watchdog()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
@@ -1000,14 +1002,17 @@ class Ui_MainWindow(object):
 
             if self.selectedMode == 1:
                 if self.load_sequence():
-                    self.write_to_prospa(True)               
+                    self.write_to_prospa(True)
+                    self.delete_prospa_file()
                     logging.info("Sequence loaded successfully")
                     logging.info("Starting sequence")
                 else:
                     self.write_to_prospa(False)
+                    self.delete_prospa_file()
                     self.ardWarningLabel.setText(
                         "Error loading sequence file")
                     self.ardWarningLabel.setStyleSheet("color: red")
+                    logging.error("Error loading sequence file")
                     self.ardConnected = False
                     if self.arduino_worker.isRunning():
                         self.arduino_worker.stop()
@@ -1020,8 +1025,8 @@ class Ui_MainWindow(object):
             # sequence format is a long string e.g. d100e200f400
             raw_sequence = f.readlines()
             raw_sequence = raw_sequence[0].strip()
-            i=0
-            step = Step(step_type='e', time_length = 100)
+            i = 0
+            step = Step(step_type='e', time_length=100)
             while i < len(raw_sequence):
                 if raw_sequence[i] in self.validTypes:
                     step.step_type = raw_sequence[i]
@@ -1043,16 +1048,16 @@ class Ui_MainWindow(object):
     def write_to_prospa(self, start):
         """Write to the Prospa file."""
         if start:
-            with open("C:/NMR Results/prospa.txt", "w") as f:
+            with open(r"C:\NMR Results\prospa.txt", "w") as f:
                 f.write("1")
         else:
-            with open("C:/NMR Results/prospa.txt", "w") as f:
+            with open(r"C:\NMR Results\prospa.txt", "w") as f:
                 f.write("0")
 
     def delete_prospa_file(self):
         """Delete the Prospa file."""
         try:
-            os.remove("C:/NMR Results/prospa.txt")
+            os.remove(r"C:\NMR Results\sequence.txt")
         except FileNotFoundError:
             pass
 
@@ -1085,8 +1090,7 @@ class Ui_MainWindow(object):
         self.update_controls()
 
     def on_Valve1Button_clicked(self):
-        logging.info("Valve 1 button clicked")
-        self.Valve1Button.setChecked(False)
+        logging.debug("Valve 1 button clicked")
         if self.arduino_worker.isRunning():
             valve_states = self.arduino_worker.get_states()  # type: ignore
             if int(valve_states[0]) == 0:    # type: ignore
@@ -1152,12 +1156,11 @@ class Ui_MainWindow(object):
         logging.info("Valve 5 button clicked")
         self.Valve5Button.setChecked(False)
         if self.arduino_worker.isRunning():
-            valve_states = self.arduino_worker.get_states()
-            #logging.info("States: " + str(valve_states))
-            if int(valve_states[4]) == 0:    # type: ignore
+            self.arduino_worker.get_valve_signal.emit()
+            # logging.info("States: " + str(valve_states))
+            if int(self.valveStates[4]) == 0:    # type: ignore
                 logging.info("Turning on valve 5")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_SHORT_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal  # type: ignore
                 self.Valve5Button.setChecked(True)
             else:
                 logging.info("Turning off valve 5")
@@ -1238,37 +1241,45 @@ class Ui_MainWindow(object):
     def on_resetButton_clicked(self):
         logging.info("Reset button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("RESET")  # type: ignore
+            self.arduino_worker.command_signal.emit("RESET")
 
     @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.info("Quick vent button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit(
-                "DEPRESSURISE")  # type: ignore
+            self.arduino_worker.command_signal.emit("QUICK_VENT")
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
         logging.info("Begin save button clicked")
         if self.ardConnected:
-            if self.saving:
+            if self.start_saving():
                 self.saving = False
                 self.beginSaveButton.setText("Begin Saving")
-                self.arduino_worker.save_signal.emit(
-                    False, self.savePathEdit.text())  # type: ignore
             else:
                 self.saving = True
                 self.beginSaveButton.setText("Stop Saving")
-                self.arduino_worker.save_signal.emit(
-                    True, self.savePathEdit.text())  # type: ignore
-                
+
+    def start_saving(self):
+        try:
+            with open(self.savePathEdit.text(), "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    ["Time", "Pressure 1", "Pressure 2", "Pressure 3", "Pressure 4"])
+                self.saving = True
+                return True
+        except Exception as e:
+            logging.error("Could not open save file")
+            self.saving = False
+            return False
+
     def setup_watchdog(self):
         self.watchdog = QtCore.QTimer()
         self.watchdog.timeout.connect(self.check_arduino_state)
         self.watchdog.start(1000)
 
     def check_arduino_state(self):
-        if not self.arduino_worker.isRunning():
+        if (not self.arduino_worker.isRunning()):
             self.ardConnected = False
             self.ardWarningLabel.setText("Connection Closed")
             self.ardWarningLabel.setStyleSheet("color: red")
@@ -1448,10 +1459,12 @@ class Ui_MainWindow(object):
     def connect_arduino_signals(self):
         self.arduino_worker.data_signal.connect(
             self.sc.update_plot)  # To update the plot
-        self.arduino_worker.save_signal.connect(
-            self.arduino_worker.save_data)  # To toggle saving data
         self.arduino_worker.command_signal.connect(
-            self.arduino_worker.send_command)  # To send commands
+            self.arduino_worker.send_command)
+        self.arduino_worker.set_valve_signal.connect(
+            self.arduino_worker.set_valve_states)
+        self.arduino_worker.get_valve_signal.connect(
+            self.arduino_worker.get_valve_states)
 
 
 class Step:
@@ -1603,12 +1616,17 @@ class RealTimePlot(FigureCanvasQTAgg):
             # Append new x (time) point
             self.x_data.append(len(self.x_data))
 
+            # Convert and append new y (pressure) points
+            for i in range(4):
+                pressure_values[i] = (
+                    float(pressure_values[i]) - 203.53) / 0.8248 / 100
+                getattr(self, f'p{i+1}_data').append(pressure_values[i])
 
-            # Append new y (pressure) point
-            self.p1_data.append(float(pressure_values[-1][1]))
-            self.p2_data.append(float(pressure_values[-1][2]))
-            self.p3_data.append(float(pressure_values[-1][3]))
-            self.p4_data.append(float(pressure_values[-1][4]))
+            # check this for time lag
+            if self.parent.saving:
+                with open(self.parent.save_path, "a") as f:
+                    f.write(f"{time.strftime('%H:%M:%S')}, {pressure_values[0]}, {
+                            pressure_values[1]}, {pressure_values[2]}, {pressure_values[3]}\n")
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
@@ -1639,10 +1657,10 @@ class RealTimePlot(FigureCanvasQTAgg):
 class ArduinoWorker(QtCore.QThread):
     # Signal to send data to the main thread
     data_signal = QtCore.pyqtSignal(list)
-    # Signal to handle commands (e.g., turning valves on/off)
     command_signal = QtCore.pyqtSignal(str)
-    save_signal = QtCore.pyqtSignal(bool, str)  # Signal to save data
-    step_signal = QtCore.pyqtSignal(Step)  # Signal to update step info
+    set_valve_signal = QtCore.pyqtSignal(list)
+    get_valve_signal = QtCore.pyqtSignal()
+    get_signal_processed = QtCore.pyqtSignal()
 
     def __init__(self, port, mode, verbose):
         super().__init__()
@@ -1655,7 +1673,7 @@ class ArduinoWorker(QtCore.QThread):
         self.controller.start()
         while self.running:
             if self.controller.serial_connected:
-                if self.controller.new_plot:
+                if self.controller.get_readings():
                     data = self.controller.readings  # Get new readings from Arduino
                     # Emit signal with data to update the graph
                     self.data_signal.emit(data)
@@ -1664,38 +1682,36 @@ class ArduinoWorker(QtCore.QThread):
     def stop(self):
         """Stop the worker and the Arduino controller."""
         self.running = False
-        self.controller.stop()
+        # if last step was pressurised then depressurise?
+        self.controller.send_reset()
         self.quit()
         self.wait()
 
-    @QtCore.pyqtSlot(str)
-    def handle_command(self, command):
-        """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
-        if self.controller.serial_connected:
-            self.controller.send_command(command)
-
     def isRunning(self):
-        logging.info(self.controller.serial_connected)
+        # logging.info(self.controller.serial_connected)
         return self.controller.serial_connected
 
-    @QtCore.pyqtSlot(bool, str)
-    def save_data(self, save, path):
-        if save:
-            self.controller.save_pressure_data(save, path)
-        else:
-            self.controller.save_pressure_data(save, path)
+    def get_valve_states(self):
+        self.parent.valveStates = self.controller.get_valve_states()
 
-    @QtCore.pyqtSlot(str)
+    def depressurise(self):
+        self.controller.send_depressurise()
+
+    def arduino_reset(self):
+        self.controller.send_reset()
+
+    def set_valve_states(self, states):
+        self.controller.set_valves(states)
+
     def send_command(self, command):
-        self.controller.send_command(command)
+        if command == "RESET":
+            self.controller.send_reset()
+        elif command == "QUICK_VENT":
+            self.controller.send_depressurise()
+        else:
+            logging.info("Invalid command for arduino")
 
-    @QtCore.pyqtSlot(Step)
-    def update_step(self, step):
-        self.controller.send_step(step)
 
-    def get_states(self):
-        return self.controller.get_valve_states()
-    
 class MotorWorker(QtCore.QThread):
     command_signal = QtCore.pyqtSignal(str)
 
@@ -1765,7 +1781,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """
         # Call the base class method to ensure the window closes
         event.accept()
-
 
 
 if __name__ == "__main__":

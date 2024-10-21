@@ -19,6 +19,7 @@ import os
 # | depressurise Coil        | 18      | Used to depressurise system from GUI    |
 # +--------------------------+---------+-----------------------------------------+
 
+
 class ArduinoController:
     def __init__(self, port, verbose, mode):
         self.port = port    # Port number to connect to arduino
@@ -58,15 +59,16 @@ class ArduinoController:
         logging.info("Starting server...")
         self.connect_arduino()
         if self.serial_connected:
-            logging.info("Arduino started") 
+            logging.info("Arduino started")
             if self.mode == 2:
-                self.arduino.write_bit(self.ttlAddr, 1)  # type: ignore # Enable TTL control
+                # type: ignore # Enable TTL control
+                self.arduino.write_bit(self.ttlAddr, 1)  # type: ignore
             else:
-                self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore # Disable TTL control
+                # type: ignore # Disable TTL control
+                self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
         else:
             logging.error("Failed to connect to Arduino. Server not started.")
             self.arduino = None
-            pass
 
     def connect_arduino(self):
         try:
@@ -74,7 +76,8 @@ class ArduinoController:
             self.arduino.serial.baudrate = self.baudrate    # type: ignore
             self.arduino.serial.timeout = 3   # type: ignore
             time.sleep(1)  # Wait for the connection to be established
-            self.readings = self.arduino.read_registers(0, 4, 4)
+            self.readings = self.arduino.read_registers(
+                0, 4, 4)    # type: ignore
             logging.info(f"Connected to Arduino on port {self.port}")
             self.serial_connected = True
         except serial.SerialException as e:
@@ -83,22 +86,49 @@ class ArduinoController:
             self.serial_connected = False
 
     def get_readings(self):
-        self.readings = self.arduino.read_registers(0, 4, 4)
+        try:
+            self.readings = self.arduino.read_registers(    # type: ignore
+                0, 4, 4)
+            self.serial_connected = True
+        except:
+            logging.error("Failed to read pressure readings")
+            self.serial_connected = False
         return self.readings
 
     def get_valve_states(self):
-        self.valve_states = self.arduino.read_bits(0, 8)
+        try:
+            self.valve_states = self.arduino.read_bits(0, 8)  # type: ignore
+            self.serial_connected = True
+        except:
+            logging.error("Failed to read valve states")
+            self.serial_connected = False
         return self.valve_states
-    
+
     def set_valves(self, valve_states):
-        for i in range(8):
-            self.arduino.write_bit(i, valve_states[i])
+        try:
+            for i in range(8):
+                if valve_states[i] != 3:
+                    self.arduino.write_bit(i, valve_states[i])  # type: ignore
+            self.serial_connected = True
+        except:
+            logging.error("Failed to set valve states")
+            self.serial_connected = False
 
     def send_reset(self):
-        self.arduino.write_bit(self.resetAddr, 1)
+        try:
+            self.arduino.write_bit(self.resetAddr, 1)  # type: ignore
+            self.serial_connected = True
+        except:
+            logging.error("Failed to reset system")
+            self.serial_connected = False
 
     def send_depressurise(self):
-        self.arduino.write_bit(self.depressuriseAddr, 1)
+        try:
+            self.arduino.write_bit(self.depressuriseAddr, 1)  # type: ignore
+            self.serial_connected = True
+        except:
+            logging.error("Failed to depressurise system")
+            self.serial_connected = False
 
     def get_mode(self):
         return self.mode
