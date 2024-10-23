@@ -21,6 +21,19 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
 
         # Initialise variables
+        self.valve_settings = {
+            'd': [0, 0, 0, 0, 0, 0, 0, 0],
+            'n': [0, 0, 0, 0, 0, 0, 0, 0],
+            'e': [0, 0, 0, 0, 0, 0, 0, 0],
+            'b': [0, 0, 0, 0, 0, 0, 0, 0]
+        }
+        self.step_types = {
+            'd': 'Depressurise',
+            'n': 'Nitrogen',
+            'e': 'Evacuate',
+            'b': 'Bubble'
+        }
+
         self.verbosity = True
         self.ardConnected = False
         self.selectedMode = None
@@ -41,13 +54,20 @@ class Ui_MainWindow(object):
 
         self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
 
+        self.sequenceTimer = QtCore.QTimer()
+        self.sequenceTimer.timeout.connect(self.update_time)
+
+        self.stepTimer = QtCore.QTimer()
+        self.stepTimer.setSingleShot(True)
+        self.stepTimer.timeout.connect(self.update_step)
+
         # Ensure the prospa file is removed
         self.delete_prospa_file()
 
         # Create the main window
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1259, 680)
-        MainWindow.setFixedSize(1259, 680)
+        MainWindow.resize(1050, 680)
+        MainWindow.setFixedSize(1050, 680)
 
         # Create the central widget
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
@@ -164,7 +184,7 @@ class Ui_MainWindow(object):
 
         # Create the valve layout
         self.gridLayoutWidget = QtWidgets.QWidget(parent=self.centralwidget)
-        self.gridLayoutWidget.setGeometry(QtCore.QRect(10, 320, 66, 294))
+        self.gridLayoutWidget.setGeometry(QtCore.QRect(10, 320, 96, 294))
         self.gridLayoutWidget.setObjectName("gridLayoutWidget")
         self.valveLayout = QtWidgets.QGridLayout(self.gridLayoutWidget)
         self.valveLayout.setContentsMargins(0, 0, 0, 0)
@@ -266,6 +286,83 @@ class Ui_MainWindow(object):
         self.resetButton.setFont(font)
         self.resetButton.setObjectName("resetButton")
         self.valveLayout.addWidget(self.resetButton, 8, 0, 1, 1)
+
+        self.currentStepTypeLabel = QtWidgets.QLabel(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.currentStepTypeLabel.setFont(font)
+        self.currentStepTypeLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTypeLabel.setObjectName("currentStepLabel")
+        self.valveLayout.addWidget(self.currentStepTypeLabel, 1, 0, 1, 1)
+
+        self.currentStepTypeEdit = QtWidgets.QLineEdit(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.currentStepTypeEdit.setFont(font)
+        self.currentStepTypeEdit.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignJustify)
+        self.currentStepTypeEdit.setObjectName("currentStepTypeEdit")
+        self.currentStepTypeEdit.setReadOnly(True)
+        self.currentStepTypeEdit.setMaximumWidth(100)
+        self.valveLayout.addWidget(self.currentStepTypeEdit, 2, 0, 1, 1)
+
+        self.currentStepTimeLabel = QtWidgets.QLabel(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.currentStepTimeLabel.setFont(font)
+        self.currentStepTimeLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTimeLabel.setObjectName("currentStepTimeLabel")
+        self.valveLayout.addWidget(self.currentStepTimeLabel, 3, 0, 1, 1)
+
+        self.currentStepTimeEdit = QtWidgets.QLineEdit(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.currentStepTimeEdit.setFont(font)
+        self.currentStepTimeEdit.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.currentStepTimeEdit.setObjectName("currentStepTimeEdit")
+        self.currentStepTimeEdit.setReadOnly(True)
+        self.currentStepTimeEdit.setMaximumWidth(100)
+        self.valveLayout.addWidget(self.currentStepTimeEdit, 4, 0, 1, 1)
+
+        self.stepsRemainingLabel = QtWidgets.QLabel(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.stepsRemainingLabel.setFont(font)
+        self.stepsRemainingLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsRemainingLabel.setObjectName("stepsRemainingLabel")
+        self.valveLayout.addWidget(self.stepsRemainingLabel, 5, 0, 1, 1)
+
+        self.stepsTimeRemainingLabel = QtWidgets.QLabel(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.stepsTimeRemainingLabel.setFont(font)
+        self.stepsTimeRemainingLabel.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.stepsTimeRemainingLabel.setObjectName("stepsTimeRemainingLabel")
+        self.valveLayout.addWidget(self.stepsTimeRemainingLabel, 6, 0, 1, 1)
+
+        # self.stepsRemainingLabel.hide()
+        # self.stepsTimeRemainingLabel.hide()
+        # self.currentStepTypeLabel.hide()
+        # self.currentStepTypeEdit.hide()
+        # self.currentStepTimeLabel.hide()
+        # self.currentStepTimeEdit.hide()
+
+        self.Valve1Button.hide()
+        self.Valve2Button.hide()
+        self.Valve3Button.hide()
+        self.Valve4Button.hide()
+        self.Valve5Button.hide()
 
         # Create the motor layout
         self.verticalLayoutWidget_2 = QtWidgets.QWidget(
@@ -682,7 +779,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets container
         self.graphContainer = QtWidgets.QWidget(self.centralwidget)
-        self.graphContainer.setGeometry(QtCore.QRect(89, 323, 655, 299))
+        self.graphContainer.setGeometry(QtCore.QRect(119, 323, 625, 299))
         self.graphContainer.setObjectName("graphContainer")
         self.graphContainer.setStyleSheet(
             "border: 2px Solid LightGray;")  # Add border
@@ -692,7 +789,7 @@ class Ui_MainWindow(object):
         self.sc = RealTimePlot(parent=self)
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
-        self.graphWidget.setGeometry(QtCore.QRect(91, 325, 651, 294))
+        self.graphWidget.setGeometry(QtCore.QRect(121, 325, 621, 294))
         self.graphWidget.setObjectName("graphWidget")
         self.graphLayout = QtWidgets.QVBoxLayout(self.graphWidget)
         self.graphLayout.setContentsMargins(0, 0, 0, 0)
@@ -702,121 +799,6 @@ class Ui_MainWindow(object):
         # Create the toolbar and add it to the layout
         self.toolbar = NavigationToolbar(self.sc, self)
         self.graphLayout.addWidget(self.toolbar)
-
-        # Create a vertical dividing line
-        self.line_2 = QtWidgets.QFrame(parent=self.centralwidget)
-        self.line_2.setGeometry(QtCore.QRect(1020, 15, 20, 620))
-        self.line_2.setFrameShape(QtWidgets.QFrame.Shape.VLine)
-        self.line_2.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.line_2.setObjectName("line_2")
-
-        # Create sequence layout
-        self.sequenceLayoutWidget = QtWidgets.QWidget(
-            parent=self.centralwidget)
-        self.sequenceLayoutWidget.setGeometry(QtCore.QRect(1040, 10, 200, 500))
-        self.sequenceLayoutWidget.setObjectName("sequenceLayoutWidget")
-        self.sequenceLayout = QtWidgets.QGridLayout(self.sequenceLayoutWidget)
-        self.sequenceLayout.setContentsMargins(0, 0, 0, 0)
-        self.sequenceLayout.setObjectName("sequenceLayout")
-
-        # Create the sequence label
-        self.sequenceLabel = QtWidgets.QLabel(parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.sequenceLabel.setFont(font)
-        self.sequenceLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.sequenceLabel.setObjectName("sequenceLabel")
-        self.sequenceLayout.addWidget(self.sequenceLabel, 0, 0, 1, 1)
-
-        # Create the sequence controls
-        self.sequenceLoadButton = QtWidgets.QPushButton(
-            parent=self.sequenceLayoutWidget)
-        self.sequenceLoadButton.setMinimumSize(QtCore.QSize(0, 60))
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.sequenceLoadButton.setFont(font)
-        self.sequenceLoadButton.setObjectName("sequenceLoadButton")
-        self.sequenceLayout.addWidget(self.sequenceLoadButton, 1, 0, 1, 1)
-
-        self.sequenceExecuteButton = QtWidgets.QPushButton(
-            parent=self.sequenceLayoutWidget)
-        self.sequenceExecuteButton.setMinimumSize(QtCore.QSize(0, 60))
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.sequenceExecuteButton.setFont(font)
-        self.sequenceExecuteButton.setObjectName("sequenceExecuteButton")
-        self.sequenceLayout.addWidget(self.sequenceExecuteButton, 2, 0, 1, 1)
-
-        self.currentStepTypeLabel = QtWidgets.QLabel(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.currentStepTypeLabel.setFont(font)
-        self.currentStepTypeLabel.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.currentStepTypeLabel.setObjectName("currentStepLabel")
-        self.sequenceLayout.addWidget(self.currentStepTypeLabel, 3, 0, 1, 1)
-
-        self.currentStepTypeEdit = QtWidgets.QLineEdit(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.currentStepTypeEdit.setFont(font)
-        self.currentStepTypeEdit.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignRight)
-        self.currentStepTypeEdit.setObjectName("currentStepTypeEdit")
-        self.currentStepTypeEdit.setReadOnly(True)
-        self.sequenceLayout.addWidget(self.currentStepTypeEdit, 4, 0, 1, 1)
-
-        self.currentStepTimeLabel = QtWidgets.QLabel(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.currentStepTimeLabel.setFont(font)
-        self.currentStepTimeLabel.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.currentStepTimeLabel.setObjectName("currentStepTimeLabel")
-        self.sequenceLayout.addWidget(self.currentStepTimeLabel, 5, 0, 1, 1)
-
-        self.currentStepTimeEdit = QtWidgets.QLineEdit(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.currentStepTimeEdit.setFont(font)
-        self.currentStepTimeEdit.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignRight)
-        self.currentStepTimeEdit.setObjectName("currentStepTimeEdit")
-        self.currentStepTimeEdit.setReadOnly(True)
-        self.sequenceLayout.addWidget(self.currentStepTimeEdit, 6, 0, 1, 1)
-
-        self.stepsRemainingLabel = QtWidgets.QLabel(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.stepsRemainingLabel.setFont(font)
-        self.stepsRemainingLabel.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.stepsRemainingLabel.setObjectName("stepsRemainingLabel")
-        self.sequenceLayout.addWidget(self.stepsRemainingLabel, 7, 0, 1, 1)
-
-        self.stepsTimeRemainingLabel = QtWidgets.QLabel(
-            parent=self.sequenceLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.stepsTimeRemainingLabel.setFont(font)
-        self.stepsTimeRemainingLabel.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.stepsTimeRemainingLabel.setObjectName("stepsTimeRemainingLabel")
-        self.sequenceLayout.addWidget(self.stepsTimeRemainingLabel, 8, 0, 1, 1)
-
-        self.sequenceStopButton = QtWidgets.QPushButton(
-            parent=self.sequenceLayoutWidget)
-        self.sequenceStopButton.setMinimumSize(QtCore.QSize(0, 60))
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.sequenceStopButton.setFont(font)
-        self.sequenceStopButton.setObjectName("sequenceStopButton")
-        self.sequenceLayout.addWidget(self.sequenceStopButton, 9, 0, 1, 1)
 
         # Connect the buttons to their slots
         # QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -947,22 +929,14 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Valve Macro 5"))
         self.valveMacro6Button.setText(
             _translate("MainWindow", "Valve Macro 6"))
-        self.sequenceLabel.setText(_translate(
-            "MainWindow", "Sequence\nControls"))
-        self.sequenceLoadButton.setText(
-            _translate("MainWindow", "Load Sequence"))
-        self.sequenceExecuteButton.setText(
-            _translate("MainWindow", "Execute Sequence"))
-        self.sequenceStopButton.setText(
-            _translate("MainWindow", "Stop Sequence"))
         self.currentStepTypeLabel.setText(
-            _translate("MainWindow", "Current Step Type"))
+            _translate("MainWindow", "Cur. Step Type"))
         self.currentStepTimeLabel.setText(
-            _translate("MainWindow", "Current Step Time"))
+            _translate("MainWindow", "Cur. Step Time"))
         self.stepsRemainingLabel.setText(
-            _translate("MainWindow", "Steps Remaining: "))
+            _translate("MainWindow", "Steps: "))
         self.stepsTimeRemainingLabel.setText(
-            _translate("MainWindow", "Time Remaining: "))
+            _translate("MainWindow", "Time: "))
 
     def on_ardConnectButton_clicked(self):
         """Handle Arduino connection/disconnection."""
@@ -970,7 +944,7 @@ class Ui_MainWindow(object):
             # If Arduino is already connected, stop the worker and disconnect
             try:
                 self.arduino_worker.stop_timer()
-                self.arduino_worker.stop() 
+                self.arduino_worker.stop()
             except Exception:
                 pass
             if self.watchdog != None:
@@ -992,13 +966,13 @@ class Ui_MainWindow(object):
                 self, port=port, mode=self.selectedMode, verbose=self.verbosity)
 
             self.arduino_worker.start()
-            
+
             self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
 
             self.arduino_worker.start_timer()
 
             timeout = 5  # Timeout in seconds
-            start_time = time.time()        
+            start_time = time.time()
             while True:
                 # Check if the timeout has been reached
                 if (time.time() - start_time > timeout) or self.arduino_worker.isConnected() == True:
@@ -1018,6 +992,9 @@ class Ui_MainWindow(object):
 
             if self.selectedMode == 1:
                 if self.load_sequence():
+                    self.calculate_sequence_time()
+                    self.sequenceTimer.start(1000)
+                    self.stepTimer.start(self.steps[0].time_length * 1000) #check if seq is in ms or s
                     self.write_to_prospa(True)
                     self.delete_prospa_file()
                     logging.info("Sequence loaded successfully")
@@ -1032,6 +1009,70 @@ class Ui_MainWindow(object):
                     self.ardConnected = False
                     self.arduino_worker.stop()
                     self.UIUpdateArdConnection()
+
+    def update_step(self):
+        if len(self.steps) == 0:
+            self.ardWarningLabel.setText("Sequence complete")
+            self.ardWarningLabel.setStyleSheet("color: green")
+            return
+        else:
+            self.current_step = self.steps.pop(0)
+            self.current_step_time = self.current_step.time_length
+            self.current_step_type = self.current_step.step_type
+            self.currentStepTypeLabel.setText(
+                f"Cur. Step Type: {self.step_types[self.current_step_type]}")    # TODO: add a dict to turn these into readable strings
+            self.currentStepTimeLabel.setText(
+                f"Cur. Step Time: {self.current_step_time}")
+            self.stepsRemainingLabel.setText(
+                f"Steps: {len(self.steps)}")
+            self.arduino_worker.set_valve_signal.emit(
+                self.valve_settings[self.current_step_type])
+            self.stepTimer.start(self.current_step_time * 1000)
+
+
+    def update_time(self):
+        # update total time
+        self.total_sequence_time -= 1
+        self.total_sequence_time = max(0, self.total_sequence_time)
+        if self.total_sequence_time == 0:
+            # self.write_to_prospa(False)   # Write to Prospa file to signal complete?
+            # self.ardWarningLabel.setText("Sequence complete")
+            # self.ardWarningLabel.setStyleSheet("color: green")
+            # self.stepsTimeRemainingLabel.setText(
+            #     f"Seq. Time: 00")
+            # self.currentStepTimeLabel.setText(
+            #     f"Cur. Step Time: 00")
+            self.sequenceTimer.stop()
+        else:
+            if self.total_sequence_time // 60 < 1:
+                self.total_sequence_time_mins = f"{
+                    self.total_sequence_time:02d}"
+            else:
+                self.total_sequence_time_mins = str(
+                    self.total_sequence_time // 60) + ":" + str(self.total_sequence_time % 60)
+
+            # update current step time
+            self.current_step_time -= 1
+            self.current_step_time = max(0, self.current_step_time)
+            if self.total_sequence_time // 60 < 1:
+                self.total_sequence_time_mins = f"{
+                    self.total_sequence_time:02d}"
+            else:
+                self.total_sequence_time_mins = str(
+                    self.total_sequence_time // 60) + ":" + str(self.total_sequence_time % 60)
+            self.current_step_time_mins = str(
+                self.current_step_time // 60) + ":" + str(self.current_step_time % 60)
+
+            self.stepsTimeRemainingLabel.setText(
+                f"Time: {self.total_sequence_time}")
+            self.currentStepTimeLabel.setText(
+                f"Cur. Step Time: {self.current_step_time_mins}")
+
+    def calculate_sequence_time(self):
+        self.total_sequence_time = 0
+        self.current_step_time = self.steps[0]
+        for step in self.steps:
+            self.total_sequence_time += step.time_length
 
     def load_sequence(self):
         """Load a sequence from a file."""
@@ -1121,19 +1162,22 @@ class Ui_MainWindow(object):
     def update_valve_states(self):
         loop = QtCore.QEventLoop()
         self.arduino_worker.valve_states_updated.connect(loop.quit)
-        QtCore.QMetaObject.invokeMethod(self.arduino_worker, "get_valve_states", QtCore.Qt.ConnectionType.QueuedConnection)
+        QtCore.QMetaObject.invokeMethod(
+            self.arduino_worker, "get_valve_states", QtCore.Qt.ConnectionType.QueuedConnection)
         loop.exec()
 
     def on_Valve1Button_clicked(self):
         logging.debug("Valve 1 button clicked")
         self.update_valve_states()
         if self.arduino_worker.isRunning():
-            if int(self.valveStates[0]) == 0: 
-                self.arduino_worker.set_valve_signal.emit([1, 2, 2, 2, 2, 2, 2, 2])
+            if int(self.valveStates[0]) == 0:
+                self.arduino_worker.set_valve_signal.emit(
+                    [1, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning on valve 1")
                 self.Valve1Button.setChecked(True)
             else:
-                self.arduino_worker.set_valve_signal.emit([0, 2, 2, 2, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [0, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning off valve 1")
                 self.Valve1Button.setChecked(False)
 
@@ -1143,11 +1187,13 @@ class Ui_MainWindow(object):
         if self.arduino_worker.isRunning():
             if int(self.valveStates[1]) == 0:
                 logging.info("Turning on valve 2")
-                self.arduino_worker.set_valve_signal.emit([2, 0, 2, 2, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 0, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(True)
             else:
                 logging.info("Turning off valve 2")
-                self.arduino_worker.set_valve_signal.emit([2, 1, 2, 2, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 1, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
@@ -1156,24 +1202,28 @@ class Ui_MainWindow(object):
         if self.arduino_worker.isRunning():
             if int(self.valveStates[2]) == 0:
                 logging.info("Turning on valve 3")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 0, 2, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 0, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(True)
             else:
                 logging.info("Turning off valve 3")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 1, 2, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 1, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(False)
-            
+
     def on_Valve4Button_clicked(self):
         logging.info("Valve 4 button clicked")
         self.update_valve_states()
         if self.arduino_worker.isRunning():
             if int(self.valveStates[3]) == 0:
                 logging.info("Turning on valve 4")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 0, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 2, 0, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(True)
             else:
                 logging.info("Turning off valve 4")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 1, 2, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 2, 1, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
@@ -1182,11 +1232,13 @@ class Ui_MainWindow(object):
         if self.arduino_worker.isRunning():
             if int(self.valveStates[4]) == 0:
                 logging.info("Turning on valve 5")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 2, 0, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 2, 2, 0, 2, 2, 2])
                 self.Valve5Button.setChecked(True)
             else:
                 logging.info("Turning off valve 5")
-                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 2, 1, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 2, 2, 2, 1, 2, 2, 2])
                 self.Valve5Button.setChecked(False)
 
     '''
@@ -1420,6 +1472,17 @@ class Ui_MainWindow(object):
                 self.valveMacro6Button.setEnabled(True)
                 self.quickBubbleButton.setEnabled(True)
                 self.bubbleTimeDoubleSpinBox.setEnabled(True)
+                self.Valve1Button.show()
+                self.Valve2Button.show()
+                self.Valve3Button.show()
+                self.Valve4Button.show()
+                self.Valve5Button.show()
+                self.currentStepTimeEdit.hide()
+                self.currentStepTypeEdit.hide()
+                self.stepsRemainingLabel.hide()
+                self.currentStepTimeLabel.hide()
+                self.currentStepTypeLabel.hide()
+                self.stepsTimeRemainingLabel.hide()
             elif self.selectedMode == 1 or self.selectedMode == 2:
                 # Toggle valve controls
                 self.Valve1Button.setEnabled(False)
@@ -1441,6 +1504,18 @@ class Ui_MainWindow(object):
                 self.valveMacro6Button.setEnabled(False)
                 self.quickBubbleButton.setEnabled(False)
                 self.bubbleTimeDoubleSpinBox.setEnabled(False)
+                if self.selectedMode == 1:
+                    self.Valve1Button.hide()
+                    self.Valve2Button.hide()
+                    self.Valve3Button.hide()
+                    self.Valve4Button.hide()
+                    self.Valve5Button.hide()
+                    self.currentStepTimeEdit.show()
+                    self.currentStepTypeEdit.show()
+                    self.stepsRemainingLabel.show()
+                    self.currentStepTimeLabel.show()
+                    self.currentStepTypeLabel.show()
+                    self.stepsTimeRemainingLabel.show()
         else:
             # Toggle connection controls
             self.manualRadioButton.setEnabled(True)
@@ -1599,7 +1674,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()   # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(1, 9)] # type: ignore
+                row, col).currentText() for col in range(1, 9)]  # type: ignore
             data.append({"Macro No.": macro_number, "Valves": valve_states})
         return data
 
