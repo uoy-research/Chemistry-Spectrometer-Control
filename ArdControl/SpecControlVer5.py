@@ -969,13 +969,15 @@ class Ui_MainWindow(object):
         if self.ardConnected:
             # If Arduino is already connected, stop the worker and disconnect
             try:
-                if self.arduino_worker.isRunning():
-                    self.arduino_worker.stop()
-            except AttributeError:
+                self.arduino_worker.stop_timer()
+                self.arduino_worker.stop() 
+            except Exception:
                 pass
             if self.watchdog != None:
                 self.watchdog.stop()
             self.ardConnected = False
+            self.ardWarningLabel.setText("Connection closed")
+            self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
         elif self.selectedMode == None:
@@ -999,17 +1001,19 @@ class Ui_MainWindow(object):
             start_time = time.time()        
             while True:
                 # Check if the timeout has been reached
-                if (time.time() - start_time > timeout) or self.arduino_worker.isRunning() == True:
+                if (time.time() - start_time > timeout) or self.arduino_worker.isConnected() == True:
                     break
                 # Sleep for a short duration to prevent high CPU usage
                 time.sleep(0.1)
 
-            if self.arduino_worker.isRunning():
+            if self.arduino_worker.isConnected():
                 self.ardConnected = True
                 self.setup_watchdog()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
+                self.ardWarningLabel.setText("Connection failed")
+                self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
             if self.selectedMode == 1:
@@ -1026,36 +1030,49 @@ class Ui_MainWindow(object):
                     self.ardWarningLabel.setStyleSheet("color: red")
                     logging.error("Error loading sequence file")
                     self.ardConnected = False
-                    if self.arduino_worker.isRunning():
-                        self.arduino_worker.stop()
+                    self.arduino_worker.stop()
                     self.UIUpdateArdConnection()
 
     def load_sequence(self):
         """Load a sequence from a file."""
-        # Get the file path
-        with open(r"C:\NMR Results\sequence.txt", "r") as f:
-            # sequence format is a long string e.g. d100e200f400
-            raw_sequence = f.readlines()
-            raw_sequence = raw_sequence[0].strip()
-            i = 0
-            step = Step(step_type='e', time_length=100)
-            while i < len(raw_sequence):
-                if raw_sequence[i] in self.validTypes:
-                    step.step_type = raw_sequence[i]
-                else:
-                    logging.error("Invalid step type in sequence file")
+        try:
+            # Get the file path
+            with open(r"C:\NMR Results\sequence.txt", "r") as f:
+                # sequence format is a long string e.g. d100e200f400
+                raw_sequence = f.readlines()
+                if not raw_sequence:
+                    logging.error("Sequence file is empty")
                     return False
-                i += 1
-                time_length = ""
-                while i < len(raw_sequence) and raw_sequence[i].isdigit():
-                    time_length += raw_sequence[i]
+                raw_sequence = raw_sequence[0].strip()
+                i = 0
+                step = Step(step_type='e', time_length=100)
+                while i < len(raw_sequence):
+                    if raw_sequence[i] in self.validTypes:
+                        step.step_type = raw_sequence[i]
+                    else:
+                        logging.error("Invalid step type in sequence file")
+                        return False
                     i += 1
-                step.time_length = int(time_length)
-                if step.time_length <= 0:
-                    logging.error("Invalid time length in sequence file")
-                    return False
-                self.steps.append(step)
-        return True
+                    time_length = ""
+                    while i < len(raw_sequence) and raw_sequence[i].isdigit():
+                        time_length += raw_sequence[i]
+                        i += 1
+                    try:
+                        step.time_length = int(time_length)
+                    except ValueError:
+                        logging.error("Invalid time length in sequence file")
+                        return False
+                    if step.time_length <= 0:
+                        logging.error("Invalid time length in sequence file")
+                        return False
+                    self.steps.append(step)
+            return True
+        except FileNotFoundError:
+            logging.error("Sequence file not found")
+            return False
+        except IOError as e:
+            logging.error(f"Error reading sequence file: {e}")
+            return False
 
     def write_to_prospa(self, start):
         """Write to the Prospa file."""
@@ -1266,8 +1283,13 @@ class Ui_MainWindow(object):
                 self.beginSaveButton.setText("Stop Saving")
 
     def start_saving(self):
+        if self.savePathEdit.text().endswith(".csv"):
+            self.save_path = self.savePathEdit.text()
+        else:
+            self.save_path = os.path.join(
+                self.savePathEdit.text(), f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\")
         try:
-            with open(self.savePathEdit.text(), "w", newline="") as f:
+            with open(self.save_path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(
                     ["Time", "Pressure 1", "Pressure 2", "Pressure 3", "Pressure 4"])
@@ -1686,13 +1708,16 @@ class ArduinoWorker(QtCore.QThread):
     def start_timer(self):
         self.timer.start(500)
 
+    def stop_timer(self):
+        self.timer.stop()
+
     def stop(self):
         """Stop the worker and the Arduino controller."""
         self.running = False
         # if last step was pressurised then depressurise?
         self.controller.send_reset()
         self.quit()
-        self.wait()
+        self.wait(1)
 
     def isConnected(self):
         # logging.info(self.controller.serial_connected)

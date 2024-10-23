@@ -69,6 +69,7 @@ class ArduinoController:
         else:
             logging.error("Failed to connect to Arduino. Server not started.")
             self.arduino = None
+            self.serial_connected = False
 
     def connect_arduino(self):
         try:

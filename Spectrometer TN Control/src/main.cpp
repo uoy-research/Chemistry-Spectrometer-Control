@@ -220,7 +220,7 @@ void handleTTL(){
         setValve(SHORT, 0);
         break;
       default:
-        Serial.println("LOG: Invalid TTL input");
+        //Serial.println("LOG: Invalid TTL input");
         break;
     }
   }
