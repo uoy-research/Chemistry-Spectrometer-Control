@@ -89,7 +89,7 @@ class Ui_MainWindow(object):
         self.ardConnectLayout.addWidget(self.ardCOMPortSpinBox)
         self.ardCOMPortSpinBox.setMaximum(255)
         self.ardCOMPortSpinBox.setMinimum(0)
-        self.ardCOMPortSpinBox.setValue(6)
+        self.ardCOMPortSpinBox.setValue(7)
 
         # Create the warning label
         self.ardWarningLabel = QtWidgets.QLabel(
@@ -987,11 +987,23 @@ class Ui_MainWindow(object):
             # Create the worker and start the Arduino communication
             port = self.ardCOMPortSpinBox.value()
             self.arduino_worker = ArduinoWorker(
-                port=port, mode=self.selectedMode, verbose=self.verbosity)
+                self, port=port, mode=self.selectedMode, verbose=self.verbosity)
 
             self.arduino_worker.start()
-            time.sleep(1)
+            
             self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
+
+            self.arduino_worker.start_timer()
+
+            timeout = 5  # Timeout in seconds
+            start_time = time.time()        
+            while True:
+                # Check if the timeout has been reached
+                if (time.time() - start_time > timeout) or self.arduino_worker.isRunning() == True:
+                    break
+                # Sleep for a short duration to prevent high CPU usage
+                time.sleep(0.1)
+
             if self.arduino_worker.isRunning():
                 self.ardConnected = True
                 self.setup_watchdog()
@@ -1089,84 +1101,77 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setStyleSheet("color: green")
         self.update_controls()
 
+    def update_valve_states(self):
+        loop = QtCore.QEventLoop()
+        self.arduino_worker.valve_states_updated.connect(loop.quit)
+        QtCore.QMetaObject.invokeMethod(self.arduino_worker, "get_valve_states", QtCore.Qt.ConnectionType.QueuedConnection)
+        loop.exec()
+
     def on_Valve1Button_clicked(self):
         logging.debug("Valve 1 button clicked")
+        self.update_valve_states()
         if self.arduino_worker.isRunning():
-            valve_states = self.arduino_worker.get_states()  # type: ignore
-            if int(valve_states[0]) == 0:    # type: ignore
+            if int(self.valveStates[0]) == 0: 
+                self.arduino_worker.set_valve_signal.emit([1, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning on valve 1")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_SWITCH_VALVE")  # type: ignore
                 self.Valve1Button.setChecked(True)
             else:
+                self.arduino_worker.set_valve_signal.emit([0, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning off valve 1")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_SWITCH_VALVE")  # type: ignore
                 self.Valve1Button.setChecked(False)
 
     def on_Valve2Button_clicked(self):
         logging.info("Valve 2 button clicked")
-        self.Valve2Button.setChecked(False)
+        self.update_valve_states()
         if self.arduino_worker.isRunning():
-            valve_states = self.arduino_worker.get_states()  # type: ignore
-            if int(valve_states[1]) == 0:
+            if int(self.valveStates[1]) == 0:
                 logging.info("Turning on valve 2")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_INLET_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 0, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(True)
             else:
                 logging.info("Turning off valve 2")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_INLET_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 1, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
         logging.info("Valve 3 button clicked")
-        self.Valve3Button.setChecked(False)
+        self.update_valve_states()
         if self.arduino_worker.isRunning():
-            valve_states = self.arduino_worker.get_states()
-            if int(valve_states[2]) == 0:
+            if int(self.valveStates[2]) == 0:
                 logging.info("Turning on valve 3")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_OUTLET_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 0, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(True)
             else:
                 logging.info("Turning off valve 3")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_OUTLET_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 1, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(False)
-
+            
     def on_Valve4Button_clicked(self):
         logging.info("Valve 4 button clicked")
-        self.Valve4Button.setChecked(False)
+        self.update_valve_states()
         if self.arduino_worker.isRunning():
-            valve_states = self.arduino_worker.get_states()
-            if int(valve_states[3]) == 0:
+            if int(self.valveStates[3]) == 0:
                 logging.info("Turning on valve 4")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_ON_VENT_VALVE")  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 0, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(True)
             else:
                 logging.info("Turning off valve 4")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_VENT_VALVE")   # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 1, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
         logging.info("Valve 5 button clicked")
-        self.Valve5Button.setChecked(False)
+        self.update_valve_states()
         if self.arduino_worker.isRunning():
-            self.arduino_worker.get_valve_signal.emit()
-            # logging.info("States: " + str(valve_states))
-            if int(self.valveStates[4]) == 0:    # type: ignore
+            if int(self.valveStates[4]) == 0:
                 logging.info("Turning on valve 5")
-                self.arduino_worker.set_valve_signal  # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 2, 0, 2, 2, 2])
                 self.Valve5Button.setChecked(True)
             else:
                 logging.info("Turning off valve 5")
-                self.arduino_worker.command_signal.emit(   # type: ignore
-                    "TURN_OFF_SHORT_VALVE")   # type: ignore
+                self.arduino_worker.set_valve_signal.emit([2, 2, 2, 2, 1, 2, 2, 2])
                 self.Valve5Button.setChecked(False)
+
     '''
     def on_Valve6Button_clicked(self):
         logging.info("Valve 6 button clicked")
@@ -1276,14 +1281,17 @@ class Ui_MainWindow(object):
     def setup_watchdog(self):
         self.watchdog = QtCore.QTimer()
         self.watchdog.timeout.connect(self.check_arduino_state)
-        self.watchdog.start(1000)
+        self.watchdog.start(500)
 
     def check_arduino_state(self):
-        if (not self.arduino_worker.isRunning()):
+        if self.arduino_worker.isConnected == False:
+            logging.info("Connection Stopped")
             self.ardConnected = False
             self.ardWarningLabel.setText("Connection Closed")
             self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
+            if self.arduino_worker.isRunning():
+                self.arduino_worker.stop()
 
     def on_connectMotorButton_clicked(self):
         logging.info("Connect motor button clicked")
@@ -1567,9 +1575,9 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
-            macro_number = self.table.item(row, 0).text()
+            macro_number = self.table.item(row, 0).text()   # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(1, 9)]
+                row, col).currentText() for col in range(1, 9)] # type: ignore
             data.append({"Macro No.": macro_number, "Valves": valve_states})
         return data
 
@@ -1660,24 +1668,23 @@ class ArduinoWorker(QtCore.QThread):
     command_signal = QtCore.pyqtSignal(str)
     set_valve_signal = QtCore.pyqtSignal(list)
     get_valve_signal = QtCore.pyqtSignal()
-    get_signal_processed = QtCore.pyqtSignal()
+    valve_states_updated = QtCore.pyqtSignal()
 
-    def __init__(self, port, mode, verbose):
+    def __init__(self, parent, port, mode, verbose):
         super().__init__()
         self.controller = ArduinoController(
             port=port, mode=mode, verbose=verbose)
         self.running = True
+        self.parent = parent
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.poll_readings)
 
     def run(self):
         """Run the Arduino controller in a background thread."""
         self.controller.start()
-        while self.running:
-            if self.controller.serial_connected:
-                if self.controller.get_readings():
-                    data = self.controller.readings  # Get new readings from Arduino
-                    # Emit signal with data to update the graph
-                    self.data_signal.emit(data)
-                time.sleep(0.5)  # Adjust polling interval as needed
+
+    def start_timer(self):
+        self.timer.start(500)
 
     def stop(self):
         """Stop the worker and the Arduino controller."""
@@ -1687,12 +1694,21 @@ class ArduinoWorker(QtCore.QThread):
         self.quit()
         self.wait()
 
-    def isRunning(self):
+    def isConnected(self):
         # logging.info(self.controller.serial_connected)
         return self.controller.serial_connected
 
+    @QtCore.pyqtSlot()
     def get_valve_states(self):
         self.parent.valveStates = self.controller.get_valve_states()
+        self.valve_states_updated.emit()
+
+    def poll_readings(self):
+        if self.controller.serial_connected:
+            if self.controller.get_readings():
+                data = self.controller.readings  # Get new readings from Arduino
+                # Emit signal with data to update the graph
+                self.data_signal.emit(data)
 
     def depressurise(self):
         self.controller.send_depressurise()

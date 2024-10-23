@@ -13,6 +13,7 @@ while True:
     # instrument.write_bit(16, 0)  # Registernumber, number of decimals
     # time.sleep(1)
     # instrument.write_bit(16, 1)  # Registernumber, number of decimals
-    readings = instrument.read_registers(0, 4, 4)  # reading registers 0 to 4 - pressure gauges
+    #readings = instrument.read_registers(0, 4, 4)  # reading registers 0 to 4 - pressure gauges
+    readings = instrument.read_bits(0, 8, 1)
     print(readings)
     time.sleep(1)

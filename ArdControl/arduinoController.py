@@ -72,15 +72,15 @@ class ArduinoController:
 
     def connect_arduino(self):
         try:
-            self.arduino = minimalmodbus.Instrument(self.port, 10)
+            self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
             self.arduino.serial.baudrate = self.baudrate    # type: ignore
             self.arduino.serial.timeout = 3   # type: ignore
-            time.sleep(1)  # Wait for the connection to be established
+            time.sleep(2)  # Wait for the connection to be established
             self.readings = self.arduino.read_registers(
                 0, 4, 4)    # type: ignore
             logging.info(f"Connected to Arduino on port {self.port}")
             self.serial_connected = True
-        except serial.SerialException as e:
+        except Exception as e:
             logging.error(f"Failed to connect to Arduino on port {
                           self.port}: {e}")
             self.serial_connected = False
@@ -97,7 +97,8 @@ class ArduinoController:
 
     def get_valve_states(self):
         try:
-            self.valve_states = self.arduino.read_bits(0, 8)  # type: ignore
+            # read_bits MUST use functioncode = 1
+            self.valve_states = self.arduino.read_bits(0, 8, 1)  # type: ignore
             self.serial_connected = True
         except:
             logging.error("Failed to read valve states")
@@ -107,7 +108,7 @@ class ArduinoController:
     def set_valves(self, valve_states):
         try:
             for i in range(8):
-                if valve_states[i] != 3:
+                if valve_states[i] != 2:
                     self.arduino.write_bit(i, valve_states[i])  # type: ignore
             self.serial_connected = True
         except:
