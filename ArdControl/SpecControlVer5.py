@@ -1107,6 +1107,17 @@ class Ui_MainWindow(object):
                         logging.error("Invalid time length in sequence file")
                         return False
                     self.steps.append(step)
+
+                if len(raw_sequence[1]) > 1:    # Look for save path in second line of seqeunce file
+                    if raw_sequence[1].endswith('.csv'):
+                        self.savePathEdit.setText(raw_sequence[1])
+                    else:   # Add timestamped csv to the file path
+                        self.savePathEdit.setText(os.path.join(
+                            raw_sequence[1], f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                else:
+                    self.savePathEdit.setText(
+                        os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                self.start_saving()
             return True
         except FileNotFoundError:
             logging.error("Sequence file not found")
