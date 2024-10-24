@@ -58,6 +58,8 @@ class Ui_MainWindow(object):
         self.stepTimer.setSingleShot(False)
         self.stepTimer.timeout.connect(self.update_step)
 
+        self.seq_new = True
+
         # Ensure the prospa file is removed
         self.delete_prospa_file()
 
@@ -589,6 +591,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.beginSaveButton.setFont(font)
         self.beginSaveButton.setObjectName("beginSaveButton")
+        self.beginSaveButton.setCheckable(True)
         self.monitorLayout.addWidget(self.beginSaveButton, 6, 1, 1, 1)
 
         # Create the bubble time widgets
@@ -987,18 +990,26 @@ class Ui_MainWindow(object):
                 self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
+            if self.selectedMode == 0:
+                self.update_valve_states()
+                for i in range(5):
+                    if self.valveStates[i] == 1:
+                        getattr(self, f'Valve{i+1}Button').setChecked(True)
+
             if self.selectedMode == 1:
-                if self.load_sequence():
+                if self.load_sequence():                    
+                    logging.info("Sequence loaded successfully")
+                    logging.info("Starting sequence")
                     # Calculate time to show on the labels
                     self.calculate_sequence_time()
                     self.currentStepTypeEdit.setText(self.step_types[self.steps[0].step_type])
+                    # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
                     # Update valve states for current step and start recurring timer
                     self.update_step()
                     # Clean up text files
                     self.write_to_prospa(True)
                     self.delete_prospa_file()
-                    logging.info("Sequence loaded successfully")
-                    logging.info("Starting sequence")
+
                     self.UIUpdateArdConnection()
                 else:
                     self.write_to_prospa(False)
@@ -1012,35 +1023,58 @@ class Ui_MainWindow(object):
                     self.UIUpdateArdConnection()
 
     def update_step(self):
-        self.sequence_running_time += 10
-        self.step_running_time += 10
-        if self.step_running_time >= self.current_step_time:
-            logging.info("Step complete")
-            self.step_running_time = 0
-            if len(self.steps) == 0:
-                self.ardWarningLabel.setText("Sequence complete")
-                self.ardWarningLabel.setStyleSheet("color: green")
-                self.stepTimer.stop()
-                return
-            else:
-                # Get the next step
-                self.current_step = self.steps.pop(0)
-                # Get the key values
-                self.current_step_time = self.current_step.time_length
-                self.current_step_type = self.current_step.step_type
-                # Update the labels
-                self.currentStepTypeEdit.setText(self.step_types[self.current_step_type])
-                
-                self.stepsRemainingLabel.setText(
-                    f"Steps: {len(self.steps) + 1}")
+        if self.ardConnected:
+            self.sequence_running_time += 10
+            self.step_running_time += 10
+            self.currentStepTimeEdit.setText(f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
+            self.stepsTimeRemainingLabel.setText(
+                f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+            if self.step_running_time >= self.current_step_time:
+                if self.seq_new == True:
+                    self.seq_new = False
+                else:
+                    logging.info("Step complete")
+                self.step_running_time = 0
+                if len(self.steps) == 0:
+                    self.ardWarningLabel.setText("Sequence complete")
+                    self.ardWarningLabel.setStyleSheet("color: green")
+                    self.currentStepTypeEdit.setText("")
+                    self.stepsRemainingLabel.setText("Steps: 0")
+                    self.stepTimer.stop()
+                    if self.saving:
+                        self.on_beginSaveButton_clicked()
+                    self.seq_new = True
+                    return
+                else:
+                    # Get the next step
+                    self.current_step = self.steps.pop(0)
+                    # Get the key values
+                    self.current_step_time = self.current_step.time_length
+                    self.current_step_type = self.current_step.step_type
+                    # Update the labels
+                    self.currentStepTypeEdit.setText(self.step_types[self.current_step_type])
+                    
+                    self.stepsRemainingLabel.setText(
+                        f"Steps: {len(self.steps) + 1}")
 
-                # Update the valves
-                self.arduino_worker.set_valve_signal.emit(
-                    self.valve_settings[self.current_step_type])
-                logging.info(f"Step {self.current_step_type} for {self.current_step_time} ms")
-        self.currentStepTimeEdit.setText(f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
-        self.stepsTimeRemainingLabel.setText(
-            f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+                    # Update the valves
+                    self.arduino_worker.set_valve_signal.emit(
+                        self.valve_settings[self.current_step_type])
+                    logging.info(f"Step {self.current_step_type} for {self.current_step_time} ms")
+        else:
+            logging.error("Arduino not connected")
+            self.ardWarningLabel.setText("Arduino not connected")
+            self.ardWarningLabel.setStyleSheet("color: red")
+            self.stepTimer.stop()
+            self.currentStepTypeEdit.setText("")
+            self.stepsRemainingLabel.setText("Steps: 0")
+            self.currentStepTimeEdit.setText("0.00")
+            self.stepsTimeRemainingLabel.setText("Time: 0.00")
+            if self.saving:
+                self.on_beginSaveButton_clicked()
+            self.seq_new = True
+            return
+
         # Restart the timer
         self.stepTimer.start(10)
 
@@ -1051,7 +1085,7 @@ class Ui_MainWindow(object):
         self.current_step_time = 0
         for step in self.steps:
             self.total_sequence_time += step.time_length 
-        logging.info(f"Sequence lenght is {self.total_sequence_time}")
+        logging.info(f"Sequence length is {self.total_sequence_time} ms")
 
     def load_sequence(self):
         """Load a sequence from a file."""
@@ -1087,7 +1121,7 @@ class Ui_MainWindow(object):
                         logging.error("Invalid time length in sequence file")
                         return False
                     step = Step(step_type, time_length)
-                    logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
+                    # logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
                     self.steps.append(step)
 
                 if len(seq_save_path) > 1:    # Look for save path in second line of seqeunce file
@@ -1100,10 +1134,10 @@ class Ui_MainWindow(object):
                     self.savePathEdit.setText(
                         os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
                     
-                for step in self.steps:
-                    logging.info(f"Step: {step.step_type} for {step.time_length} ms")
+                # for step in self.steps:
+                    # logging.info(f"Step: {step.step_type} for {step.time_length} ms")
 
-                self.start_saving()
+                self.on_beginSaveButton_clicked()
             return True
         except FileNotFoundError:
             logging.error("Sequence file not found")
@@ -1167,7 +1201,7 @@ class Ui_MainWindow(object):
     def on_Valve1Button_clicked(self):
         logging.debug("Valve 1 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isConnected():
+        if self.ardConnected:
             if int(self.valveStates[0]) == 0:
                 self.arduino_worker.set_valve_signal.emit(
                     [1, 2, 2, 2, 2, 2, 2, 2])
@@ -1182,7 +1216,7 @@ class Ui_MainWindow(object):
     def on_Valve2Button_clicked(self):
         logging.info("Valve 2 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isConnected():
+        if self.ardConnected:
             if int(self.valveStates[1]) == 0:
                 logging.info("Turning on valve 2")
                 self.arduino_worker.set_valve_signal.emit(
@@ -1197,7 +1231,7 @@ class Ui_MainWindow(object):
     def on_Valve3Button_clicked(self):
         logging.info("Valve 3 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isConnected():
+        if self.ardConnected:
             if int(self.valveStates[2]) == 0:
                 logging.info("Turning on valve 3")
                 self.arduino_worker.set_valve_signal.emit(
@@ -1212,7 +1246,7 @@ class Ui_MainWindow(object):
     def on_Valve4Button_clicked(self):
         logging.info("Valve 4 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isConnected():
+        if self.ardConnected:
             if int(self.valveStates[3]) == 0:
                 logging.info("Turning on valve 4")
                 self.arduino_worker.set_valve_signal.emit(
@@ -1227,7 +1261,7 @@ class Ui_MainWindow(object):
     def on_Valve5Button_clicked(self):
         logging.info("Valve 5 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isConnected():
+        if self.ardConnected:
             if int(self.valveStates[4]) == 0:
                 logging.info("Turning on valve 5")
                 self.arduino_worker.set_valve_signal.emit(
@@ -1325,12 +1359,22 @@ class Ui_MainWindow(object):
     def on_beginSaveButton_clicked(self):
         logging.info("Begin save button clicked")
         if self.ardConnected:
-            if self.start_saving():
+            if self.saving:
                 self.saving = False
+                self.beginSaveButton.setChecked(False)
                 self.beginSaveButton.setText("Begin Saving")
             else:
-                self.saving = True
-                self.beginSaveButton.setText("Stop Saving")
+                if self.start_saving():
+                    self.beginSaveButton.setChecked(True)
+                    self.beginSaveButton.setText("Stop Saving")
+                else:
+                    self.saving = False
+                    self.beginSaveButton.setChecked(False)
+                    self.beginSaveButton.setText("Begin Saving")
+                    logging.error("Error starting save")
+        else:
+            logging.info("Arduino not connected")
+
 
     def start_saving(self):
         if self.savePathEdit.text().endswith(".csv"):
@@ -1338,6 +1382,7 @@ class Ui_MainWindow(object):
         else:
             self.save_path = os.path.join(
                 self.savePathEdit.text(), f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\")
+            self.savePathEdit.setText(self.save_path)
         try:
             with open(self.save_path, "w", newline="") as f:
                 writer = csv.writer(f)
