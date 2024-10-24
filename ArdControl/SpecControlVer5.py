@@ -23,9 +23,9 @@ class Ui_MainWindow(object):
         # Initialise variables
         self.valve_settings = {
             'd': [0, 0, 0, 0, 0, 0, 0, 0],
-            'n': [0, 0, 0, 0, 0, 0, 0, 0],
+            'n': [1, 1, 1, 1, 1, 1, 1, 1],
             'e': [0, 0, 0, 0, 0, 0, 0, 0],
-            'b': [0, 0, 0, 0, 0, 0, 0, 0]
+            'b': [1, 1, 1, 1, 1, 1, 1, 1]
         }
         self.step_types = {
             'd': 'Depressurise',
@@ -54,11 +54,8 @@ class Ui_MainWindow(object):
 
         self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
 
-        self.sequenceTimer = QtCore.QTimer()
-        self.sequenceTimer.timeout.connect(self.update_time)
-
         self.stepTimer = QtCore.QTimer()
-        self.stepTimer.setSingleShot(True)
+        self.stepTimer.setSingleShot(False)
         self.stepTimer.timeout.connect(self.update_step)
 
         # Ensure the prospa file is removed
@@ -303,7 +300,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.currentStepTypeEdit.setFont(font)
         self.currentStepTypeEdit.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignJustify)
+            QtCore.Qt.AlignmentFlag.AlignCenter)
         self.currentStepTypeEdit.setObjectName("currentStepTypeEdit")
         self.currentStepTypeEdit.setReadOnly(True)
         self.currentStepTypeEdit.setMaximumWidth(100)
@@ -992,13 +989,17 @@ class Ui_MainWindow(object):
 
             if self.selectedMode == 1:
                 if self.load_sequence():
+                    # Calculate time to show on the labels
                     self.calculate_sequence_time()
-                    self.sequenceTimer.start(1000)
-                    self.stepTimer.start(self.steps[0].time_length * 1000) #check if seq is in ms or s
+                    self.currentStepTypeEdit.setText(self.step_types[self.steps[0].step_type])
+                    # Update valve states for current step and start recurring timer
+                    self.update_step()
+                    # Clean up text files
                     self.write_to_prospa(True)
                     self.delete_prospa_file()
                     logging.info("Sequence loaded successfully")
                     logging.info("Starting sequence")
+                    self.UIUpdateArdConnection()
                 else:
                     self.write_to_prospa(False)
                     self.delete_prospa_file()
@@ -1011,112 +1012,97 @@ class Ui_MainWindow(object):
                     self.UIUpdateArdConnection()
 
     def update_step(self):
-        if len(self.steps) == 0:
-            self.ardWarningLabel.setText("Sequence complete")
-            self.ardWarningLabel.setStyleSheet("color: green")
-            return
-        else:
-            self.current_step = self.steps.pop(0)
-            self.current_step_time = self.current_step.time_length
-            self.current_step_type = self.current_step.step_type
-            self.currentStepTypeLabel.setText(
-                f"Cur. Step Type: {self.step_types[self.current_step_type]}")    # TODO: add a dict to turn these into readable strings
-            self.currentStepTimeLabel.setText(
-                f"Cur. Step Time: {self.current_step_time}")
-            self.stepsRemainingLabel.setText(
-                f"Steps: {len(self.steps)}")
-            self.arduino_worker.set_valve_signal.emit(
-                self.valve_settings[self.current_step_type])
-            self.stepTimer.start(self.current_step_time * 1000)
-
-
-    def update_time(self):
-        # update total time
-        self.total_sequence_time -= 1
-        self.total_sequence_time = max(0, self.total_sequence_time)
-        if self.total_sequence_time == 0:
-            # self.write_to_prospa(False)   # Write to Prospa file to signal complete?
-            # self.ardWarningLabel.setText("Sequence complete")
-            # self.ardWarningLabel.setStyleSheet("color: green")
-            # self.stepsTimeRemainingLabel.setText(
-            #     f"Seq. Time: 00")
-            # self.currentStepTimeLabel.setText(
-            #     f"Cur. Step Time: 00")
-            self.sequenceTimer.stop()
-        else:
-            if self.total_sequence_time // 60 < 1:
-                self.total_sequence_time_mins = f"{
-                    self.total_sequence_time:02d}"
+        self.sequence_running_time += 10
+        self.step_running_time += 10
+        if self.step_running_time >= self.current_step_time:
+            logging.info("Step complete")
+            self.step_running_time = 0
+            if len(self.steps) == 0:
+                self.ardWarningLabel.setText("Sequence complete")
+                self.ardWarningLabel.setStyleSheet("color: green")
+                self.stepTimer.stop()
+                return
             else:
-                self.total_sequence_time_mins = str(
-                    self.total_sequence_time // 60) + ":" + str(self.total_sequence_time % 60)
+                # Get the next step
+                self.current_step = self.steps.pop(0)
+                # Get the key values
+                self.current_step_time = self.current_step.time_length
+                self.current_step_type = self.current_step.step_type
+                # Update the labels
+                self.currentStepTypeEdit.setText(self.step_types[self.current_step_type])
+                
+                self.stepsRemainingLabel.setText(
+                    f"Steps: {len(self.steps) + 1}")
 
-            # update current step time
-            self.current_step_time -= 1
-            self.current_step_time = max(0, self.current_step_time)
-            if self.total_sequence_time // 60 < 1:
-                self.total_sequence_time_mins = f"{
-                    self.total_sequence_time:02d}"
-            else:
-                self.total_sequence_time_mins = str(
-                    self.total_sequence_time // 60) + ":" + str(self.total_sequence_time % 60)
-            self.current_step_time_mins = str(
-                self.current_step_time // 60) + ":" + str(self.current_step_time % 60)
-
-            self.stepsTimeRemainingLabel.setText(
-                f"Time: {self.total_sequence_time}")
-            self.currentStepTimeLabel.setText(
-                f"Cur. Step Time: {self.current_step_time_mins}")
+                # Update the valves
+                self.arduino_worker.set_valve_signal.emit(
+                    self.valve_settings[self.current_step_type])
+                logging.info(f"Step {self.current_step_type} for {self.current_step_time} ms")
+        self.currentStepTimeEdit.setText(f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
+        self.stepsTimeRemainingLabel.setText(
+            f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+        # Restart the timer
+        self.stepTimer.start(10)
 
     def calculate_sequence_time(self):
+        self.sequence_running_time = -10
+        self.step_running_time = -10
         self.total_sequence_time = 0
-        self.current_step_time = self.steps[0]
+        self.current_step_time = 0
         for step in self.steps:
-            self.total_sequence_time += step.time_length
+            self.total_sequence_time += step.time_length 
+        logging.info(f"Sequence lenght is {self.total_sequence_time}")
 
     def load_sequence(self):
         """Load a sequence from a file."""
         try:
             # Get the file path
+            self.steps = [] # initialise steps
             with open(r"C:\NMR Results\sequence.txt", "r") as f:
                 # sequence format is a long string e.g. d100e200f400
                 raw_sequence = f.readlines()
                 if not raw_sequence:
                     logging.error("Sequence file is empty")
                     return False
-                raw_sequence = raw_sequence[0].strip()
+                seq_save_path = raw_sequence[1].strip()
+                sequence_string = raw_sequence[0].strip()
                 i = 0
-                step = Step(step_type='e', time_length=100)
-                while i < len(raw_sequence):
-                    if raw_sequence[i] in self.validTypes:
-                        step.step_type = raw_sequence[i]
+                while i < len(sequence_string):
+                    if sequence_string[i] in self.step_types.keys():
+                        step_type = sequence_string[i]
                     else:
                         logging.error("Invalid step type in sequence file")
                         return False
                     i += 1
                     time_length = ""
-                    while i < len(raw_sequence) and raw_sequence[i].isdigit():
-                        time_length += raw_sequence[i]
+                    while i < len(sequence_string) and sequence_string[i].isdigit():
+                        time_length += sequence_string[i]
                         i += 1
                     try:
-                        step.time_length = int(time_length)
+                        time_length = int(time_length)
                     except ValueError:
                         logging.error("Invalid time length in sequence file")
                         return False
-                    if step.time_length <= 0:
+                    if time_length <= 0:
                         logging.error("Invalid time length in sequence file")
                         return False
+                    step = Step(step_type, time_length)
+                    logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
                     self.steps.append(step)
 
-                if len(raw_sequence[1]) > 1:    # Look for save path in second line of seqeunce file
-                    if raw_sequence[1].endswith('.csv'):
-                        self.savePathEdit.setText(raw_sequence[1])
+                if len(seq_save_path) > 1:    # Look for save path in second line of seqeunce file
+                    if seq_save_path.endswith('.csv'):
+                        self.savePathEdit.setText(seq_save_path)
                     else:   # Add timestamped csv to the file path
                         self.savePathEdit.setText(os.path.join(
-                            raw_sequence[1], f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
                 else:
                     self.savePathEdit.setText(
                         os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                    
+                for step in self.steps:
+                    logging.info(f"Step: {step.step_type} for {step.time_length} ms")
+
                 self.start_saving()
             return True
         except FileNotFoundError:
@@ -1138,7 +1124,8 @@ class Ui_MainWindow(object):
     def delete_prospa_file(self):
         """Delete the Prospa file."""
         try:
-            os.remove(r"C:\NMR Results\sequence.txt")
+            # os.remove(r"C:\NMR Results\sequence.txt")
+            pass
         except FileNotFoundError:
             pass
 
@@ -1180,7 +1167,7 @@ class Ui_MainWindow(object):
     def on_Valve1Button_clicked(self):
         logging.debug("Valve 1 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isRunning():
+        if self.arduino_worker.isConnected():
             if int(self.valveStates[0]) == 0:
                 self.arduino_worker.set_valve_signal.emit(
                     [1, 2, 2, 2, 2, 2, 2, 2])
@@ -1195,61 +1182,61 @@ class Ui_MainWindow(object):
     def on_Valve2Button_clicked(self):
         logging.info("Valve 2 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isRunning():
+        if self.arduino_worker.isConnected():
             if int(self.valveStates[1]) == 0:
                 logging.info("Turning on valve 2")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 0, 2, 2, 2, 2, 2, 2])
+                    [2, 1, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(True)
             else:
                 logging.info("Turning off valve 2")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 1, 2, 2, 2, 2, 2, 2])
+                    [2, 0, 2, 2, 2, 2, 2, 2])
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
         logging.info("Valve 3 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isRunning():
+        if self.arduino_worker.isConnected():
             if int(self.valveStates[2]) == 0:
                 logging.info("Turning on valve 3")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 0, 2, 2, 2, 2, 2])
+                    [2, 2, 1, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(True)
             else:
                 logging.info("Turning off valve 3")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 1, 2, 2, 2, 2, 2])
+                    [2, 2, 0, 2, 2, 2, 2, 2])
                 self.Valve3Button.setChecked(False)
 
     def on_Valve4Button_clicked(self):
         logging.info("Valve 4 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isRunning():
+        if self.arduino_worker.isConnected():
             if int(self.valveStates[3]) == 0:
                 logging.info("Turning on valve 4")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 2, 0, 2, 2, 2, 2])
+                    [2, 2, 2, 1, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(True)
             else:
                 logging.info("Turning off valve 4")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 2, 1, 2, 2, 2, 2])
+                    [2, 2, 2, 0, 2, 2, 2, 2])
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
         logging.info("Valve 5 button clicked")
         self.update_valve_states()
-        if self.arduino_worker.isRunning():
+        if self.arduino_worker.isConnected():
             if int(self.valveStates[4]) == 0:
                 logging.info("Turning on valve 5")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 2, 2, 0, 2, 2, 2])
+                    [2, 2, 2, 2, 1, 2, 2, 2])
                 self.Valve5Button.setChecked(True)
             else:
                 logging.info("Turning off valve 5")
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 2, 2, 1, 2, 2, 2])
+                    [2, 2, 2, 2, 0, 2, 2, 2])
                 self.Valve5Button.setChecked(False)
 
     '''
@@ -1375,8 +1362,7 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setText("Connection Closed")
             self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
-            if self.arduino_worker.isRunning():
-                self.arduino_worker.stop()
+            self.arduino_worker.stop()
 
     def on_connectMotorButton_clicked(self):
         logging.info("Connect motor button clicked")

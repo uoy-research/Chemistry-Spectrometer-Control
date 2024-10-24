@@ -3,8 +3,8 @@ import minimalmodbus
 import time
 
 instrument = minimalmodbus.Instrument('COM7', 10)  # port name, slave address (in decimal)
-instrument.serial.baudrate = 9600
-instrument.serial.timeout = 3
+instrument.serial.baudrate = 9600   # type: ignore
+instrument.serial.timeout = 3   # type: ignore
 
 time.sleep(2)  # wait for the connection to be established
 ## Read temperature (PV = ProcessValue) ##
