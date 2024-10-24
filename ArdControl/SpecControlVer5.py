@@ -1149,10 +1149,10 @@ class Ui_MainWindow(object):
     def write_to_prospa(self, start):
         """Write to the Prospa file."""
         if start:
-            with open(r"C:\NMR Results\prospa.txt", "w") as f:
+            with open(r"C:\ssbubble\prospa.txt", "w") as f:
                 f.write("1")
         else:
-            with open(r"C:\NMR Results\prospa.txt", "w") as f:
+            with open(r"C:\ssbubble\prospa.txt", "w") as f:
                 f.write("0")
 
     def delete_prospa_file(self):
