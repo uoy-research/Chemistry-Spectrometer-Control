@@ -8,8 +8,8 @@ const byte SlaveId = 10;
 // const int Lamp1Coil = 0;
 const int TTLCoil = 16;
 const int testCoil = 19;
-const int depressuriseCoil = 17;
-const int resetCoil = 18;
+const int depressuriseCoil = 18;
+const int resetCoil = 17;
 
 const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
 const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
@@ -247,7 +247,7 @@ void reset(){
 
 void setValves(){
     //set valves based on coil values
-    for (int i = 0; i < 5; i++)
+    for (int i = 4; i >= 0; i--)
     {
         setValve(i, mb.coil(valveCoil[i]));
     }

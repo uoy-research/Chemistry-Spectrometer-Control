@@ -108,9 +108,14 @@ class ArduinoController:
 
     def set_valves(self, valve_states):
         try:
+            """
             for i in range(8):
                 if valve_states[i] != 2:
                     self.arduino.write_bit(i, valve_states[i])  # type: ignore
+            self.serial_connected = True
+            """
+            write_states = [self.valve_states[i] if valve_states[i] == 2 else valve_states[i] for i in range(8)]
+            self.arduino.write_bits(0, write_states)  # type: ignore
             self.serial_connected = True
         except:
             logging.error("Failed to set valve states")

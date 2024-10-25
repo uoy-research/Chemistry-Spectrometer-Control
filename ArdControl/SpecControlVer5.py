@@ -489,6 +489,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.quickVentButton.setFont(font)
         self.quickVentButton.setObjectName("quickVentButton")
+        self.quickVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.quickVentButton, 0, 0, 1, 1)
 
         self.slowVentButton = QtWidgets.QPushButton(
@@ -498,6 +499,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.slowVentButton.setFont(font)
         self.slowVentButton.setObjectName("slowVentButton")
+        self.slowVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.slowVentButton, 0, 1, 1, 1)
 
         self.buildPressureButton = QtWidgets.QPushButton(parent=self.gridLayoutWidget_2)
@@ -506,6 +508,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.buildPressureButton.setFont(font)
         self.buildPressureButton.setObjectName("buildPressureButton")
+        self.buildPressureButton.setCheckable(True)
         self.monitorLayout.addWidget(self.buildPressureButton, 1, 0, 1, 1)
 
         self.switchGasButton = QtWidgets.QPushButton(parent=self.gridLayoutWidget_2)
@@ -514,6 +517,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.switchGasButton.setFont(font)
         self.switchGasButton.setObjectName("switchGasButton")
+        self.switchGasButton.setCheckable(True)
         self.monitorLayout.addWidget(self.switchGasButton, 1, 1, 1, 1)
 
         self.valveMacro1Button = QtWidgets.QPushButton(
@@ -523,6 +527,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.valveMacro1Button.setFont(font)
         self.valveMacro1Button.setObjectName("valveMacro1Button")
+        # self.valveMacro1Button.setCheckable(True)
         self.monitorLayout.addWidget(self.valveMacro1Button, 2, 0, 1, 1)
 
         self.valveMacro2Button = QtWidgets.QPushButton(
@@ -532,6 +537,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.valveMacro2Button.setFont(font)
         self.valveMacro2Button.setObjectName("valveMacro2Button")
+        # self.valveMacro2Button.setCheckable(True)
         self.monitorLayout.addWidget(self.valveMacro2Button, 2, 1, 1, 1)
 
         self.valveMacro3Button = QtWidgets.QPushButton(
@@ -541,6 +547,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.valveMacro3Button.setFont(font)
         self.valveMacro3Button.setObjectName("valveMacro3Button")
+        # self.valveMacro3Button.setCheckable(True)
         self.monitorLayout.addWidget(self.valveMacro3Button, 3, 0, 1, 1)
 
         self.valveMacro4Button = QtWidgets.QPushButton(
@@ -550,6 +557,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.valveMacro4Button.setFont(font)
         self.valveMacro4Button.setObjectName("valveMacro4Button")
+        #self.valveMacro4Button.setCheckable(True)
         self.monitorLayout.addWidget(self.valveMacro4Button, 3, 1, 1, 1)
 
         # Create the pressure radio buttons
@@ -953,7 +961,7 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Edit Motor Macros"))
         self.editValveMacroAction.setText(_translate(
             "MainWindow", "Edit Valve Macros"))
-        self.savePathEdit.setText(_translate("MainWindow", "C:/NMR Results"))
+        self.savePathEdit.setText(_translate("MainWindow", "C:\\ssbubble"))
         self.resetButton.setText(_translate("MainWindow", "Reset"))
         self.buildPressureButton.setText(_translate("MainWindow", "Build Pressure"))
         self.switchGasButton.setText(_translate("MainWindow", "Switch Gas"))
@@ -1034,9 +1042,7 @@ class Ui_MainWindow(object):
             # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
                 self.update_valve_states()
-                for i in range(5):
-                    if self.valveStates[i] == 1:
-                        getattr(self, f'Valve{i+1}Button').setChecked(True)
+                self.update_valve_button_states()
 
             # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
@@ -1073,6 +1079,21 @@ class Ui_MainWindow(object):
                     self.ardConnected = False
                     self.arduino_worker.stop()
                     self.UIUpdateArdConnection()
+
+    def update_valve_button_states(self):
+        for i in range(5):
+            if self.valveStates[i] == 1:
+                getattr(self, f'Valve{i+1}Button').setChecked(True)
+                if i == 0:
+                    self.switchGasButton.setChecked(True)
+                elif i == 1:
+                    self.buildPressureButton.setChecked(True)
+            elif self.valveStates[i] == 0:
+                getattr(self, f'Valve{i+1}Button').setChecked(False)
+                if i == 0:
+                    self.switchGasButton.setChecked(False)
+                elif i == 1:
+                    self.buildPressureButton.setChecked(False)
 
     """Recurring function that updates the current step and valve states as well as the time labels."""
     def update_step(self):
@@ -1459,7 +1480,7 @@ class Ui_MainWindow(object):
     def on_slowVentButton_clicked(self):
         logging.debug("Slow vent button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("SLOW_VENT")
+            self.arduino_worker.command_signal.emit("SLOW_VENT")    # [2, 0, 1, 1, 0, 2, 2, 2]
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
@@ -1481,40 +1502,78 @@ class Ui_MainWindow(object):
         else:
             logging.info("Arduino not connected")
 
-    def on_quickBubbleButton_clicked(self):
+    def on_quickBubbleButton_clicked(self):     # TODO: Implement quick bubble on a timer
         logging.debug("Quick bubble button clicked")
+
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("QUICK_BUBBLE")
+            if self.quickBubbleButton.isChecked():
+                self.quickBubbleButton.setChecked(False)
+                self.arduino_worker.set_valve_signal.emit([2, 0, 0, 0, 2, 2, 2, 2])
+                self.update_valve_states()
+                self.update_valve_button_states()
+            else:
+                self.quickBubbleButton.setChecked(True)
+                self.arduino_worker.set_valve_signal.emit([2, 1, 1, 1, 2, 2, 2, 2])
+                self.update_valve_states()
+                self.update_valve_button_states()
 
     def on_buildPressureButton_clicked(self):
-        logging.debug("Build pressure button clicked")
+        logging.debug("Build pressure button clicked")#
+        self.update_valve_states()
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("BUILD_PRESSURE")
+            if self.valveStates[1] == 1:
+                self.buildPressureButton.setChecked(False)
+                self.arduino_worker.set_valve_signal.emit([2, 0, 2, 2, 2, 2, 2, 2])
+            else:
+                self.buildPressureButton.setChecked(True)
+                self.arduino_worker.set_valve_signal.emit([2, 1, 2, 2, 2, 2, 2, 2])
+        self.update_valve_states()
+        self.update_valve_button_states()
 
     def on_switchGasButton_clicked(self):
         logging.debug("Switch gas button clicked")
+        self.update_valve_states()
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("SWITCH_GAS")
+            if self.valveStates[0] == 1:
+                self.switchGasButton.setChecked(False)
+                self.arduino_worker.set_valve_signal.emit([0, 2, 2, 2, 2, 2, 2, 2])
+            else:
+                self.switchGasButton.setChecked(True)
+                self.arduino_worker.set_valve_signal.emit([1, 2, 2, 2, 2, 2, 2, 2])
+        self.update_valve_states()
+        self.update_valve_button_states()
 
     def on_valveMacro1Button_clicked(self):
         logging.debug("Valve macro 1 button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("VALVE_MACRO_1")
+            self.arduino_worker.set_valve_signal.emit(
+                    self.macro_settings["1"])
+            self.update_valve_states()
+            self.update_valve_button_states()
 
     def on_valveMacro2Button_clicked(self):
         logging.debug("Valve macro 2 button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("VALVE_MACRO_2")
+            self.arduino_worker.set_valve_signal.emit(
+                    self.macro_settings["2"])
+            self.update_valve_states()
+            self.update_valve_button_states()
 
     def on_valveMacro3Button_clicked(self):
         logging.debug("Valve macro 3 button clicked")
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("VALVE_MACRO_3")
+            self.arduino_worker.set_valve_signal.emit(
+                    self.macro_settings["3"])
+            self.update_valve_states()
+            self.update_valve_button_states()
 
     def on_valveMacro4Button_clicked(self):
         logging.debug("Valve macro 4 button clicked")
-        for key, value in self.macro_settings.items():
-            logging.info(f"Macro {key}: {value}")
+        if self.ardConnected:
+            self.arduino_worker.set_valve_signal.emit(
+                    self.macro_settings["4"])
+            self.update_valve_states()
+            self.update_valve_button_states()
 
 
     def start_saving(self):
@@ -1542,6 +1601,8 @@ class Ui_MainWindow(object):
         self.watchdog.start(500)
 
     def check_arduino_state(self):
+        self.update_valve_states()
+        self.update_valve_button_states()
         if self.arduino_worker.isConnected == False:
             logging.info("Connection Stopped")
             self.ardConnected = False
@@ -1866,7 +1927,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
     def get_macro_data_dict(self):
         data = {}
         for row in range(self.table.rowCount()):
-            macro_number = int(self.table.item(row, 0).text()[-1])   # type: ignore
+            macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             valve_states = [self.table.cellWidget(
                 row, col).currentText() for col in range(1, 9)] # type: ignore
             valve_states = [1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
