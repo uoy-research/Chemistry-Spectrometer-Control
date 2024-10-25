@@ -18,51 +18,66 @@ matplotlib.use('QtAgg')
 
 
 class Ui_MainWindow(object):
+    # creates the GUI for the main window
     def setupUi(self, MainWindow):
 
         # Initialise variables
+
+        # List of valve settings for each step type
         self.valve_settings = {
             'd': [0, 0, 0, 0, 0, 0, 0, 0],
-            'n': [1, 1, 1, 1, 1, 1, 1, 1],
+            'n': [1, 1, 1, 1, 1, 0, 0, 0],
             'e': [0, 0, 0, 0, 0, 0, 0, 0],
-            'b': [1, 1, 1, 1, 1, 1, 1, 1]
+            'b': [2, 1, 1, 1, 0, 0, 0, 0],
+            's': [2, 2, 2, 0, 0, 0, 0, 0],
+            'h': [2, 0, 0, 0, 0, 0, 0, 0]
         }
+        # list of programmed step types + recognisable name for the GUI 
         self.step_types = {
             'd': 'Depressurise',
             'n': 'Nitrogen',
             'e': 'Evacuate',
-            'b': 'Bubble'
+            'b': 'Bubble',
+            's': 'Sleep',
+            'h': 'Hold Bubble'
         }
 
-        self.verbosity = True
+        # Show debug logs
+        self.verbosity = False
+
+        # Bool to track arduino connection
         self.ardConnected = False
+
+        # Variable to track valve arduino running mode
         self.selectedMode = None
-        self.connection_in_progress = False
-        self.monitoring = False
+
+        # Bool to track pressure reading saving
         self.saving = False
-        self.default_save_path = os.path.join("C:\\", "NMR Results")
-        self.motorConnectd = False
+
+        # Default save path
+        self.default_save_path = os.path.join("C:\\", "ssbubble")
+
+        # Array for storing sequence steps
         self.steps = []
-        # self.controller = None
-        self.motorController = None
-        self.sequenceLoaded = False
-        self.sequenceReady = False
-        self.sequenceRunning = False
+
+        # Watchdog gets activated when valve arduino is connected and updates the connection status
         self.watchdog = None
 
-        self.validTypes = ['b', 'd', 'n', 'e']
-
+        # Array for keeping track of valve states
         self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
 
+        # QTimer for updating the sequence step and time display
         self.stepTimer = QtCore.QTimer()
         self.stepTimer.setSingleShot(False)
         self.stepTimer.timeout.connect(self.update_step)
 
+        # Bool that avoids "Step complete" message on sequence init
         self.seq_new = True
 
-        # Ensure the prospa file is removed
-        self.delete_prospa_file()
+        # Ensure the prospa file is removed - prospa must be activated once gui already open
+        self.delete_sequence_file()
 
+        """Create UI Widgets"""
         # Create the main window
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1050, 680)
@@ -954,6 +969,7 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
+        # If no mode is selected, display a warning
         elif self.selectedMode == None:
             self.ardWarningLabel.setText("Please select a mode")
             self.ardWarningLabel.setStyleSheet("color: red")
@@ -969,8 +985,10 @@ class Ui_MainWindow(object):
 
             self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
 
+            # Start the arduino time that read pressure readings every 500ms
             self.arduino_worker.start_timer()
 
+            # Check if the connection was successful with 5 sec timeout
             timeout = 5  # Timeout in seconds
             start_time = time.time()
             while True:
@@ -980,8 +998,10 @@ class Ui_MainWindow(object):
                 # Sleep for a short duration to prevent high CPU usage
                 time.sleep(0.1)
 
+            # Update the UI based on the connection status
             if self.arduino_worker.isConnected():
                 self.ardConnected = True
+                # Start the watchdog timer that updates arduino connection status
                 self.setup_watchdog()
             else:
                 self.ardConnected = False
@@ -990,59 +1010,90 @@ class Ui_MainWindow(object):
                 self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
+            # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
                 self.update_valve_states()
                 for i in range(5):
                     if self.valveStates[i] == 1:
                         getattr(self, f'Valve{i+1}Button').setChecked(True)
 
+            # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
+                # Check if sequence gets loaded correctly
                 if self.load_sequence():                    
                     logging.info("Sequence loaded successfully")
                     logging.info("Starting sequence")
                     # Calculate time to show on the labels
                     self.calculate_sequence_time()
                     self.currentStepTypeEdit.setText(self.step_types[self.steps[0].step_type])
-                    # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
+                    # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")                  
+                    
+                    # Tell prospa that sequence was loaded successfully and is now running
+                    self.write_to_prospa(True)
+                    self.delete_sequence_file()
+                    
                     # Update valve states for current step and start recurring timer
                     self.update_step()
-                    # Clean up text files
-                    self.write_to_prospa(True)
-                    self.delete_prospa_file()
 
+                    # Update the UI
                     self.UIUpdateArdConnection()
                 else:
+                    # If sequence loading fails, tell prospa to stop
                     self.write_to_prospa(False)
-                    self.delete_prospa_file()
+                    self.delete_sequence_file()
+
+                    # Update the UI
                     self.ardWarningLabel.setText(
                         "Error loading sequence file")
                     self.ardWarningLabel.setStyleSheet("color: red")
                     logging.error("Error loading sequence file")
+
+                    # Stop the arduino worker
                     self.ardConnected = False
                     self.arduino_worker.stop()
                     self.UIUpdateArdConnection()
 
+    """Recurring function that updates the current step and valve states as well as the time labels."""
     def update_step(self):
+        # Check the connection
         if self.ardConnected:
+            # Increment time tracker by 10ms
             self.sequence_running_time += 10
             self.step_running_time += 10
+
+            # Update the time labels
             self.currentStepTimeEdit.setText(f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
             self.stepsTimeRemainingLabel.setText(
                 f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+            
+            # Check if the current step is complete
             if self.step_running_time >= self.current_step_time:
+                # Check if sequence has been initialized
                 if self.seq_new == True:
                     self.seq_new = False
+                # If not, step is complete
                 else:
                     logging.info("Step complete")
+
+                # Reset the step timer
                 self.step_running_time = 0
+
+                # Check if there are more steps
                 if len(self.steps) == 0:
+                    # If not, sequence is complete
                     self.ardWarningLabel.setText("Sequence complete")
                     self.ardWarningLabel.setStyleSheet("color: green")
                     self.currentStepTypeEdit.setText("")
                     self.stepsRemainingLabel.setText("Steps: 0")
+
+                    # Stop the timer to prevent this function from recurring
                     self.stepTimer.stop()
+
+                    # Stop saving at the end of the sequence
                     if self.saving:
                         self.on_beginSaveButton_clicked()
+
+                    # Reset sequence init flag
                     self.seq_new = True
                     return
                 else:
@@ -1057,11 +1108,14 @@ class Ui_MainWindow(object):
                     self.stepsRemainingLabel.setText(
                         f"Steps: {len(self.steps) + 1}")
 
-                    # Update the valves
+                    # Update the valves with new step state
                     self.arduino_worker.set_valve_signal.emit(
                         self.valve_settings[self.current_step_type])
+                    
+                    # Log the step type and time
                     logging.info(f"Step {self.current_step_type} for {self.current_step_time} ms")
         else:
+            # If arduino is not connected, stop the timer and reset all labels
             logging.error("Arduino not connected")
             self.ardWarningLabel.setText("Arduino not connected")
             self.ardWarningLabel.setStyleSheet("color: red")
@@ -1070,15 +1124,20 @@ class Ui_MainWindow(object):
             self.stepsRemainingLabel.setText("Steps: 0")
             self.currentStepTimeEdit.setText("0.00")
             self.stepsTimeRemainingLabel.setText("Time: 0.00")
+
+            # Stop saving if it was started
             if self.saving:
                 self.on_beginSaveButton_clicked()
+
+            # Reset sequence init flag
             self.seq_new = True
             return
 
-        # Restart the timer
+        # Recur the function every 10ms until sequence is over
         self.stepTimer.start(10)
 
     def calculate_sequence_time(self):
+        """Calculate the total time of the sequence."""
         self.sequence_running_time = -10
         self.step_running_time = -10
         self.total_sequence_time = 0
@@ -1092,21 +1151,30 @@ class Ui_MainWindow(object):
         try:
             # Get the file path
             self.steps = [] # initialise steps
-            with open(r"C:\NMR Results\sequence.txt", "r") as f:
+            with open(r"C:\ssbubble\sequence.txt", "r") as f:
                 # sequence format is a long string e.g. d100e200f400
                 raw_sequence = f.readlines()
+
+                # Check if the sequence file is empty
                 if not raw_sequence:
                     logging.error("Sequence file is empty")
                     return False
+                
+                # Get the save path from the second line of the sequence file
                 seq_save_path = raw_sequence[1].strip()
                 sequence_string = raw_sequence[0].strip()
                 i = 0
+
+                # Parse the sequence string
                 while i < len(sequence_string):
+                    # Check for valid step types based on dictionaries in the class (at the top of the file)
                     if sequence_string[i] in self.step_types.keys():
                         step_type = sequence_string[i]
                     else:
                         logging.error("Invalid step type in sequence file")
                         return False
+                    
+                    # Get the time length of the step
                     i += 1
                     time_length = ""
                     while i < len(sequence_string) and sequence_string[i].isdigit():
@@ -1120,45 +1188,51 @@ class Ui_MainWindow(object):
                     if time_length <= 0:
                         logging.error("Invalid time length in sequence file")
                         return False
+                    
+                    # Create a step object and add it to the list
                     step = Step(step_type, time_length)
                     # logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
                     self.steps.append(step)
 
-                if len(seq_save_path) > 1:    # Look for save path in second line of seqeunce file
-                    if seq_save_path.endswith('.csv'):
-                        self.savePathEdit.setText(seq_save_path)
-                    else:   # Add timestamped csv to the file path
-                        self.savePathEdit.setText(os.path.join(
-                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-                else:
-                    self.savePathEdit.setText(
-                        os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                # Automatically start saving at sequence start
+                if self.saving == False:
+                    # Get the save path from the sequence file
+                    if len(seq_save_path) > 1:    # Look for save path in second line of seqeunce file
+                        if seq_save_path.endswith('.csv'):
+                            self.savePathEdit.setText(seq_save_path)
+                        else:   # Add timestamped csv to the file path if no file specified
+                            self.savePathEdit.setText(os.path.join(
+                                seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                    else:
+                        # If no save path is specified, use the default path
+                        self.savePathEdit.setText(
+                            os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
                     
-                # for step in self.steps:
-                    # logging.info(f"Step: {step.step_type} for {step.time_length} ms")
+                    # Simulate save button click
+                    self.on_beginSaveButton_clicked()
 
-                self.on_beginSaveButton_clicked()
-            return True
+            return True # Signal that sequence was loaded successfully
+        
         except FileNotFoundError:
             logging.error("Sequence file not found")
-            return False
+            return False    # Signal that sequence file was not found
         except IOError as e:
             logging.error(f"Error reading sequence file: {e}")
-            return False
+            return False    # Signal error when parsing sequence file
 
     def write_to_prospa(self, start):
-        """Write to the Prospa file."""
+        """Write the file to Prospa."""
         if start:
             with open(r"C:\ssbubble\prospa.txt", "w") as f:
-                f.write("1")
+                f.write("1")    # Signal success
         else:
             with open(r"C:\ssbubble\prospa.txt", "w") as f:
-                f.write("0")
+                f.write("0")    # Signal failure
 
-    def delete_prospa_file(self):
-        """Delete the Prospa file."""
+    def delete_sequence_file(self):
+        """Delete the sequence file that Prospa makes."""
         try:
-            # os.remove(r"C:\NMR Results\sequence.txt")
+            os.remove(r"C:\ssbubble\sequence.txt")
             pass
         except FileNotFoundError:
             pass
@@ -1172,8 +1246,8 @@ class Ui_MainWindow(object):
     def on_manualRadioButton_clicked(self):
         self.selectedMode = 0
 
+    """Update valve arduino controls."""
     def UIUpdateArdConnection(self):
-        self.connection_in_progress = False  # Reset the flag
         self.ardConnectButton.setEnabled(True)  # Re-enable the button
         if self.ardConnected == False:
             self.ardConnectButton.setText("Connect")
@@ -1191,18 +1265,23 @@ class Ui_MainWindow(object):
             self.ardWarningLabel.setStyleSheet("color: green")
         self.update_controls()
 
+    """Update the valve states with a thread safe call."""
     def update_valve_states(self):
-        loop = QtCore.QEventLoop()
+        loop = QtCore.QEventLoop()  # Event loop ensures that state is updated before continuing
         self.arduino_worker.valve_states_updated.connect(loop.quit)
         QtCore.QMetaObject.invokeMethod(
             self.arduino_worker, "get_valve_states", QtCore.Qt.ConnectionType.QueuedConnection)
         loop.exec()
 
+    """Toggle valve 1"""
     def on_Valve1Button_clicked(self):
         logging.debug("Valve 1 button clicked")
+        # Update the valve states
         self.update_valve_states()
+        # Check if the arduino is connected
         if self.ardConnected:
             if int(self.valveStates[0]) == 0:
+                # Only change specified valve
                 self.arduino_worker.set_valve_signal.emit(
                     [1, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning on valve 1")
@@ -1321,6 +1400,7 @@ class Ui_MainWindow(object):
     def on_pressure4RadioButton_clicked(self):
         pass
 
+    """Opens a file dialog to select the save path."""
     def on_selectSavePathButton_clicked(self):
         """
         logging.info("Select save path button clicked")
@@ -1477,6 +1557,7 @@ class Ui_MainWindow(object):
         dialog = ValveMacroEditor(self)
         dialog.exec()
 
+    """Enables and disables controls based on the running mode"""
     def update_controls(self):
         if self.ardConnected:
             # Toggle connection controls
@@ -1677,7 +1758,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         self.table
 
     def load_data(self):
-        json_path = os.path.join(self.executable_dir, 'valve_macro_data.json')
+        json_path = os.path.join("C:\\ssbubble", 'valve_macro_data.json')
         # print(json_path)
         if os.path.exists(json_path):
             try:
@@ -1864,8 +1945,10 @@ class ArduinoWorker(QtCore.QThread):
     def send_command(self, command):
         if command == "RESET":
             self.controller.send_reset()
+            logging.info("Resetting Arduino")
         elif command == "QUICK_VENT":
             self.controller.send_depressurise()
+            logging.info("Depressurising Arduino")
         else:
             logging.info("Invalid command for arduino")
 

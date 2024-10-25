@@ -37,8 +37,8 @@ class ArduinoController:
         self.valveAddr = [0, 1, 2, 3, 4, 5, 6, 7]
         self.pressureAddr = [0, 1, 2, 3]
         self.ttlAddr = 16
-        self.resetAddr = 1
-        self.depressuriseAddr = 0
+        self.resetAddr = 17
+        self.depressuriseAddr = 18
 
         if verbose:
             logging.basicConfig(level=logging.DEBUG)

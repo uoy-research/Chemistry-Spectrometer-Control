@@ -1,0 +1,3 @@
+pyinstaller --onefile --icon=C:\Users\gnw510\Spectro Proj\ArdControlExport\chem.ico --add-data "arduinoController.py;." --add-data "motorController.py;." --hidden-import=PyQt6.QtCore --hidden-import=PyQt6.QtGui --hidden-import=PyQt6.QtWidgets SpecControlVer5.py
+
+pyinstaller --onefile SpecControlVer5.py --icon=chem.ico

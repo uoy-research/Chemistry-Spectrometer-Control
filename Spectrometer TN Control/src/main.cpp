@@ -238,6 +238,11 @@ void reset(){
     TTLState = true;
     mb.setCoil(TTLCoil, true);
     mb.setCoil(resetCoil, 0);
+    setValve(SWITCH, 0);
+    setValve(IN, 0);
+    setValve(OUT, 0);
+    setValve(VENT, 0);
+    setValve(SHORT, 0);
 }
 
 void setValves(){

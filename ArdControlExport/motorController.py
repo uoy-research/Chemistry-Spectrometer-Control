@@ -4,6 +4,7 @@ import logging
 import time
 import csv
 import os
+import minimalmodbus
 
 # 25,600 microsteps per millimeter
 
@@ -13,8 +14,6 @@ class MotorController:
         self.baudrate = 9600
         # self.arduino = None
         self.shutdown_flag = False
-        self.last_heartbeat_time = 0
-        self.heartbeat_time = 5
         self.serial_connected = False
         self.heartbeat_thread = None
         self.reading_thread = None

@@ -33,39 +33,13 @@
             "Open",
             "Closed",
             "Closed",
-            "Closed",
+            "Ignore",
             "Closed",
             "Closed"
         ]
     },
     {
         "Macro No.": "Macro 4",
-        "Valves": [
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed"
-        ]
-    },
-    {
-        "Macro No.": "Macro 5",
-        "Valves": [
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed",
-            "Closed"
-        ]
-    },
-    {
-        "Macro No.": "Macro 6",
         "Valves": [
             "Closed",
             "Closed",
