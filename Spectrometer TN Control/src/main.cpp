@@ -117,15 +117,15 @@ void loop() {
         TTLState = true;
     }
     else{
-        if (TTLState == true){mbLast = millis();TTLState = false;serialConnected = false;}  //If system was in TTL mode, update mbLast and TTLState
-            
-        setValves(); //set valves based on coil values  
+        if (TTLState == true){mbLast = millis();TTLState = false;serialConnected = true;}  //If system was in TTL mode, update mbLast and TTLState
 
         //check for depressurise command
         if(mb.coil(depressuriseCoil) == 1){depressurise();} //check for depressurise command
 
         //check for reset command   
         if(mb.coil(resetCoil) == 1){reset();} //check for reset command   
+
+        setValves(); //set valves based on coil values  
     }
 
     if((long)(millis() - tPoll) > (long)pollTime){ //if it's time to poll the pressure sensors
@@ -238,6 +238,9 @@ void reset(){
     TTLState = true;
     mb.setCoil(TTLCoil, true);
     mb.setCoil(resetCoil, 0);
+    for (int i = 0; i < 8; i++) {
+        mb.setCoil(valveCoil[i], 0);
+    }
     setValve(SWITCH, 0);
     setValve(IN, 0);
     setValve(OUT, 0);

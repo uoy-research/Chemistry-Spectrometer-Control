@@ -57,8 +57,7 @@ class ArduinoController:
 
     def start(self):
         logging.info("Starting server...")
-        self.connect_arduino()
-        if self.serial_connected:
+        if self.connect_arduino():
             logging.info("Arduino started")
             if self.mode == 2:
                 # type: ignore # Enable TTL control
@@ -81,10 +80,12 @@ class ArduinoController:
                 0, 4, 4)    # type: ignore
             logging.info(f"Connected to Arduino on port {self.port}")
             self.serial_connected = True
+            return True
         except Exception as e:
             logging.error(f"Failed to connect to Arduino on port {
                           self.port}: {e}")
             self.serial_connected = False
+            return False
 
     def get_readings(self):
         try:
@@ -139,3 +140,9 @@ class ArduinoController:
 
     def get_mode(self):
         return self.mode
+    
+    def get_ttl_state(self):
+        return self.arduino.read_bit(16, 1)
+    
+    def disableTTL(self):
+        self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore

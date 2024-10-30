@@ -493,7 +493,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.quickVentButton.setFont(font)
         self.quickVentButton.setObjectName("quickVentButton")
-        #self.quickVentButton.setCheckable(True)
+        self.quickVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.quickVentButton, 0, 0, 1, 1)
 
         self.slowVentButton = QtWidgets.QPushButton(
@@ -503,7 +503,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.slowVentButton.setFont(font)
         self.slowVentButton.setObjectName("slowVentButton")
-        #self.slowVentButton.setCheckable(True)
+        self.slowVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.slowVentButton, 0, 1, 1, 1)
 
         self.buildPressureButton = QtWidgets.QPushButton(parent=self.gridLayoutWidget_2)
@@ -988,22 +988,28 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Steps: "))
         self.stepsTimeRemainingLabel.setText(
             _translate("MainWindow", "Time: "))
+        
+    def disconnect_ard(self):
+        try:
+            self.arduino_worker.send_command("RESET")
+            self.arduino_worker.stop_timer()
+            self.arduino_worker.stop()
+        except Exception:
+            pass
+        if self.watchdog != None:
+            self.watchdog.stop()
+        self.ardConnected = False
+        self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
+        self.update_valve_button_states()
+        self.ardWarningLabel.setText("Connection closed")
+        self.ardWarningLabel.setStyleSheet("color: red")
+        self.UIUpdateArdConnection()
 
     def on_ardConnectButton_clicked(self):
         """Handle Arduino connection/disconnection."""
         if self.ardConnected:
             # If Arduino is already connected, stop the worker and disconnect
-            try:
-                self.arduino_worker.stop_timer()
-                self.arduino_worker.stop()
-            except Exception:
-                pass
-            if self.watchdog != None:
-                self.watchdog.stop()
-            self.ardConnected = False
-            self.ardWarningLabel.setText("Connection closed")
-            self.ardWarningLabel.setStyleSheet("color: red")
-            self.UIUpdateArdConnection()
+            self.disconnect_ard()
 
         # If no mode is selected, display a warning
         elif self.selectedMode == None:
@@ -1048,11 +1054,13 @@ class Ui_MainWindow(object):
 
             # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
+                self.arduino_worker.send_command("TTLDISABLE")  #ensure tTL mode disabled
                 self.update_valve_states()
                 self.update_valve_button_states()
 
             # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
+                self.arduino_worker.send_command("TTLDISABLE")  #ensure tTL mode disabled
                 # Check if sequence gets loaded correctly
                 if self.load_sequence():                    
                     logging.info("Sequence loaded successfully")
@@ -1076,6 +1084,8 @@ class Ui_MainWindow(object):
                     self.write_to_prospa(False)
                     self.delete_sequence_file()
 
+                    self.disconnect_ard()
+
                     # Update the UI
                     self.ardWarningLabel.setText(
                         "Error loading sequence file")
@@ -1088,19 +1098,23 @@ class Ui_MainWindow(object):
                     self.UIUpdateArdConnection()
 
     def update_valve_button_states(self):
+        special_cases = {
+            0: self.switchGasButton,
+            1: self.buildPressureButton
+        }
+
         for i in range(5):
-            if self.valveStates[i] == 1:
-                getattr(self, f'Valve{i+1}Button').setChecked(True)
-                if i == 0:
-                    self.switchGasButton.setChecked(True)
-                elif i == 1:
-                    self.buildPressureButton.setChecked(True)
-            elif self.valveStates[i] == 0:
-                getattr(self, f'Valve{i+1}Button').setChecked(False)
-                if i == 0:
-                    self.switchGasButton.setChecked(False)
-                elif i == 1:
-                    self.buildPressureButton.setChecked(False)
+            button = getattr(self, f'Valve{i+1}Button')
+            button.setChecked(self.valveStates[i] == 1)
+            if i in special_cases:
+                special_cases[i].setChecked(self.valveStates[i] == 1)
+
+        if self.valveStates[2] == 1 and self.valveStates[4] == 1:
+            self.slowVentButton.setChecked(self.valveStates[3] == 1)
+            self.quickVentButton.setChecked(self.valveStates[3] != 1)
+        else:
+            self.quickVentButton.setChecked(False)
+            self.slowVentButton.setChecked(False)
 
     """Recurring function that updates the current step and valve states as well as the time labels."""
     def update_step(self):
@@ -1476,22 +1490,41 @@ class Ui_MainWindow(object):
     def on_resetButton_clicked(self):
         logging.debug("Reset button clicked")
         if self.ardConnected:
+            logging.info("Resetting")
+            self.arduino_worker.set_valve_signal.emit([0, 0, 0, 0, 0, 0, 0, 0])
             self.arduino_worker.command_signal.emit("RESET")
-            self.update_valve_states()
+            self.arduino_worker.command_signal.emit("RESTART")
+            # self.valveStates = [0, 0, 0, 0, 0, 0, 0, 0]
+            # self.update_valve_states()
             self.update_valve_button_states()
 
     @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.debug("Quick vent button clicked")
+        self.update_valve_states()
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("QUICK_VENT")
-            self.update_valve_states()
-            self.update_valve_button_states()
+            if self.valveStates[2] == 1 and self.valveStates[4] == 1:
+                self.quickVentButton.setChecked(False)
+                self.arduino_worker.set_valve_signal.emit([2, 2, 0, 2, 0, 2, 2, 2])
+            else:
+                self.quickVentButton.setChecked(True)
+                self.arduino_worker.set_valve_signal.emit([2, 2, 1, 2, 1, 2, 2, 2])
+        self.update_valve_states()
+        self.update_valve_button_states()
+
 
     def on_slowVentButton_clicked(self):
         logging.debug("Slow vent button clicked")
+        self.update_valve_states()
         if self.ardConnected:
-            self.arduino_worker.command_signal.emit("SLOW_VENT")    # [2, 0, 1, 1, 0, 2, 2, 2]
+            if self.valveStates[2] == 1 and self.valveStates[3] == 1 and self.valveStates[4] == 1:
+                self.slowVentButton.setChecked(False)
+                self.arduino_worker.set_valve_signal.emit([2, 2, 0, 0, 0, 2, 2, 2])
+            else:
+                self.slowVentButton.setChecked(True)
+                self.arduino_worker.set_valve_signal.emit([2, 2, 1, 1, 1, 2, 2, 2])
+        self.update_valve_states()
+        self.update_valve_button_states()
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
@@ -1513,7 +1546,7 @@ class Ui_MainWindow(object):
         else:
             logging.info("Arduino not connected")
 
-    def on_quickBubbleButton_clicked(self):     # TODO: Implement quick bubble on a timer
+    def on_quickBubbleButton_clicked(self): 
         if self.ardConnected:
             if not self.bubbleTimer.isActive():
                 self.arduino_worker.set_valve_signal.emit(
@@ -1617,15 +1650,11 @@ class Ui_MainWindow(object):
         self.watchdog.start(500)
 
     def check_arduino_state(self):
+        logging.info("Checking arduino connection")
         self.update_valve_states()
         self.update_valve_button_states()
-        if self.arduino_worker.isConnected == False:
-            logging.info("Connection Stopped")
-            self.ardConnected = False
-            self.ardWarningLabel.setText("Connection Closed")
-            self.ardWarningLabel.setStyleSheet("color: red")
-            self.UIUpdateArdConnection()
-            self.arduino_worker.stop()
+        if self.arduino_worker.controller.serial_connected == False:
+            self.disconnect_ard()
 
     def on_connectMotorButton_clicked(self):
         logging.info("Connect motor button clicked")
@@ -2064,11 +2093,12 @@ class ArduinoWorker(QtCore.QThread):
         self.running = False
         # if last step was pressurised then depressurise?
         self.controller.send_reset()
+        self.controller.serial_connected = False
         self.quit()
         self.wait(1)
 
     def isConnected(self):
-        # logging.info(self.controller.serial_connected)
+        logging.info(f"Connection is {self.controller.serial_connected}")
         return self.controller.serial_connected
 
     @QtCore.pyqtSlot()
@@ -2082,12 +2112,13 @@ class ArduinoWorker(QtCore.QThread):
                 data = self.controller.readings  # Get new readings from Arduino
                 # Emit signal with data to update the graph
                 self.data_signal.emit(data)
+            # mode = self.controller.get_mode()
+            # ttl_state = self.controller.get_ttl_state()
+            # logging.info(f"mode: {mode} ttl: {ttl_state}")
+            
 
     def depressurise(self):
         self.controller.send_depressurise()
-
-    def arduino_reset(self):
-        self.controller.send_reset()
 
     def set_valve_states(self, states):
         self.controller.set_valves(states)
@@ -2099,6 +2130,10 @@ class ArduinoWorker(QtCore.QThread):
         elif command == "QUICK_VENT":
             self.controller.send_depressurise()
             logging.info("Depressurising Arduino")
+        elif command == "RESTART":
+            self.controller.start()
+        elif command == "TTLDISABLE":
+            self.controller.disableTTL()
         else:
             logging.info("Invalid command for arduino")
 
