@@ -83,6 +83,10 @@ class Ui_MainWindow(object):
         self.stepTimer.setSingleShot(False)
         self.stepTimer.timeout.connect(self.update_step)
 
+        self.bubbleTimer = QtCore.QTimer()
+        self.bubbleTimer.setSingleShot(True)
+        self.bubbleTimer.timeout.connect(self.bubble_timeout)
+
         # Bool that avoids "Step complete" message on sequence init
         self.seq_new = True
 
@@ -489,7 +493,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.quickVentButton.setFont(font)
         self.quickVentButton.setObjectName("quickVentButton")
-        self.quickVentButton.setCheckable(True)
+        #self.quickVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.quickVentButton, 0, 0, 1, 1)
 
         self.slowVentButton = QtWidgets.QPushButton(
@@ -499,7 +503,7 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.slowVentButton.setFont(font)
         self.slowVentButton.setObjectName("slowVentButton")
-        self.slowVentButton.setCheckable(True)
+        #self.slowVentButton.setCheckable(True)
         self.monitorLayout.addWidget(self.slowVentButton, 0, 1, 1, 1)
 
         self.buildPressureButton = QtWidgets.QPushButton(parent=self.gridLayoutWidget_2)
@@ -642,8 +646,10 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.quickBubbleButton.setFont(font)
+        self.quickBubbleButton.setCheckable(True)
         self.quickBubbleButton.setObjectName("quickBubbleButton")
         self.monitorLayout.addWidget(self.quickBubbleButton, 8, 0, 1, 2)
+
         self.bubbleTimeDoubleSpinBox = QtWidgets.QDoubleSpinBox(
             parent=self.gridLayoutWidget_2)
         self.bubbleTimeDoubleSpinBox.setAlignment(
@@ -867,6 +873,7 @@ class Ui_MainWindow(object):
         self.buildPressureButton.clicked.connect(
             self.on_buildPressureButton_clicked)
         self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
+        self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
         self.valveMacro1Button.clicked.connect(
             self.on_valveMacro1Button_clicked)
         self.valveMacro2Button.clicked.connect(
@@ -1470,12 +1477,16 @@ class Ui_MainWindow(object):
         logging.debug("Reset button clicked")
         if self.ardConnected:
             self.arduino_worker.command_signal.emit("RESET")
+            self.update_valve_states()
+            self.update_valve_button_states()
 
     @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.debug("Quick vent button clicked")
         if self.ardConnected:
             self.arduino_worker.command_signal.emit("QUICK_VENT")
+            self.update_valve_states()
+            self.update_valve_button_states()
 
     def on_slowVentButton_clicked(self):
         logging.debug("Slow vent button clicked")
@@ -1503,19 +1514,24 @@ class Ui_MainWindow(object):
             logging.info("Arduino not connected")
 
     def on_quickBubbleButton_clicked(self):     # TODO: Implement quick bubble on a timer
-        logging.debug("Quick bubble button clicked")
-
         if self.ardConnected:
-            if self.quickBubbleButton.isChecked():
-                self.quickBubbleButton.setChecked(False)
-                self.arduino_worker.set_valve_signal.emit([2, 0, 0, 0, 2, 2, 2, 2])
-                self.update_valve_states()
-                self.update_valve_button_states()
-            else:
+            if not self.bubbleTimer.isActive():
+                self.arduino_worker.set_valve_signal.emit(
+                    [2, 1, 1, 1, 2, 2, 2, 2])
+                duration = int(float(self.bubbleTimeDoubleSpinBox.text())*1000)
+                self.bubbleTimer.start(duration)
+                logging.info(f"Quick bubble for {duration} ms")
                 self.quickBubbleButton.setChecked(True)
-                self.arduino_worker.set_valve_signal.emit([2, 1, 1, 1, 2, 2, 2, 2])
-                self.update_valve_states()
-                self.update_valve_button_states()
+            else:
+                logging.info("Already bubbling")
+                self.quickBubbleButton.setChecked(True)
+        else:
+            logging.info("Arduino not connected")
+
+    def bubble_timeout(self):
+        self.arduino_worker.set_valve_signal.emit(
+                    [2, 0, 0, 0, 2, 2, 2, 2])
+        self.quickBubbleButton.setChecked(False)
 
     def on_buildPressureButton_clicked(self):
         logging.debug("Build pressure button clicked")#
