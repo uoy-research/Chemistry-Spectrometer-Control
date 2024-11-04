@@ -73,11 +73,12 @@ unsigned long mbLast = 0; //time of last modbus command
 // # +--------------------------+---------+-----------------------------------------+
 // # |         Coil/reg         | Address |                 Purpose                 |
 // # +--------------------------+---------+-----------------------------------------+
-// # | Command Register         | 0       | Holds the command instruction           |
-// # | Desired Position         | 1-2     | two input registers used to contain the |
+// # | Command Register         | 1       | Holds the command instruction           |
+// # | Desired Position         | 2-3     | two input registers used to contain the |
 // # | ,                        | ,       | desired motor position                  |
-// # | Current Position         | 3-4     | two input registers used to contain the |
+// # | Current Position         | 4-5     | two input registers used to contain the |
 // # | ,                        | ,       | current motor position                  |
+// # | Moving Flag              | 1       | Flag to show if motor is moving or not  |                |
 // # +--------------------------+---------+-----------------------------------------+
 
 void handleInput(char input);
@@ -86,10 +87,11 @@ void addCoils();
 void setup(){
   stepper.setup(NORMAL, 200);				     // Initialize uStepper S32
   MySerial.begin(baudrate);
-  mb.config(baudrate);
-  mb.setAdditionalServerData("uStepper S32");
+  
+  mb.config(baudrate); // Set up modbus communication
+  mb.setAdditionalServerData("uStepper S32"); // Give it a name
 
-  addCoils();
+  addCoils(); // Add coils and registers to modbus
 
   delay(500);
   stepper.setCurrent(standby_runCurrent);	       // Set motor run current
@@ -99,42 +101,47 @@ void setup(){
   stepper.setBrakeMode(FREEWHEELBRAKE);
   stepper.setMaxVelocity(standby_maxVelocity); // Set maximum velocity of motor
   delay(500);
-  Serial.println("Motor ready! First calibrate positions using character 'i'.");
+  //Serial.println("Motor ready! First calibrate positions using character 'i'.");
 }
 
 void loop() {
   if (MySerial.available() > 0) {
-    mbLast = millis(); //update mbLast
+    mbLast = millis(); //update last comm time
     serialConnected = true; //update serial connection state
-
-    mb.task(); // Modbus task
-
-    char input = MySerial.read();
-    handleInput(input);
   }
   else{
     //digitalWrite(test_led, LOW);
     if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset(); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
   }
+  
+  mb.task(); // Modbus task, call early
+
+  getCurrentPosition(); // Get current position
+
+  //char input = MySerial.read();
+  uint16_t input = mb.getIreg(1);
+  handleInput(static_cast<char>input);
 }
 
 void handleInput(char input) {
   switch(input) {
+
+/*    These functions are blocking, so they are not suitable for use with Modbus.
     case 'u': // Move upwards continuously
       stepper.runContinous(CW);
-      Serial.println("Moving upwards!");
+      //Serial.println("Moving upwards!");
       break;
 
     case 'd': // Move downwards continuously
       stepper.runContinous(CCW);
-      Serial.println("Moving downwards!");
+      //Serial.println("Moving downwards!");
       break;
-
+*/
     case 's': // Stop
       stepper.stop(HARD);
-      Serial.println("Stop!");
+      //Serial.println("Stop!");
       currentPosition = stepper.getPosition();
-      Serial.print("Current position: "); Serial.println(currentPosition);
+      //Serial.print("Current position: "); Serial.println(currentPosition);
       break;
 
     case 'i': // Calibrate positions
@@ -144,43 +151,45 @@ void handleInput(char input) {
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
-      Serial.println("Finding top position!");
-      stepper.moveToEnd(CW, 50, stallSensitivity);
+      //Serial.println("Finding top position!");
+      stepper.moveToEnd(CW, 50, stallSensitivity);  //This is blocking and needs to be changed
       topPosition  = stepper.getPosition();
-      Serial.print("Top position: "); Serial.println(topPosition);
+      //Serial.print("Top position: "); Serial.println(topPosition);
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
       break;
 
     case 'b': // Sample to down position
-      Serial.println("Sample down!");
+      //Serial.println("Sample down!");
       downPosition = topPosition - 2475000;
       setPosition = downPosition;
       stepper.movePosition(setPosition);
       break;
 
     case '6': // Sample to 6 mT position
-      Serial.println("6 mT position!");
+      //Serial.println("6 mT position!");
       sixmTPosition = topPosition - 2475000 + 1284300;
       setPosition = sixmTPosition;
       stepper.movePosition(setPosition);
       break;
 
     case 't': // Sample to up position
-      Serial.println("Sample up!");
+      //Serial.println("Sample up!");
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
       break;
 
+/*  Now handled by modbus registers
     case 'r': // Read position
       currentPosition = stepper.getPosition();
-      Serial.print("Current position: "); Serial.println(currentPosition);
+      //Serial.print("Current position: "); Serial.println(currentPosition);
       break;
+*/
 
     case 'e': // Shutdown
-      Serial.println("Shutting down!");
+      //Serial.println("Shutting down!");
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
@@ -194,18 +203,18 @@ void handleInput(char input) {
       break;
 
     case 'y': // Move upwards by 5 mm
-      Serial.println("Moving upwards by 5 mm!");
+      //Serial.println("Moving upwards by 5 mm!");
       stepper.moveAngle(225);
       break;
 
     case 'z': // Move downwards by 5 mm
-      Serial.println("Moving downwards by 5 mm!");
+      //Serial.println("Moving downwards by 5 mm!");
       stepper.moveAngle(-225);
       break;
 
     case 'm': // Perform field map
-      Serial.println("Performing field map!");
-      Serial.println("Mapping 75 points in 5 mm intervals.");
+      //Serial.println("Performing field map!");
+      //Serial.println("Mapping 75 points in 5 mm intervals.");
       downPosition = topPosition - 2475000;
       setPosition = downPosition;
       stepper.movePosition(setPosition);
@@ -215,16 +224,48 @@ void handleInput(char input) {
         delay(5000);
         stepper.moveAngle(225);
         currentPosition = stepper.getPosition();
-        Serial.print("Current position: "); Serial.println(currentPosition);
+        //Serial.print("Current position: "); Serial.println(currentPosition);
       }
+    case 'x': // Move to position
+      //Serial.println("Moving to position!");
+      setPosition = getTargetPosition();
+      stepper.movePosition(setPosition);
+      break;
     break;
   }
 }
 
+int32_t getTargetPosition(){
+  uint16_t high = mb.getIreg(2);
+  uint16_t low = mb.getIreg(3);
+  return combine(high, low);
+}
+
+void getCurrentPosition(){
+  int32_t currentPosition = stepper.getPosition();  // Get current position
+  uint16_t high, low; // Declare high and low word
+  disassemble(currentPosition, high, low);  // Disassemble current position into two uint16_t
+  mb.setIreg(4, high); // Add high word to input register 4
+  mb.setIreg(5, low);  // Add low word to input register 5
+}
+
 void addCoils(){
-  mb.addIreg(0, 0);
   mb.addIreg(1, 0);
   mb.addIreg(2, 0);
   mb.addIreg(3, 0);
   mb.addIreg(4, 0);
+  mb.addIreg(5, 0);
+  mb.addCoil(1, 0);
+}
+
+// Doing high word first
+// Function to combine two uint16_t into a signed 32-bit int
+int32_t combine(uint16_t high, uint16_t low) {
+    return (static_cast<int32_t>(high) << 16) | low;
+}
+
+// Function to disassemble a signed 32-bit int into two uint16_t
+void disassemble(int32_t combined, uint16_t &high, uint16_t &low) {
+    high = static_cast<uint16_t>((combined >> 16) & 0xFFFF);
+    low = static_cast<uint16_t>(combined & 0xFFFF);
 }
