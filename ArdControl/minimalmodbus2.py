@@ -2,7 +2,7 @@
 import minimalmodbus
 import time
 
-instrument = minimalmodbus.Instrument('COM7', 10)  # port name, slave address (in decimal)
+instrument = minimalmodbus.Instrument('COM8', 11)  # port name, slave address (in decimal)
 instrument.serial.baudrate = 9600   # type: ignore
 instrument.serial.timeout = 3   # type: ignore
 

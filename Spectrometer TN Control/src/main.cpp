@@ -38,7 +38,7 @@ bool serialConnected = 0; //serial connection state
 float pressureInputs[4] = {0,0,0,0};  //container for pressure values from the analog pins
 
 unsigned long tPoll = 0; //start time
-unsigned long mbTimeout = 2000; //timeout length for modbus commands
+unsigned long mbTimeout = 2000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
 #define MySerial Serial // define serial port used, Serial most of the time, or Serial1, Serial2 ... if available

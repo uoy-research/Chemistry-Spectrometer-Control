@@ -25,15 +25,8 @@
 ********************************************************************************************/
 
 #include <UstepperS32.h>
-#include <Arduino.h>
-#include <ModbusSerial.h>
 
 UstepperS32 stepper;
-
-#define MySerial Serial // define serial port used, Serial most of the time, or Serial1, Serial2 ... if available
-
-const int TxenPin = -1; // -1 disables the feature, change that if you are using an RS485 driver, this pin would be connected to the DE and /RE pins of the driver.
-const byte SlaveId = 11;
 
 /* Motor parameters */
 double runCurrent = 100; // Motor run current, % of maximum
@@ -61,64 +54,24 @@ int upPosition;
 int setPosition;
 int mapPositions;
 
-/* Added params */
-const unsigned long baudrate = 9600;
-
-// ModbusSerial object
-ModbusSerial mb (MySerial, SlaveId, TxenPin);
-
-unsigned long mbTimeout = 2000; //timeout length for no comms
-unsigned long mbLast = 0; //time of last modbus command
-
-// # +--------------------------+---------+-----------------------------------------+
-// # |         Coil/reg         | Address |                 Purpose                 |
-// # +--------------------------+---------+-----------------------------------------+
-// # | Command Register         | 0       | Holds the command instruction           |
-// # | Desired Position         | 1-2     | two input registers used to contain the |
-// # | ,                        | ,       | desired motor position                  |
-// # | Current Position         | 3-4     | two input registers used to contain the |
-// # | ,                        | ,       | current motor position                  |
-// # +--------------------------+---------+-----------------------------------------+
-
-void handleInput(char input);
-void addCoils();
-
 void setup(){
   stepper.setup(NORMAL, 200);				     // Initialize uStepper S32
-  MySerial.begin(baudrate);
-  mb.config(baudrate);
-  mb.setAdditionalServerData("uStepper S32");
-
-  addCoils();
-
-  delay(500);
+  Serial.begin(9600);
+  delay(1000);
   stepper.setCurrent(standby_runCurrent);	       // Set motor run current
   stepper.setHoldCurrent(standby_holdCurrent);   // Set motor hold current
   stepper.setMaxAcceleration(standby_maxAcceleration);  // Set maximum acceleration of motor
   stepper.setMaxDeceleration(standby_maxDeceleration);  // Set maximum deceleration of motor
   stepper.setBrakeMode(FREEWHEELBRAKE);
   stepper.setMaxVelocity(standby_maxVelocity); // Set maximum velocity of motor
-  delay(500);
+  delay(1000);
   Serial.println("Motor ready! First calibrate positions using character 'i'.");
 }
 
 void loop() {
-  if (MySerial.available() > 0) {
-    mbLast = millis(); //update mbLast
-    serialConnected = true; //update serial connection state
+  char input;
+  input = Serial.read();
 
-    mb.task(); // Modbus task
-
-    char input = MySerial.read();
-    handleInput(input);
-  }
-  else{
-    //digitalWrite(test_led, LOW);
-    if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset(); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
-  }
-}
-
-void handleInput(char input) {
   switch(input) {
     case 'u': // Move upwards continuously
       stepper.runContinous(CW);
@@ -219,12 +172,4 @@ void handleInput(char input) {
       }
     break;
   }
-}
-
-void addCoils(){
-  mb.addIreg(0, 0);
-  mb.addIreg(1, 0);
-  mb.addIreg(2, 0);
-  mb.addIreg(3, 0);
-  mb.addIreg(4, 0);
 }
