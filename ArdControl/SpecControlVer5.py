@@ -677,6 +677,7 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.curMotorPosLabel.setObjectName("curMotorPosLabel")
         self.motorPosLayout.addWidget(self.curMotorPosLabel, 0, 0, 1, 1)
+
         self.targetMotorPosEdit = QtWidgets.QLineEdit(
             parent=self.gridLayoutWidget_3)
         sizePolicy = QtWidgets.QSizePolicy(
@@ -691,6 +692,7 @@ class Ui_MainWindow(object):
         self.targetMotorPosEdit.setFont(font)
         self.targetMotorPosEdit.setObjectName("targetMotorPosEdit")
         self.motorPosLayout.addWidget(self.targetMotorPosEdit, 1, 1, 1, 1)
+
         self.curMotorPosEdit = QtWidgets.QLineEdit(
             parent=self.gridLayoutWidget_3)
         sizePolicy = QtWidgets.QSizePolicy(
@@ -702,9 +704,11 @@ class Ui_MainWindow(object):
         self.curMotorPosEdit.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setPointSize(10)
+        self.curMotorPosEdit.setReadOnly(True)
         self.curMotorPosEdit.setFont(font)
         self.curMotorPosEdit.setObjectName("curMotorPosEdit")
         self.motorPosLayout.addWidget(self.curMotorPosEdit, 0, 1, 1, 1)
+
         self.targetMotorPosLabel = QtWidgets.QLabel(
             parent=self.gridLayoutWidget_3)
         font = QtGui.QFont()
@@ -714,6 +718,7 @@ class Ui_MainWindow(object):
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.targetMotorPosLabel.setObjectName("targetMotorPosLabel")
         self.motorPosLayout.addWidget(self.targetMotorPosLabel, 1, 0, 1, 1)
+
         self.motorMoveToTargetButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_3)
         self.motorMoveToTargetButton.setMinimumSize(QtCore.QSize(0, 40))

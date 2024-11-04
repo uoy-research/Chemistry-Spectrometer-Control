@@ -142,7 +142,7 @@ class ArduinoController:
         return self.mode
     
     def get_ttl_state(self):
-        return self.arduino.read_bit(16, 1)
+        return self.arduino.read_bit(16, 1) # type: ignore
     
     def disableTTL(self):
         self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
