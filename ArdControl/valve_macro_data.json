@@ -10,7 +10,8 @@
             "Closed",
             "Closed",
             "Closed"
-        ]
+        ],
+        "Timer": 1000
     },
     {
         "Macro No.": "Macro 2",
@@ -23,7 +24,8 @@
             "Open",
             "Closed",
             "Closed"
-        ]
+        ],
+        "Timer": 1000
     },
     {
         "Macro No.": "Macro 3",
@@ -36,7 +38,8 @@
             "Ignore",
             "Closed",
             "Closed"
-        ]
+        ],
+        "Timer": 1000
     },
     {
         "Macro No.": "Macro 4",
@@ -49,6 +52,7 @@
             "Closed",
             "Closed",
             "Closed"
-        ]
+        ],
+        "Timer": 1000
     }
 ]

@@ -25,12 +25,12 @@ class Ui_MainWindow(object):
 
         # List of valve settings for each step type
         self.valve_settings = {
-            'd': [0, 0, 0, 0, 0, 0, 0, 0],
-            'n': [1, 1, 1, 1, 1, 0, 0, 0],
-            'e': [0, 0, 0, 0, 0, 0, 0, 0],
-            'b': [2, 1, 1, 1, 0, 0, 0, 0],
-            's': [2, 2, 2, 0, 0, 0, 0, 0],
-            'h': [2, 0, 0, 0, 0, 0, 0, 0]
+            'd': [0, 0, 0, 0, 0, 2, 2, 2],
+            'n': [1, 1, 1, 1, 1, 2, 2, 2],
+            'e': [0, 0, 0, 0, 0, 2, 2, 2],
+            'b': [2, 1, 1, 1, 0, 2, 2, 2],
+            's': [2, 2, 2, 0, 0, 2, 2, 2],
+            'h': [2, 0, 0, 0, 0, 2, 2, 2]
         }
         # list of programmed step types + recognisable name for the GUI 
         self.step_types = {
@@ -44,11 +44,26 @@ class Ui_MainWindow(object):
         
         # List of valve settings for each macro
         self.macro_settings = {
-            '1': [1, 1, 1, 1, 1, 0, 0, 0],
-            '2': [2, 1, 1, 1, 0, 0, 0, 0],
-            '3': [2, 2, 2, 0, 0, 0, 0, 0],
-            '4': [2, 0, 0, 0, 0, 0, 0, 0]
+            "1": {
+                "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
+                "Timer": 1.0
+            },
+            "2": {
+                "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
+                "Timer": 1.0
+            },
+            "3": {
+                "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
+                "Timer": 1.0
+            },
+            "4": {
+                "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
+                "Timer": 1.0
+            }
         }
+
+        # Initialise the prev valve states
+        self.previous_valve_states = [0, 0, 0, 0, 0, 2, 2, 2]
 
         self.macro_editor = ValveMacroEditor(self)
         self.macro_editor.load_data()
@@ -1567,9 +1582,17 @@ class Ui_MainWindow(object):
             logging.info("Arduino not connected")
 
     def bubble_timeout(self):
-        self.arduino_worker.set_valve_signal.emit(
-                    [2, 0, 0, 0, 2, 2, 2, 2])
-        self.quickBubbleButton.setChecked(False)
+        logging.debug("Macro timer completed")
+        if self.ardConnected:
+            # Restore the previous valve states
+            self.arduino_worker.set_valve_signal.emit(self.previous_valve_states)
+            self.update_valve_states()
+            self.update_valve_button_states()
+        # Enable all controls
+        self.toggle_valve_controls(True)
+        # Stop and disconnect the timer
+        self.bubbleTimer.stop()
+        self.bubbleTimer.timeout.disconnect(self.bubble_timeout)
 
     def on_buildPressureButton_clicked(self):
         logging.debug("Build pressure button clicked")#
@@ -1600,34 +1623,66 @@ class Ui_MainWindow(object):
     def on_valveMacro1Button_clicked(self):
         logging.debug("Valve macro 1 button clicked")
         if self.ardConnected:
-            self.arduino_worker.set_valve_signal.emit(
-                    self.macro_settings["1"])
+            # Save current valve states
+            self.previous_valve_states = self.valveStates.copy()
+            # Set the new valve states
+            self.arduino_worker.set_valve_signal.emit(self.macro_settings["1"]["Valves"])
             self.update_valve_states()
             self.update_valve_button_states()
+            # Disable all controls
+            self.toggle_valve_controls(False)
+            # Start the timer
+            timer_duration = int(self.macro_settings["1"]["Timer"] * 1000)  # Convert to milliseconds
+            self.bubbleTimer.timeout.connect(self.bubble_timeout)
+            self.bubbleTimer.start(timer_duration)
 
     def on_valveMacro2Button_clicked(self):
         logging.debug("Valve macro 2 button clicked")
         if self.ardConnected:
-            self.arduino_worker.set_valve_signal.emit(
-                    self.macro_settings["2"])
+            # Save current valve states
+            self.previous_valve_states = self.valveStates.copy()
+            # Set the new valve states
+            self.arduino_worker.set_valve_signal.emit(self.macro_settings["2"]["Valves"])
             self.update_valve_states()
             self.update_valve_button_states()
+            # Disable all controls
+            self.toggle_valve_controls(False)
+            # Start the timer
+            timer_duration = int(self.macro_settings["2"]["Timer"] * 1000)  # Convert to milliseconds
+            self.bubbleTimer.timeout.connect(self.bubble_timeout)
+            self.bubbleTimer.start(timer_duration)
 
     def on_valveMacro3Button_clicked(self):
         logging.debug("Valve macro 3 button clicked")
         if self.ardConnected:
-            self.arduino_worker.set_valve_signal.emit(
-                    self.macro_settings["3"])
+            # Save current valve states
+            self.previous_valve_states = self.valveStates.copy()
+            # Set the new valve states
+            self.arduino_worker.set_valve_signal.emit(self.macro_settings["3"]["Valves"])
             self.update_valve_states()
             self.update_valve_button_states()
+            # Disable all controls
+            self.toggle_valve_controls(False)
+            # Start the timer
+            timer_duration = int(self.macro_settings["3"]["Timer"] * 1000)  # Convert to milliseconds
+            self.bubbleTimer.timeout.connect(self.bubble_timeout)
+            self.bubbleTimer.start(timer_duration)
 
     def on_valveMacro4Button_clicked(self):
         logging.debug("Valve macro 4 button clicked")
         if self.ardConnected:
-            self.arduino_worker.set_valve_signal.emit(
-                    self.macro_settings["4"])
+            # Save current valve states
+            self.previous_valve_states = self.valveStates.copy()
+            # Set the new valve states
+            self.arduino_worker.set_valve_signal.emit(self.macro_settings["4"]["Valves"])
             self.update_valve_states()
             self.update_valve_button_states()
+            # Disable all controls
+            self.toggle_valve_controls(False)
+            # Start the timer
+            timer_duration = int(self.macro_settings["4"]["Timer"] * 1000)  # Convert to milliseconds
+            self.bubbleTimer.timeout.connect(self.bubble_timeout)
+            self.bubbleTimer.start(timer_duration)
 
 
     def start_saving(self):
@@ -1655,7 +1710,7 @@ class Ui_MainWindow(object):
         self.watchdog.start(500)
 
     def check_arduino_state(self):
-        logging.info("Checking arduino connection")
+        # logging.debug("Checking arduino connection")
         self.update_valve_states()
         self.update_valve_button_states()
         if self.arduino_worker.controller.serial_connected == False:
@@ -1728,6 +1783,24 @@ class Ui_MainWindow(object):
     def edit_valve_macro(self):
         # dialog = ValveMacroEditor(self)
         self.macro_editor.exec()
+
+    def toggle_valve_controls(self, state):
+        self.switchGasButton.setEnabled(state)
+        self.valveMacro1Button.setEnabled(state)
+        self.valveMacro2Button.setEnabled(state)
+        self.valveMacro3Button.setEnabled(state)
+        self.valveMacro4Button.setEnabled(state)
+        self.buildPressureButton.setEnabled(state)
+        self.quickBubbleButton.setEnabled(state)
+        self.bubbleTimeDoubleSpinBox.setEnabled(state)
+        self.switchGasButton.setEnabled(state)
+        self.quickVentButton.setEnabled(state)
+        self.slowVentButton.setEnabled(state)
+        self.Valve1Button.setEnabled(state)
+        self.Valve2Button.setEnabled(state)
+        self.Valve3Button.setEnabled(state)
+        self.Valve4Button.setEnabled(state)
+        self.Valve5Button.setEnabled(state)
 
     """Enables and disables controls based on the running mode"""
     def update_controls(self):
@@ -1905,14 +1978,14 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         self.setWindowTitle("Valve Macro Editor")
         self.setGeometry(100, 100, 650, 190)
-        self.setFixedSize(620, 180)
+        self.setFixedSize(500, 180)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
         self.table.setRowCount(4)
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(
-            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"])
+            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
 
         # Set layout
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -1929,66 +2002,98 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
 
+        self.table.setColumnWidth(6, 80)
+
     def load_data(self):
         json_path = os.path.join("C:\\ssbubble", 'valve_macro_data.json')
-        # print(json_path)
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r') as f:
                     data = json.load(f)
                 for i, macro in enumerate(data):
+                    # Macro No.
                     item = QtWidgets.QTableWidgetItem(macro["Macro No."])
                     # Make the item read-only
-                    item.setFlags(item.flags() & ~
-                                  QtCore.Qt.ItemFlag.ItemIsEditable)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
-                    for j, state in enumerate(macro["Valves"], start=1):
+                    # Valve States
+                    for j, state in enumerate(macro["Valves"][:5], start=1):  # Only process the first 5 values
                         combo = QtWidgets.QComboBox()
                         combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
                         self.table.setCellWidget(i, j, combo)
+                    # Timer SpinBox
+                    timer_spinbox = QtWidgets.QDoubleSpinBox()
+                    timer_spinbox.setRange(0.1, 3600)
+                    timer_spinbox.setSingleStep(0.1)
+                    timer_val = macro.get("Timer", 1.0)   # Default to 1 second
+                    timer_spinbox.setValue(timer_val)
+                    self.table.setCellWidget(i, 6, timer_spinbox)  # Timer column index is 7
             except (json.JSONDecodeError, KeyError, IndexError):
                 self.set_default_values()
         else:
             self.set_default_values()
-        
 
     def set_default_values(self):
         for i in range(4):
+            # Macro No.
             item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
             # Make the item read-only
             item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 0, item)
-            for j in range(1, 9):
+            # Valve States
+            for j in range(1, 6):  # Columns 1 to 5 for V1 to V5
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed", "Ignore"])
                 combo.setCurrentIndex(1)  # Default to "Closed"
                 self.table.setCellWidget(i, j, combo)
+            # Timer SpinBox
+            timer_spinbox = QtWidgets.QDoubleSpinBox()
+            timer_spinbox.setRange(0.1, 3600)
+            timer_spinbox.setSingleStep(0.1)
+            timer_spinbox.setValue(1.0)  # Default timer value
+            self.table.setCellWidget(i, 6, timer_spinbox)
 
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()   # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(1, 9)]  # type: ignore
-            data.append({"Macro No.": macro_number, "Valves": valve_states})
+                row, col).currentText() for col in range(1, 6)]  # V1 to V5 # type: ignore
+            # Get Timer value
+            valve_states.extend(["Closed", "Closed", "Closed"]) # Add 2 for the last 3 valves
+            timer_spinbox = self.table.cellWidget(row, 6)
+            timer_value = timer_spinbox.value() if timer_spinbox else 1.0  # Default to 1 second    # type: ignore
+            data.append({
+                "Macro No.": macro_number,
+                "Valves": valve_states,
+                "Timer": timer_value
+            })
         return data
-    
+
     def get_macro_data_dict(self):
         data = {}
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(1, 9)] # type: ignore
-            valve_states = [1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
-            data[macro_number] = valve_states
+                row, col).currentText() for col in range(1, 6)]  # V1 to V5 # type: ignore
+            valve_states_numeric = [1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
+            valve_states_numeric.extend([2, 2, 2]) # Add 2 for the last 3 valves
+            # Get Timer value
+            timer_spinbox = self.table.cellWidget(row, 6)
+            timer_value = timer_spinbox.value() if timer_spinbox else 1.0  # Default to 1 second    # type: ignore
+            data[macro_number] = {
+                "Valves": valve_states_numeric,
+                "Timer": timer_value
+            }
         return data
 
     def closeEvent(self, event):
+        # Update parent's macro_settings with the new data
         self.parent.macro_settings = self.get_macro_data_dict()
+        # Save data to JSON
         data = self.get_macro_data()
         json_path = os.path.join("C:\\ssbubble", 'valve_macro_data.json')
-        # print(json_path)
         with open(json_path, 'w') as f:
             json.dump(data, f, indent=4)
         super().closeEvent(event)
@@ -2103,7 +2208,7 @@ class ArduinoWorker(QtCore.QThread):
         self.wait(1)
 
     def isConnected(self):
-        logging.info(f"Connection is {self.controller.serial_connected}")
+        # logging.info(f"Connection is {self.controller.serial_connected}")
         return self.controller.serial_connected
 
     @QtCore.pyqtSlot()
