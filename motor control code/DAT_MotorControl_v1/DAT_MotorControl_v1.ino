@@ -67,7 +67,7 @@ const unsigned long baudrate = 9600;
 // ModbusSerial object
 ModbusSerial mb (MySerial, SlaveId, TxenPin);
 
-unsigned long mbTimeout = 2000; //timeout length for no comms
+unsigned long mbTimeout = 200000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
 // # +--------------------------+---------+-----------------------------------------+
@@ -78,7 +78,9 @@ unsigned long mbLast = 0; //time of last modbus command
 // # | ,                        | ,       | desired motor position                  |
 // # | Current Position         | 4-5     | two input registers used to contain the |
 // # | ,                        | ,       | current motor position                  |
-// # | Moving Flag              | 1       | Flag to show if motor is moving or not  |                |
+// # | Moving Flag              | 1       | Flag to show if motor is moving or not  |                
+// # | Calibration Flag         | 2       | Flag to show if motor is calibrated     |
+// # | Init Flag                | 3       | Flag to show if serial comms established|                
 // # +--------------------------+---------+-----------------------------------------+
 
 void handleInput(char input);
@@ -119,8 +121,10 @@ void loop() {
   getCurrentPosition(); // Get current position
 
   //char input = MySerial.read();
-  uint16_t input = mb.getIreg(1);
-  handleInput(static_cast<char>input);
+  if (mb.coil(3) == 1) {
+    uint16_t input = mb.getIreg(1);
+    handleInput(static_cast<char>input);
+  }
 }
 
 void handleInput(char input) {
@@ -158,6 +162,7 @@ void handleInput(char input) {
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
+      mb.setCoil(2, 1); // Set calibration flag to true
       break;
 
     case 'b': // Sample to down position
@@ -229,6 +234,7 @@ void handleInput(char input) {
     case 'x': // Move to position
       //Serial.println("Moving to position!");
       setPosition = getTargetPosition();
+      setPosition = max(upPosition, (upPosition - setPosition));
       stepper.movePosition(setPosition);
       break;
     break;
@@ -256,6 +262,8 @@ void addCoils(){
   mb.addIreg(4, 0);
   mb.addIreg(5, 0);
   mb.addCoil(1, 0);
+  mb.addCoil(2, 0);
+  mb.addCoil(3, 0);
 }
 
 // Doing high word first
