@@ -118,6 +118,8 @@ void loop() {
     if ((long)(millis() - mbLast) > (long)(mbTimeout)){mb.setCoil(3, 0); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
   }
   
+  
+
   mb.task(); // Modbus task, call early
 
   getCurrentPosition(); // Get current position
@@ -126,7 +128,7 @@ void loop() {
   if (mb.coil(3) == 1) {
     uint16_t input = mb.Hreg(2);
     handleInput(static_cast<char>(input));
-    mb.Hreg(1, 0);
+    mb.setHreg(2, 0);
   }
 }
 
@@ -163,6 +165,7 @@ void handleInput(char input) {
       topPosition  = stepper.getPosition();
       //Serial.print("Top position: "); Serial.println(topPosition);
       upPosition = topPosition - 100000;
+      downPosition = topPosition - 2475000; // define down pos once calibrated
       setPosition = upPosition;
       stepper.movePosition(setPosition);
       mb.setCoil(2, 1); // Set calibration flag to true
@@ -234,13 +237,16 @@ void handleInput(char input) {
         currentPosition = stepper.getPosition();
         //Serial.print("Current position: "); Serial.println(currentPosition);
       }
+      break;
     case 'x': // Move to position
       //Serial.println("Moving to position!");
       setPosition = getTargetPosition();
-      setPosition = max(upPosition, (upPosition - setPosition));
+      setPosition = min(upPosition, (upPosition - setPosition));
       stepper.movePosition(setPosition);
       break;
-    break;
+    default:
+      //Serial.println("LOG: Invalid input");
+      break;
   }
 }
 

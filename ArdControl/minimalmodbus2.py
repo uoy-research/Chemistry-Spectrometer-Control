@@ -3,7 +3,7 @@ import minimalmodbus
 import time
 
 # port name, slave address (in decimal)
-instrument = minimalmodbus.Instrument('COM8', 11)
+instrument = minimalmodbus.Instrument('COM5', 11)
 instrument.serial.baudrate = 9600   # type: ignore
 instrument.serial.timeout = 3   # type: ignore
 
@@ -18,7 +18,7 @@ while True:
     while readings == False:
         try:
             readings = instrument.read_registers(
-                4, 2, 3)  # reading current position
+                5, 2, 3)  # reading current position
         except:
             pass
         time.sleep(0.5)
@@ -38,11 +38,12 @@ while True:
     calibrated = False
     while calibrated == False:
         try:
-            calibrated = instrument.read_bit(2, 2)  # reading calibration status
+            calibrated = instrument.read_bit(2, 1)  # reading calibration status
         except:
+            print("Not read")
             pass
-        print("Calibrating...")
-        time.sleep(0.5)
+        print(calibrated)
+        time.sleep(0.2)
 
     print("Calibrated?")
     while True:
@@ -58,11 +59,30 @@ while True:
                     print("Invalid input")
                     continue
         targetPos = int(target)
+        print(targetPos)
         targetPos &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
-        high = (combined >> 16) & 0xFFFF
-        low = combined & 0xFFFF
-        instrument.write_registers(3, [high, low])  # writing target position
-        instrument.write_register(2, ord('x'))
+        high = (targetPos >> 16) & 0xFFFF
+        low = targetPos & 0xFFFF
+        print([high, low])
+        try:
+            instrument.write_register(3, high)  # writing target position
+            instrument.write_register(4, low)  # writing target position
+        except:
+            print("Not written")
+            pass
+        readings = instrument.read_registers(
+                3, 2, 3)
+
+        combined = ((readings[0] & 0xFFFF) << 16) | (readings[1] & 0xFFFF)
+        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+
+        print(combined)
+
+        try:
+            instrument.write_register(2, ord('x'))
+        except:
+            print("Not written x2")
+            pass
 
 
 def disassemble(combined):
@@ -70,3 +90,8 @@ def disassemble(combined):
     high = (combined >> 16) & 0xFFFF
     low = combined & 0xFFFF
     return high, low
+
+def assemble(high, low):
+    combined = ((high & 0xFFFF) << 16) | (low & 0xFFFF)
+    combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+    return combined
