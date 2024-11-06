@@ -18,7 +18,7 @@ while True:
     while readings == False:
         try:
             readings = instrument.read_registers(
-                4, 2, 4)  # reading current position
+                4, 2, 3)  # reading current position
         except:
             pass
         time.sleep(0.5)
@@ -28,15 +28,20 @@ while True:
     combined = (high_word << 16) | low_word
     if combined >= 0x80000000:
         combined -= 0x100000000
+    print(high_word, low_word)
     print(f"Current position: {combined}")
     input("Press Enter to continue...")
 
     instrument.write_bit(3, 1)  # writing 1 to toggle init flag
-    instrument.write_register(1, ord('i'), 0)  # writing 0 to setpoint register
+    instrument.write_register(2, ord('i'))  # writing 'i' to command register
 
     calibrated = False
     while calibrated == False:
-        calibrated = instrument.read_bit(2, 1)  # reading calibration status
+        try:
+            calibrated = instrument.read_bit(2, 2)  # reading calibration status
+        except:
+            pass
+        print("Calibrating...")
         time.sleep(0.5)
 
     print("Calibrated?")
@@ -56,8 +61,8 @@ while True:
         targetPos &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
         high = (combined >> 16) & 0xFFFF
         low = combined & 0xFFFF
-        instrument.write_registers(2, [high, low])  # writing target position
-        instrument.write_register(1, ord('x'), 0)
+        instrument.write_registers(3, [high, low])  # writing target position
+        instrument.write_register(2, ord('x'))
 
 
 def disassemble(combined):

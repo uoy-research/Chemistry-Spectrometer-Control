@@ -70,13 +70,15 @@ ModbusSerial mb (MySerial, SlaveId, TxenPin);
 unsigned long mbTimeout = 200000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
+bool serialConnected = false;
+
 // # +--------------------------+---------+-----------------------------------------+
 // # |         Coil/reg         | Address |                 Purpose                 |
 // # +--------------------------+---------+-----------------------------------------+
-// # | Command Register         | 1       | Holds the command instruction           |
-// # | Desired Position         | 2-3     | two input registers used to contain the |
+// # | Command Register         | 2       | Holds the command instruction           |
+// # | Desired Position         | 3-4     | two hold registers used to contain the  |
 // # | ,                        | ,       | desired motor position                  |
-// # | Current Position         | 4-5     | two input registers used to contain the |
+// # | Current Position         | 5-6     | two hold registers used to contain the  |
 // # | ,                        | ,       | current motor position                  |
 // # | Moving Flag              | 1       | Flag to show if motor is moving or not  |                
 // # | Calibration Flag         | 2       | Flag to show if motor is calibrated     |
@@ -113,7 +115,7 @@ void loop() {
   }
   else{
     //digitalWrite(test_led, LOW);
-    if ((long)(millis() - mbLast) > (long)(mbTimeout)){reset(); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
+    if ((long)(millis() - mbLast) > (long)(mbTimeout)){mb.setCoil(3, 0); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
   }
   
   mb.task(); // Modbus task, call early
@@ -122,8 +124,9 @@ void loop() {
 
   //char input = MySerial.read();
   if (mb.coil(3) == 1) {
-    uint16_t input = mb.getIreg(1);
-    handleInput(static_cast<char>input);
+    uint16_t input = mb.Hreg(2);
+    handleInput(static_cast<char>(input));
+    mb.Hreg(1, 0);
   }
 }
 
@@ -242,8 +245,8 @@ void handleInput(char input) {
 }
 
 int32_t getTargetPosition(){
-  uint16_t high = mb.getIreg(2);
-  uint16_t low = mb.getIreg(3);
+  uint16_t high = mb.Hreg(3);
+  uint16_t low = mb.Hreg(4);
   return combine(high, low);
 }
 
@@ -251,16 +254,16 @@ void getCurrentPosition(){
   int32_t currentPosition = stepper.getPosition();  // Get current position
   uint16_t high, low; // Declare high and low word
   disassemble(currentPosition, high, low);  // Disassemble current position into two uint16_t
-  mb.setIreg(4, high); // Add high word to input register 4
-  mb.setIreg(5, low);  // Add low word to input register 5
+  mb.setIreg(5, high); // Add high word to input register 4
+  mb.setIreg(6, low);  // Add low word to input register 5
 }
 
 void addCoils(){
-  mb.addIreg(1, 0);
-  mb.addIreg(2, 0);
-  mb.addIreg(3, 0);
-  mb.addIreg(4, 0);
-  mb.addIreg(5, 0);
+  mb.addHreg(2, 0);
+  mb.addHreg(3, 0);
+  mb.addHreg(4, 0);
+  mb.addHreg(5, 0);
+  mb.addHreg(6, 0);
   mb.addCoil(1, 0);
   mb.addCoil(2, 0);
   mb.addCoil(3, 0);
