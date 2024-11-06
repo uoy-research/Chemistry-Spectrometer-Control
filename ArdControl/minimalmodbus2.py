@@ -39,6 +39,16 @@ while True:
     while calibrated == False:
         try:
             calibrated = instrument.read_bit(2, 1)  # reading calibration status
+            readings = instrument.read_registers(
+                5, 2, 3)  # reading current position
+            high_word = readings[0]
+            low_word = readings[1]
+            combined = (high_word << 16) | low_word
+            if combined >= 0x80000000:
+                combined -= 0x100000000
+            print(high_word, low_word)
+            print(f"Current position: {combined}")
+
         except:
             print("Not read")
             pass

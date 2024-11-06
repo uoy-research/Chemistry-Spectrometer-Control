@@ -161,7 +161,11 @@ void handleInput(char input) {
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
       //Serial.println("Finding top position!");
+
+      
       stepper.moveToEnd(CW, 50, stallSensitivity);  //This is blocking and needs to be changed
+      mbLast = millis(); //update last comm time
+
       topPosition  = stepper.getPosition();
       //Serial.print("Top position: "); Serial.println(topPosition);
       upPosition = topPosition - 100000;
