@@ -69,6 +69,8 @@ class Ui_MainWindow(object):
         self.macro_editor.load_data()
         self.macro_settings = self.macro_editor.get_macro_data_dict()
 
+        self.vent_flag = False
+
         # Show debug logs
         self.verbosity = False
 
@@ -1135,13 +1137,6 @@ class Ui_MainWindow(object):
             if i in special_cases:
                 special_cases[i].setChecked(self.valveStates[i] == 1)
 
-        if self.valveStates[2] == 1 and self.valveStates[4] == 1:
-            self.slowVentButton.setChecked(self.valveStates[3] == 1)
-            self.quickVentButton.setChecked(self.valveStates[3] != 1)
-        else:
-            self.quickVentButton.setChecked(False)
-            self.slowVentButton.setChecked(False)
-
     """Recurring function that updates the current step and valve states as well as the time labels."""
 
     def update_step(self):
@@ -1538,14 +1533,19 @@ class Ui_MainWindow(object):
         logging.debug("Quick vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.valveStates[2] == 1 and self.valveStates[4] == 1:
+            if self.vent_flag:
                 self.quickVentButton.setChecked(False)
-                self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 0, 2, 0, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(self.previous_valve_states)
+                self.toggle_valve_controls(True)
+                self.vent_flag = False
             else:
+                self.previous_valve_states = self.valveStates.copy()
                 self.quickVentButton.setChecked(True)
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 2, 1, 2, 1, 2, 2, 2])
+                self.toggle_valve_controls(False)
+                self.quickVentButton.setEnabled(True)
+                self.vent_flag = True
         self.update_valve_states()
         self.update_valve_button_states()
 
@@ -1553,14 +1553,19 @@ class Ui_MainWindow(object):
         logging.debug("Slow vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.valveStates[2] == 1 and self.valveStates[3] == 1 and self.valveStates[4] == 1:
+            if self.vent_flag:
                 self.slowVentButton.setChecked(False)
-                self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 0, 0, 0, 2, 2, 2])
+                self.arduino_worker.set_valve_signal.emit(self.previous_valve_states)
+                self.toggle_valve_controls(True)
+                self.vent_flag = False
             else:
                 self.slowVentButton.setChecked(True)
+                self.previous_valve_states = self.valveStates.copy()
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 2, 1, 1, 1, 2, 2, 2])
+                self.toggle_valve_controls(False)
+                self.slowVentButton.setEnabled(True)
+                self.vent_flag = True
         self.update_valve_states()
         self.update_valve_button_states()
 
@@ -1587,12 +1592,14 @@ class Ui_MainWindow(object):
     def on_quickBubbleButton_clicked(self):
         if self.ardConnected:
             if not self.bubbleTimer.isActive():
+                self.previous_valve_states = self.valveStates.copy()
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 1, 1, 1, 2, 2, 2, 2])
                 duration = int(float(self.bubbleTimeDoubleSpinBox.text())*1000)
                 self.bubbleTimer.start(duration)
                 logging.info(f"Quick bubble for {duration} ms")
                 self.quickBubbleButton.setChecked(True)
+                self.toggle_valve_controls(False)
             else:
                 logging.info("Already bubbling")
                 self.quickBubbleButton.setChecked(True)
@@ -1607,6 +1614,8 @@ class Ui_MainWindow(object):
                 self.previous_valve_states)
             self.update_valve_states()
             self.update_valve_button_states()
+        if self.quickBubbleButton.isChecked():
+            self.quickBubbleButton.setChecked(False)
         # Enable all controls
         self.toggle_valve_controls(True)
         # Stop and disconnect the timer
@@ -2190,6 +2199,16 @@ class RealTimePlot(FigureCanvasQTAgg):
                 with open(self.parent.save_path, "a") as f:
                     f.write(f"{time.strftime('%H:%M:%S')}, {pressure_values[0]}, {
                             pressure_values[1]}, {pressure_values[2]}, {pressure_values[3]}\n")
+                    
+            # Check if venting is complete
+            if self.parent.vent_flag:
+                logging.info(f"Pressure 3: {pressure_values[2]}")
+                if pressure_values[2] < 0.1:
+                    self.parent.arduino_worker.set_valve_signal.emit(self.parent.previous_valve_states)
+                    self.parent.vent_flag = False
+                    self.parent.quickVentButton.setChecked(False)
+                    self.parent.slowVentButton.setChecked(False)
+                    self.parent.toggle_valve_controls(True)
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
