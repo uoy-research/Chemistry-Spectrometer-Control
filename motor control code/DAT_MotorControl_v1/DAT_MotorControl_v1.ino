@@ -71,7 +71,7 @@ unsigned long mbTimeout = 200000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
 bool serialConnected = false;
-bool intFlag = false;
+bool initFlag = false;
 
 const int intPin1 = 10; // This is the interrupt pin for the uStepper S32
 const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
@@ -134,7 +134,7 @@ void loop() {
   getCurrentPosition(); // Get current position
 
   //char input = MySerial.read();
-  if (mb.coil(3) == 1) {
+  if (mb.coil(3) == 1 && initFlag == false) {
     uint16_t input = mb.Hreg(2);
     handleInput(static_cast<char>(input));
     mb.setHreg(2, 0);
@@ -255,32 +255,19 @@ void handleInput(char input) {
       //Serial.println("Moving to position!");
       setPosition = getTargetPosition();
       setPosition = min(upPosition, (upPosition - setPosition));
+      setPosition = max(downPosition, setPosition);
       stepper.movePosition(setPosition);
       break;
-    case 'c':
-
+    case 'c': // Calibrate
       stepper.setCurrent(runCurrent);
       stepper.setHoldCurrent(holdCurrent);
       stepper.setMaxAcceleration(maxAcceleration);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
-      //Custom calibrate
-      
-      while(digitalRead(intPin1) == LOW){
-        curPos = stepper.getPosition();
-        stepper.movePosition(curPos + 1000);
-      }
 
-      mbLast = millis(); //update last comm time
-
-      topPosition  = stepper.getPosition();
-      //Serial.print("Top position: "); Serial.println(topPosition);
-      upPosition = topPosition - 100000;
-      downPosition = topPosition - 2475000; // define down pos once calibrated
-      setPosition = upPosition;
-      stepper.movePosition(setPosition);
-      mb.setCoil(2, 1); // Set calibration flag to true
+      stepper.movePosition(10000000);
+      initFlag = 1;
       break;
 
     default:
@@ -297,12 +284,22 @@ void topInterrupt(){
   stepper.stop(HARD);
   //topPosition  = stepper.getPosition();
   //upPosition = topPosition - 100000;
+  if (initFlag == 1){
+    topPosition  = stepper.getPosition();
+    //Serial.print("Top position: "); Serial.println(topPosition);
+    upPosition = topPosition - 100000;
+    downPosition = topPosition - 2475000; // define down pos once calibrated
+    setPosition = upPosition;
+    stepper.movePosition(setPosition);
+    mb.setCoil(2, 1); // Set calibration flag to true
+    initFlag = 0;
+  }
 }
 
 void botInterrupt(){
   stepper.stop(HARD);
   while(digitalRead(intPin2) == HIGH){
-    stepper.moveangle(25);
+    stepper.moveAngle(25);
   }
   stepper.stop(HARD);
   downPosition = stepper.getPosition();

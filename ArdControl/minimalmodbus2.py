@@ -34,7 +34,7 @@ while True:
     input("Press Enter to continue...")
 
     instrument.write_bit(3, 1)  # writing 1 to toggle init flag
-    instrument.write_register(2, ord('i'))  # writing 'i' to command register
+    instrument.write_register(2, ord('c'))  # writing 'i' to command register
 
     calibrated = False
     while calibrated == False:
@@ -50,8 +50,8 @@ while True:
             print(high_word, low_word)
             print(f"Current position: {combined}")
 
-        except:
-            print("Not read")
+        except Exception as e:
+            print("Not read", e)
             pass
         print(calibrated)
         time.sleep(0.2)
