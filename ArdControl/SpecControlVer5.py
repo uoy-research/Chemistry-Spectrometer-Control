@@ -1387,7 +1387,7 @@ class Ui_MainWindow(object):
     """Toggle valve 1"""
 
     def on_Valve1Button_clicked(self):
-        logging.debug("Valve 1 button clicked")
+        # logging.debug("Valve 1 button clicked")
         # Update the valve states
         self.update_valve_states()
         # Check if the arduino is connected
@@ -1405,7 +1405,7 @@ class Ui_MainWindow(object):
                 self.Valve1Button.setChecked(False)
 
     def on_Valve2Button_clicked(self):
-        logging.info("Valve 2 button clicked")
+        # logging.info("Valve 2 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[1]) == 0:
@@ -1420,7 +1420,7 @@ class Ui_MainWindow(object):
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
-        logging.info("Valve 3 button clicked")
+        # logging.info("Valve 3 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[2]) == 0:
@@ -1435,7 +1435,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.setChecked(False)
 
     def on_Valve4Button_clicked(self):
-        logging.info("Valve 4 button clicked")
+        # logging.info("Valve 4 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[3]) == 0:
@@ -1450,7 +1450,7 @@ class Ui_MainWindow(object):
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
-        logging.info("Valve 5 button clicked")
+        # logging.info("Valve 5 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[4]) == 0:
