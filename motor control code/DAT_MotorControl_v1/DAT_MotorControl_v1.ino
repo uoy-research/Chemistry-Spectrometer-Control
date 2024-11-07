@@ -71,6 +71,10 @@ unsigned long mbTimeout = 200000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
 bool serialConnected = false;
+bool intFlag = false;
+
+const int intPin1 = 10; // This is the interrupt pin for the uStepper S32
+const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
 
 // # +--------------------------+---------+-----------------------------------------+
 // # |         Coil/reg         | Address |                 Purpose                 |
@@ -96,6 +100,11 @@ void setup(){
   mb.setAdditionalServerData("uStepper S32"); // Give it a name
 
   addCoils(); // Add coils and registers to modbus
+
+  pinMode(intPin1, INPUT_PULLUP);
+  pinMode(intPin2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(intPin1), topInterrupt, RISING);
+  attachInterrupt(digitalPinToInterrupt(intPin2), botInterrupt, RISING);
 
   delay(500);
   stepper.setCurrent(standby_runCurrent);	       // Set motor run current
@@ -248,10 +257,55 @@ void handleInput(char input) {
       setPosition = min(upPosition, (upPosition - setPosition));
       stepper.movePosition(setPosition);
       break;
+    case 'c':
+
+      stepper.setCurrent(runCurrent);
+      stepper.setHoldCurrent(holdCurrent);
+      stepper.setMaxAcceleration(maxAcceleration);
+      stepper.setMaxDeceleration(maxDeceleration);
+      stepper.setBrakeMode(COOLBRAKE);
+      stepper.setMaxVelocity(maxVelocity);
+      //Custom calibrate
+      
+      while(digitalRead(intPin1) == LOW){
+        curPos = stepper.getPosition();
+        stepper.movePosition(curPos + 1000);
+      }
+
+      mbLast = millis(); //update last comm time
+
+      topPosition  = stepper.getPosition();
+      //Serial.print("Top position: "); Serial.println(topPosition);
+      upPosition = topPosition - 100000;
+      downPosition = topPosition - 2475000; // define down pos once calibrated
+      setPosition = upPosition;
+      stepper.movePosition(setPosition);
+      mb.setCoil(2, 1); // Set calibration flag to true
+      break;
+
     default:
       //Serial.println("LOG: Invalid input");
       break;
   }
+}
+
+void topInterrupt(){
+  stepper.stop(HARD);
+  while(digitalRead(intPin1) == HIGH){
+    stepper.moveAngle(-25);
+  }
+  stepper.stop(HARD);
+  //topPosition  = stepper.getPosition();
+  //upPosition = topPosition - 100000;
+}
+
+void botInterrupt(){
+  stepper.stop(HARD);
+  while(digitalRead(intPin2) == HIGH){
+    stepper.moveangle(25);
+  }
+  stepper.stop(HARD);
+  downPosition = stepper.getPosition();
 }
 
 int32_t getTargetPosition(){

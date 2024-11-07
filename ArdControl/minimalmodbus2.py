@@ -3,7 +3,7 @@ import minimalmodbus
 import time
 
 # port name, slave address (in decimal)
-instrument = minimalmodbus.Instrument('COM5', 11)
+instrument = minimalmodbus.Instrument('COM9', 11)
 instrument.serial.baudrate = 9600   # type: ignore
 instrument.serial.timeout = 3   # type: ignore
 
@@ -13,6 +13,7 @@ while True:
     # instrument.write_bit(16, 0)  # Registernumber, number of decimals
     # time.sleep(1)
     # instrument.write_bit(16, 1)  # Registernumber, number of decimals
+   
     # readings = instrument.read_registers(0, 4, 4)  # reading registers 0 to 4 - pressure gauges
     readings = False
     while readings == False:
