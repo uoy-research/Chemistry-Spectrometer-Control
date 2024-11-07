@@ -319,6 +319,17 @@ class Ui_MainWindow(object):
         self.ValveLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.ValveLabel.setObjectName("ValveLabel")
         self.valveLayout.addWidget(self.ValveLabel, 0, 0, 1, 1)
+
+        self.devValveCheckbox = QtWidgets.QCheckBox(parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(9)
+        self.devValveCheckbox.setFont(font)
+        self.devValveCheckbox.setTristate(False)
+        self.devValveCheckbox.setObjectName("devValveCheckbox")
+        self.devValveCheckbox.setChecked(False)
+        self.devValveCheckbox.setText("Enable\nControls")
+        self.valveLayout.addWidget(self.devValveCheckbox, 1, 0, 1, 1, QtCore.Qt.AlignmentFlag.AlignHCenter)
+
         self.showValvesCheckbox = QtWidgets.QCheckBox(
             parent=self.gridLayoutWidget)
         font = QtGui.QFont()
@@ -413,6 +424,7 @@ class Ui_MainWindow(object):
         self.Valve3Button.hide()
         self.Valve4Button.hide()
         self.Valve5Button.hide()
+        self.devValveCheckbox.hide()
 
         # Create the motor layout
         self.verticalLayoutWidget_2 = QtWidgets.QWidget(
@@ -910,6 +922,7 @@ class Ui_MainWindow(object):
             self.on_valveMacro3Button_clicked)
         self.valveMacro4Button.clicked.connect(
             self.on_valveMacro4Button_clicked)
+        self.devValveCheckbox.clicked.connect(self.on_devValveCheckbox_clicked)
 
         # Connect menu actions to their slots
         self.editMotorMacroAction.triggered.connect(self.edit_motor_macro)
@@ -1451,6 +1464,9 @@ class Ui_MainWindow(object):
                     [2, 2, 2, 2, 0, 2, 2, 2])
                 self.Valve5Button.setChecked(False)
 
+    def on_devValveCheckbox_clicked(self):
+        self.update_controls()
+
     '''
     def on_Valve6Button_clicked(self):
         logging.info("Valve 6 button clicked")
@@ -1868,11 +1884,19 @@ class Ui_MainWindow(object):
             # self.selectSavePathButton.setEnabled(True)
             if self.selectedMode == 0:
                 # Toggle valve controls
-                self.Valve1Button.setEnabled(True)
-                self.Valve2Button.setEnabled(True)
-                self.Valve3Button.setEnabled(True)
-                self.Valve4Button.setEnabled(True)
-                self.Valve5Button.setEnabled(True)
+                self.devValveCheckbox.setEnabled(True)
+                if self.devValveCheckbox.isChecked():
+                    self.Valve1Button.setEnabled(True)
+                    self.Valve2Button.setEnabled(True)
+                    self.Valve3Button.setEnabled(True)
+                    self.Valve4Button.setEnabled(True)
+                    self.Valve5Button.setEnabled(True)
+                else:
+                    self.Valve1Button.setEnabled(False)
+                    self.Valve2Button.setEnabled(False)
+                    self.Valve3Button.setEnabled(False)
+                    self.Valve4Button.setEnabled(False)
+                    self.Valve5Button.setEnabled(False)                
                 # self.Valve6Button.setEnabled(True)
                 # self.Valve7Button.setEnabled(True)
                 # self.Valve8Button.setEnabled(True)
@@ -1892,6 +1916,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.show()
                 self.Valve4Button.show()
                 self.Valve5Button.show()
+                self.devValveCheckbox.show()
                 self.currentStepTimeEdit.hide()
                 self.currentStepTypeEdit.hide()
                 self.stepsRemainingLabel.hide()
@@ -1905,6 +1930,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.setEnabled(False)
                 self.Valve4Button.setEnabled(False)
                 self.Valve5Button.setEnabled(False)
+                self.devValveCheckbox.setEnabled(False)
                 # self.Valve6Button.setEnabled(False)
                 # self.Valve7Button.setEnabled(False)
                 # self.Valve8Button.setEnabled(False)
@@ -1925,6 +1951,7 @@ class Ui_MainWindow(object):
                     self.Valve3Button.hide()
                     self.Valve4Button.hide()
                     self.Valve5Button.hide()
+                    self.devValveCheckbox.hide()
                     self.currentStepTimeEdit.show()
                     self.currentStepTypeEdit.show()
                     self.stepsRemainingLabel.show()
@@ -1943,6 +1970,7 @@ class Ui_MainWindow(object):
             self.Valve3Button.setEnabled(False)
             self.Valve4Button.setEnabled(False)
             self.Valve5Button.setEnabled(False)
+            self.devValveCheckbox.setEnabled(False)
             # self.Valve6Button.setEnabled(False)
             # self.Valve7Button.setEnabled(False)
             # self.Valve8Button.setEnabled(False)
