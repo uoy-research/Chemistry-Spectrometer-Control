@@ -1013,6 +1013,10 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Steps: "))
         self.stepsTimeRemainingLabel.setText(
             _translate("MainWindow", "Time: "))
+        
+        # Update the main window's buttons with the new labels
+        for i in range(4):
+            getattr(self, f'valveMacro{i+1}Button').setText(self.macro_settings[str(i+1)]['Label'])
 
     def disconnect_ard(self):
         try:
@@ -2018,14 +2022,14 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         self.setWindowTitle("Valve Macro Editor")
         self.setGeometry(100, 100, 650, 190)
-        self.setFixedSize(500, 180)
+        self.setFixedSize(623, 170)  # Adjusted width to accommodate new column
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
         self.table.setRowCount(4)
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
+            ["Macro No.", "Label", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
 
         # Set layout
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -2041,8 +2045,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
-
-        self.table.setColumnWidth(6, 80)
+        self.table.setColumnWidth(7, 80)  # Timer column is now index 7
 
     def load_data(self):
         json_path = os.path.join("C:\\ssbubble", 'valve_macro_data.json')
@@ -2054,12 +2057,15 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     # Macro No.
                     item = QtWidgets.QTableWidgetItem(macro["Macro No."])
                     # Make the item read-only
-                    item.setFlags(item.flags() & ~
-                                  QtCore.Qt.ItemFlag.ItemIsEditable)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
+                    # Label
+                    label_text = macro.get("Label", "")
+                    label_item = QtWidgets.QTableWidgetItem(label_text)
+                    self.table.setItem(i, 1, label_item)
                     # Valve States
                     # Only process the first 5 values
-                    for j, state in enumerate(macro["Valves"][:5], start=1):
+                    for j, state in enumerate(macro["Valves"][:5], start=2):  # start from column 2
                         combo = QtWidgets.QComboBox()
                         combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
@@ -2071,7 +2077,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     timer_val = macro.get("Timer", 1.0)   # Default to 1 second
                     timer_spinbox.setValue(timer_val)
                     # Timer column index is 7
-                    self.table.setCellWidget(i, 6, timer_spinbox)
+                    self.table.setCellWidget(i, 7, timer_spinbox)
             except (json.JSONDecodeError, KeyError, IndexError):
                 self.set_default_values()
         else:
@@ -2084,8 +2090,11 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             # Make the item read-only
             item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 0, item)
+            # Label
+            label_item = QtWidgets.QTableWidgetItem("")
+            self.table.setItem(i, 1, label_item)
             # Valve States
-            for j in range(1, 6):  # Columns 1 to 5 for V1 to V5
+            for j in range(2, 7):  # Columns 2 to 6 for V1 to V5
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed", "Ignore"])
                 combo.setCurrentIndex(1)  # Default to "Closed"
@@ -2095,24 +2104,23 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             timer_spinbox.setRange(0.1, 3600)
             timer_spinbox.setSingleStep(0.1)
             timer_spinbox.setValue(1.0)  # Default timer value
-            self.table.setCellWidget(i, 6, timer_spinbox)
+            self.table.setCellWidget(i, 7, timer_spinbox)
 
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()   # type: ignore
-            valve_states = [self.table.cellWidget(  # V1 to V5
-                row, col).currentText() for col in range(1, 6)]  # type: ignore
-
-            # Add 2 for the last 3 valves
+            label_text = self.table.item(row, 1).text()     # type: ignore
+            valve_states = [self.table.cellWidget(
+                row, col).currentText() for col in range(2, 7)]  # V1 to V5 #type: ignore
+            # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
-            timer_spinbox = self.table.cellWidget(
-                row, 6)   # Default to 1 second
-
+            timer_spinbox = self.table.cellWidget(row, 7)
             # Get Timer value
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0   # type: ignore
             data.append({
                 "Macro No.": macro_number,
+                "Label": label_text,
                 "Valves": valve_states,
                 "Timer": timer_value
             })
@@ -2122,17 +2130,18 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         data = {}
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
-            valve_states = [self.table.cellWidget(              # V1 to V5
-                row, col).currentText() for col in range(1, 6)]  # type: ignore
+            label_text = self.table.item(row, 1).text()        # type: ignore
+            valve_states = [self.table.cellWidget(
+                row, col).currentText() for col in range(2, 7)]  # V1 to V5 #type: ignore
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
             valve_states_numeric.extend([2, 2, 2])
             # Get Timer value
-            timer_spinbox = self.table.cellWidget(row, 6)
-            # Default to 1 second    # type: ignore
+            timer_spinbox = self.table.cellWidget(row, 7)
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0   # type: ignore
             data[macro_number] = {
+                "Label": label_text,
                 "Valves": valve_states_numeric,
                 "Timer": timer_value
             }
@@ -2151,6 +2160,11 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             os.makedirs(json_dir)
         with open(json_path, 'w') as f:
             json.dump(data, f, indent=4)
+
+        # Update the main window's buttons with the new labels
+        for i in range(4):
+            getattr(self.parent, f'valveMacro{i+1}Button').setText(self.parent.macro_settings[str(i+1)]['Label'])
+
         super().closeEvent(event)
 
 
