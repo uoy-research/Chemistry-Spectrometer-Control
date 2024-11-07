@@ -23,6 +23,9 @@ class Ui_MainWindow(object):
 
         # Initialise variables
 
+        # how frequently the valve states are checked (ms)
+        self.valveCheckInterval = 50
+
         # List of valve settings for each step type
         self.valve_settings = {
             'd': [0, 0, 0, 0, 0, 2, 2, 2],
@@ -2173,6 +2176,8 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
 
+        self.max_points = 500
+
         # Initialize data
         self.p1_data = []
         self.p2_data = []
@@ -2190,7 +2195,7 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.line4, = self.ax.plot([], [], lw=2, color="purple")
 
         # Set plot limits and labels
-        self.ax.set_xlim(0, 100)
+        self.ax.set_xlim(0, self.max_points)
         self.ax.set_ylim(0, 11)
         self.ax.set_xlabel('Time')
         self.ax.set_ylabel('mBar')
@@ -2200,13 +2205,25 @@ class RealTimePlot(FigureCanvasQTAgg):
         if pressure_values:
             # Update x_data and y_data with the newest value
             # Append new x (time) point
-            self.x_data.append(len(self.x_data))
+            if self.x_data == []:
+                self.x_data.append(0)
+            else:
+                self.x_data.append(self.x_data[-1] + 1)
+
+            # Limit the x_data size
+            if len(self.x_data) > self.max_points:
+                self.x_data = self.x_data[-self.max_points:]
 
             # Convert and append new y (pressure) points
             for i in range(4):
                 pressure_values[i] = (
                     float(pressure_values[i]) - 203.53) / 0.8248 / 100
-                getattr(self, f'p{i+1}_data').append(pressure_values[i])
+                p_data = getattr(self, f'p{i+1}_data')
+                p_data.append(pressure_values[i])
+
+                # Limit the p_data size
+                if len(p_data) > self.max_points:
+                    setattr(self, f'p{i+1}_data', p_data[-self.max_points:])
 
             # check this for time lag
             if self.parent.saving:
@@ -2243,9 +2260,8 @@ class RealTimePlot(FigureCanvasQTAgg):
                 self.line4.set_data([], [])
 
             # Adjust limits if necessary
-            if len(self.x_data) > 100:
-                self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
-
+            if len(self.x_data) >= self.max_points:
+                self.ax.set_xlim(self.x_data[0], self.x_data[-1])
             # Ensure y lim
             self.ax.set_ylim(0, 11)
 
@@ -2275,7 +2291,7 @@ class ArduinoWorker(QtCore.QThread):
         self.controller.start()
 
     def start_timer(self):
-        self.timer.start(500)
+        self.timer.start(self.parent.valveCheckInterval)
 
     def stop_timer(self):
         self.timer.stop()
