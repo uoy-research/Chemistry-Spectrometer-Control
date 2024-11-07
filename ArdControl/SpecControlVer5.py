@@ -2177,7 +2177,7 @@ class RealTimePlot(FigureCanvasQTAgg):
 
         # Set plot limits and labels
         self.ax.set_xlim(0, 100)
-        self.ax.set_ylim(0, 10)
+        self.ax.set_ylim(0, 11)
         self.ax.set_xlabel('Time')
         self.ax.set_ylabel('mBar')
 
@@ -2231,6 +2231,9 @@ class RealTimePlot(FigureCanvasQTAgg):
             # Adjust limits if necessary
             if len(self.x_data) > 100:
                 self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
+
+            # Ensure y lim
+            self.ax.set_ylim(0, 11)
 
             # Redraw the canvas with the new data
             self.draw()
