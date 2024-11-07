@@ -531,7 +531,7 @@ class Ui_MainWindow(object):
         self.buildPressureButton.setFont(font)
         self.buildPressureButton.setObjectName("buildPressureButton")
         self.buildPressureButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.buildPressureButton, 5, 1, 1, 1)
+        self.monitorLayout.addWidget(self.buildPressureButton, 6, 1, 1, 1)
 
         self.switchGasButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -541,7 +541,7 @@ class Ui_MainWindow(object):
         self.switchGasButton.setFont(font)
         self.switchGasButton.setObjectName("switchGasButton")
         self.switchGasButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.switchGasButton, 5, 0, 1, 1)
+        self.monitorLayout.addWidget(self.switchGasButton, 6, 0, 1, 1)
 
         self.valveMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -551,7 +551,7 @@ class Ui_MainWindow(object):
         self.valveMacro1Button.setFont(font)
         self.valveMacro1Button.setObjectName("valveMacro1Button")
         # self.valveMacro1Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro1Button, 6, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro1Button, 7, 0, 1, 1)
 
         self.valveMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -561,7 +561,7 @@ class Ui_MainWindow(object):
         self.valveMacro2Button.setFont(font)
         self.valveMacro2Button.setObjectName("valveMacro2Button")
         # self.valveMacro2Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro2Button, 6, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro2Button, 7, 1, 1, 1)
 
         self.valveMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -571,7 +571,7 @@ class Ui_MainWindow(object):
         self.valveMacro3Button.setFont(font)
         self.valveMacro3Button.setObjectName("valveMacro3Button")
         # self.valveMacro3Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro3Button, 7, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro3Button, 8, 0, 1, 1)
 
         self.valveMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -581,7 +581,7 @@ class Ui_MainWindow(object):
         self.valveMacro4Button.setFont(font)
         self.valveMacro4Button.setObjectName("valveMacro4Button")
         # self.valveMacro4Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro4Button, 7, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro4Button, 8, 1, 1, 1)
 
         # Create the pressure radio buttons
         self.pressure4RadioButton = QtWidgets.QRadioButton(
