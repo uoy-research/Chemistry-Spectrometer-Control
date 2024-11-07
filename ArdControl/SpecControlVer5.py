@@ -511,7 +511,7 @@ class Ui_MainWindow(object):
         self.quickVentButton.setFont(font)
         self.quickVentButton.setObjectName("quickVentButton")
         self.quickVentButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.quickVentButton, 0, 0, 1, 1)
+        self.monitorLayout.addWidget(self.quickVentButton, 9, 0, 1, 1)
 
         self.slowVentButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -521,7 +521,7 @@ class Ui_MainWindow(object):
         self.slowVentButton.setFont(font)
         self.slowVentButton.setObjectName("slowVentButton")
         self.slowVentButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.slowVentButton, 0, 1, 1, 1)
+        self.monitorLayout.addWidget(self.slowVentButton, 9, 1, 1, 1)
 
         self.buildPressureButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -531,7 +531,7 @@ class Ui_MainWindow(object):
         self.buildPressureButton.setFont(font)
         self.buildPressureButton.setObjectName("buildPressureButton")
         self.buildPressureButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.buildPressureButton, 1, 0, 1, 1)
+        self.monitorLayout.addWidget(self.buildPressureButton, 5, 1, 1, 1)
 
         self.switchGasButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -541,7 +541,7 @@ class Ui_MainWindow(object):
         self.switchGasButton.setFont(font)
         self.switchGasButton.setObjectName("switchGasButton")
         self.switchGasButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.switchGasButton, 1, 1, 1, 1)
+        self.monitorLayout.addWidget(self.switchGasButton, 5, 0, 1, 1)
 
         self.valveMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -551,7 +551,7 @@ class Ui_MainWindow(object):
         self.valveMacro1Button.setFont(font)
         self.valveMacro1Button.setObjectName("valveMacro1Button")
         # self.valveMacro1Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro1Button, 2, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro1Button, 6, 0, 1, 1)
 
         self.valveMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -561,7 +561,7 @@ class Ui_MainWindow(object):
         self.valveMacro2Button.setFont(font)
         self.valveMacro2Button.setObjectName("valveMacro2Button")
         # self.valveMacro2Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro2Button, 2, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro2Button, 6, 1, 1, 1)
 
         self.valveMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -571,7 +571,7 @@ class Ui_MainWindow(object):
         self.valveMacro3Button.setFont(font)
         self.valveMacro3Button.setObjectName("valveMacro3Button")
         # self.valveMacro3Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro3Button, 3, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro3Button, 7, 0, 1, 1)
 
         self.valveMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -581,7 +581,7 @@ class Ui_MainWindow(object):
         self.valveMacro4Button.setFont(font)
         self.valveMacro4Button.setObjectName("valveMacro4Button")
         # self.valveMacro4Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro4Button, 3, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro4Button, 7, 1, 1, 1)
 
         # Create the pressure radio buttons
         self.pressure4RadioButton = QtWidgets.QRadioButton(
@@ -593,7 +593,7 @@ class Ui_MainWindow(object):
         self.pressure4RadioButton.setAutoExclusive(False)
         self.pressure4RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure4RadioButton, 5, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure4RadioButton, 1, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure2RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -603,7 +603,7 @@ class Ui_MainWindow(object):
         self.pressure2RadioButton.setAutoExclusive(False)
         self.pressure2RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure2RadioButton, 4, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure2RadioButton, 0, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure1RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -613,7 +613,7 @@ class Ui_MainWindow(object):
         self.pressure1RadioButton.setAutoExclusive(False)
         self.pressure1RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure1RadioButton, 4, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure1RadioButton, 0, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure3RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -623,7 +623,7 @@ class Ui_MainWindow(object):
         self.pressure3RadioButton.setAutoExclusive(False)
         self.pressure3RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure3RadioButton, 5, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure3RadioButton, 1, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
         # Create the save path buttons
         self.selectSavePathButton = QtWidgets.QPushButton(
@@ -633,13 +633,13 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.selectSavePathButton.setFont(font)
         self.selectSavePathButton.setObjectName("selectSavePathButton")
-        self.monitorLayout.addWidget(self.selectSavePathButton, 6, 0, 1, 1)
+        self.monitorLayout.addWidget(self.selectSavePathButton, 2, 0, 1, 1)
         self.savePathEdit = QtWidgets.QLineEdit(parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.savePathEdit.setFont(font)
         self.savePathEdit.setObjectName("savePathEdit")
-        self.monitorLayout.addWidget(self.savePathEdit, 7, 0, 1, 2)
+        self.monitorLayout.addWidget(self.savePathEdit, 3, 0, 1, 2)
         self.beginSaveButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.beginSaveButton.setMinimumSize(QtCore.QSize(0, 25))
@@ -648,7 +648,7 @@ class Ui_MainWindow(object):
         self.beginSaveButton.setFont(font)
         self.beginSaveButton.setObjectName("beginSaveButton")
         self.beginSaveButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.beginSaveButton, 6, 1, 1, 1)
+        self.monitorLayout.addWidget(self.beginSaveButton, 2, 1, 1, 1)
 
         # Create the bubble time widgets
         self.bubbleTimeLabel = QtWidgets.QLabel(parent=self.gridLayoutWidget_2)
@@ -658,7 +658,7 @@ class Ui_MainWindow(object):
         self.bubbleTimeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
                                           QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeLabel.setObjectName("bubbleTimeLabel")
-        self.monitorLayout.addWidget(self.bubbleTimeLabel, 9, 0, 1, 1)
+        self.monitorLayout.addWidget(self.bubbleTimeLabel, 4, 0, 1, 1)
         self.quickBubbleButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.quickBubbleButton.setMinimumSize(QtCore.QSize(0, 25))
@@ -667,7 +667,7 @@ class Ui_MainWindow(object):
         self.quickBubbleButton.setFont(font)
         self.quickBubbleButton.setCheckable(True)
         self.quickBubbleButton.setObjectName("quickBubbleButton")
-        self.monitorLayout.addWidget(self.quickBubbleButton, 8, 0, 1, 2)
+        self.monitorLayout.addWidget(self.quickBubbleButton, 5, 0, 1, 2)
 
         self.bubbleTimeDoubleSpinBox = QtWidgets.QDoubleSpinBox(
             parent=self.gridLayoutWidget_2)
@@ -676,7 +676,7 @@ class Ui_MainWindow(object):
         self.bubbleTimeDoubleSpinBox.setObjectName("bubbleTimeDoubleSpinBox")
         self.bubbleTimeDoubleSpinBox.setMinimum(0.0)
         self.bubbleTimeDoubleSpinBox.setValue(5.00)
-        self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 9, 1, 1, 1)
+        self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 4, 1, 1, 1)
 
         # Create the motor position layout
         self.gridLayoutWidget_3 = QtWidgets.QWidget(parent=self.centralwidget)
