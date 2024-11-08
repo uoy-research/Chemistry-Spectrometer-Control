@@ -8,6 +8,7 @@ import minimalmodbus
 
 # 25,600 microsteps per millimeter
 
+
 class MotorController:
     def __init__(self, port):
         self.port = port
@@ -17,7 +18,8 @@ class MotorController:
         self.serial_connected = False
         self.heartbeat_thread = None
         self.reading_thread = None
-        self.lock = threading.Lock()
+        self.motor_position = 0
+        self.target_position = 0
         self.commands_dict = {
             "HEARTBEAT": 'y',  # Heartbeat response
             "START": 'S',    # Start the Arduino
@@ -30,151 +32,99 @@ class MotorController:
             "CALIBRATE": 'c',  # Calibrate
         }
 
+    def start(self):
+        logging.info("Starting motor controller...")
+        if self.connect_arduino():
+            logging.info("Motor controller started")
+        else:
+            logging.error("Failed to start motor controller")
+            self.serial_connected = False
+            self.instrument = None
+
     def connect_arduino(self):
         try:
-            self.arduino = serial.Serial(f"COM{self.port}", self.baudrate)
-            logging.info(f"Connected to Arduino on port {self.port}")
+            self.instrument = minimalmodbus.Instrument(f"COM{self.port}", 11)
+            self.instrument.serial.baudrate = self.baudrate    # type: ignore
+            self.instrument.serial.timeout = 3   # type: ignore
+            self.instrument.write_bit(3, 1)  # writing 1 to toggle init flag
             self.serial_connected = True
+            logging.info(f"Connected to Arduino on port {self.port}")
         except serial.SerialException as e:
             logging.error(f"Failed to connect to Arduino on port {
                           self.port}: {e}")
             self.serial_connected = False
 
-    def start(self):
-        print("starting")
-        logging.info("Starting server...")
-        self.connect_arduino()
-        # logging.info("Arduino is connected? " + str(self.serial_connected))
-        if self.serial_connected:
-            time.sleep(1.2)  # Wait for Arduino to initialise
-            self.send_command("START")
-            # time.sleep(2.2)  # Wait for Arduino to initialise
-            logging.info("Arduino started")
-            self.last_heartbeat_time = time.time()
-            self.start_heartbeat()
-            self.start_reading()
-        else:
+    def get_current_position(self):
+        try:
+            readings = self.instrument.read_registers(  # type: ignore
+                5, 2, 3)
+            self.motor_position = self.assemble(readings[0], readings[1])
+        except Exception as e:
+            logging.error("Couldn't read motor position", e)
+            self.serial_connected = False
+            pass
+        return self.motor_position
+
+    def calibrate(self):
+        # writing 'c' to command register
+        self.instrument.write_register(2, ord('c'))  # type: ignore
+        self.serial_connected = True
+
+    def check_calibrated(self):
+        try:
+            # reading calibration status
+            calibrated = self.instrument.read_bit(2, 1)  # type: ignore
+            self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't read calibration status", e)
+            self.serial_connected = False
+            calibrated = False
+        return calibrated
+
+    def move_to_position(self, position):
+        try:
+            if self.check_calibrated():
+                high, low = self.disassemble(position)  # type: ignore
+                # writing high word
+                self.instrument.write_register(5, high, 3)  # type: ignore
+                # writing low word
+                self.instrument.write_register(6, low, 3)  # type: ignore
+                # writing 'x' to command register
+                self.instrument.write_register(2, ord('x'))  # type: ignore
+                self.serial_connected = True
+            else:
+                logging.error("Motor not calibrated")
+                self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't move to position", e)
+            self.serial_connected = False
             pass
 
-    def start_heartbeat(self):
-        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
-        self.heartbeat_thread.daemon = True
-        self.heartbeat_thread.start()
+    def stop_motor(self):
+        try:
+            self.instrument.write_register(2, ord('s'))  # type: ignore
+            self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't stop motor", e)
+            self.serial_connected = False
+            pass
 
-    def send_heartbeat(self):
-        while not self.shutdown_flag and self.arduino != None:
-            try:
-                if self.serial_connected:
-                    with self.lock:
-                        self.arduino.write(
-                            self.commands_dict["HEARTBEAT"].encode())
-                        self.arduino.flush()
-                    logging.info("Sent HEARTBEAT")
-                    # self.last_heartbeat_time = time.time()
-                time.sleep(3)  # Send heartbeat every 3 seconds
-            except serial.SerialException as e:
-                logging.error(f"Failed to send heartbeat: {e}")
-                self.serial_connected = False
+    def shutdown(self):
+        try:
+            self.instrument.write_register(2, ord('e'))  # type: ignore
+            self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't stop motor", e)
+            self.serial_connected = False
+            pass
 
-    def start_reading(self):
-        self.reading_thread = threading.Thread(target=self.read_responses)
-        self.reading_thread.daemon = True
-        self.reading_thread.start()
+    def disassemble(self, combined):
+        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+        high = (combined >> 16) & 0xFFFF
+        low = combined & 0xFFFF
+        return high, low
 
-    def read_responses(self):
-        while not self.shutdown_flag and self.arduino != None:
-
-            if self.serial_connected and self.arduino.in_waiting > 0:
-                try:
-                    response = self.arduino.readline().decode('utf-8').strip()
-                    logging.info(f"Received: {response}")
-                    self.process_response(response)
-                except serial.SerialException as e:
-                    logging.error(f"Failed to read from Arduino: {e}")
-                    try:
-                        self.start_reading()
-                    except Exception as e:
-                        logging.error(f"Failed to restart reading thread: {e}")
-                        self.serial_connected = False
-            if self.last_heartbeat_time + self.heartbeat_time < time.time():
-                logging.error(
-                    "No heartbeat received from Arduino. Stopping server.")
-                self.stop()
-
-    def process_response(self, response):
-        if isinstance(response, bytes):
-            response = response.decode('utf-8').strip()
-        else:
-            response = response.strip()  # Already a string, just strip whitespace
-        # Process the response from Arduino
-        if response == "RESET":
-            logging.info("Arduino reset")
-            self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]
-        # Heartbeat response - "HEARTBEAT_ACK"
-        elif response == "HEARTBEATACK":
-            self.last_heartbeat_time = time.time()  # Update heartbeat time
-            # logging.info("Received HEARTBEAT_ACK")
-        elif response == "yes":
-            self.last_heartbeat_time = time.time() + 10 # Update heartbeat time
-        # Pressure reading - "P <pressure1> ... <valveState1> ... C"
-        # Pressure values are in mbar, valve states are 0 or 1
-        # P 1013 1014 1015 1016 1 1 1 1 1 1 0 1 C
-        # Sequence loaded - "SEQ: <sequence>"
-        elif response.startswith("SEQ: "):
-            if response.endswith("False"):
-                self.sequence_loaded = False
-                logging.info(f"Sequence loaded: {
-                             response.replace('SEQ: ', '')}")
-            else:
-                self.sequence_loaded = True
-                logging.info(f"Sequence loaded: {
-                             response.replace('SEQ: ', '')}")
-        elif response.startswith("LOG: "):  # Log message - "LOG <message>"
-            log_message = response.replace("LOG: ", "")
-            print(log_message)
-            logging.info(f"Ard: {log_message}")
-        else:
-            logging.warning(f"Unknown response: {response}")
-
-
-    def send_command(self, command):
-        if command in self.commands_dict:
-            command = self.commands_dict[command]
-
-        if self.serial_connected and self.arduino is not None:
-            if command in self.commands_dict.values():
-                try:
-                    with self.lock:
-                        self.arduino.write(command.encode())
-                        self.arduino.flush()
-                    logging.info(f"Sent command: {command}")
-                    return True  # Command sent successfully
-                except serial.SerialException as e:
-                    logging.error(f"Failed to send command: {e}")
-                    self.serial_connected = False
-                    return False  # Failed to send command
-            else:
-                logging.error("Invalid command - not a recognised command")
-                logging.error(f"Command: {command}")
-                return False  # Invalid command
-        else:
-            logging.error("Cannot send command - not connected to Arduino")
-            return False  # Not connected to Arduino
-
-    def stop(self):
-        self.shutdown_flag = True
-        self.send_command('STOP')
-        logging.info("Sent STOP command")
-        self.arduino.close()
-        logging.info("Closed serial connection")
-
-    def move_to_target(self, target):
-        with self.lock:
-            self.arduino.write('p'.encode())
-            self.arduino.write(str(target).encode())
-            self.arduino.write('\n'.encode())
-            self.arduino.flush()
-  
-    def calibrate(self):
-        self.send_command('CALIBRATE')
-        logging.info("Sent CALIBRATE command")
+    def assemble(self, high, low):
+        combined = ((high & 0xFFFF) << 16) | (low & 0xFFFF)
+        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+        return combined
