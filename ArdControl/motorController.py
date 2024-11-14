@@ -68,6 +68,7 @@ class MotorController:
     def calibrate(self):
         # writing 'c' to command register
         self.instrument.write_register(2, ord('c'))  # type: ignore
+        self.instrument.write_bit(1, 1)  # writing 1 to toggle command flag # type: ignore
         self.serial_connected = True
 
     def check_calibrated(self):
@@ -91,6 +92,8 @@ class MotorController:
                 self.instrument.write_register(6, low, 3)  # type: ignore
                 # writing 'x' to command register
                 self.instrument.write_register(2, ord('x'))  # type: ignore
+                # writing 1 to toggle command flag
+                self.instrument.write_bit(1, 1)  # type: ignore
                 self.serial_connected = True
             else:
                 logging.error("Motor not calibrated")
@@ -103,6 +106,7 @@ class MotorController:
     def stop_motor(self):
         try:
             self.instrument.write_register(2, ord('s'))  # type: ignore
+            self.instrument.write_bit(1, 1)  # type: ignore
             self.serial_connected = True
         except Exception as e:
             logging.error("Couldn't stop motor", e)
@@ -112,6 +116,7 @@ class MotorController:
     def shutdown(self):
         try:
             self.instrument.write_register(2, ord('e'))  # type: ignore
+            self.instrument.write_bit(1, 1)  # type: ignore
             self.serial_connected = True
         except Exception as e:
             logging.error("Couldn't stop motor", e)

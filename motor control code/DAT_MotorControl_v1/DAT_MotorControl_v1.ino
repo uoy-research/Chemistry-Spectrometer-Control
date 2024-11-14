@@ -80,13 +80,13 @@ const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
 // # |         Coil/reg         | Address |                 Purpose                 |
 // # +--------------------------+---------+-----------------------------------------+
 // # | Command Register         | 2       | Holds the command instruction           |
-// # | Desired Position         | 3-4     | two hold registers used to contain the  |
+// # | Desired Position Reg     | 3-4     | two hold registers used to contain the  |
 // # | ,                        | ,       | desired motor position                  |
-// # | Current Position         | 5-6     | two hold registers used to contain the  |
+// # | Current Position Reg     | 5-6     | two hold registers used to contain the  |
 // # | ,                        | ,       | current motor position                  |
-// # | Moving Flag              | 1       | Flag to show if motor is moving or not  |                
-// # | Calibration Flag         | 2       | Flag to show if motor is calibrated     |
-// # | Init Flag                | 3       | Flag to show if serial comms established|                
+// # | Command Coil             | 1       | Flag to show if command is waiting      |                
+// # | Calibration Coil         | 2       | Flag to show if motor is calibrated     |
+// # | Init Coil                | 3       | Flag to show if serial comms established|                
 // # +--------------------------+---------+-----------------------------------------+
 
 void handleInput(char input);
@@ -118,23 +118,15 @@ void setup(){
 }
 
 void loop() {
-  if (MySerial.available() > 0) {
-    mbLast = millis(); //update last comm time
-    serialConnected = true; //update serial connection state
-  }
-  else{
-    //digitalWrite(test_led, LOW);
-    if ((long)(millis() - mbLast) > (long)(mbTimeout)){mb.setCoil(3, 0); serialConnected = false;}    //If no serial activity for longer than mbTimeout, declare disconnection
-  }
-  
-  
+  if (MySerial.available() > 0) { mbLast = millis(); serialConnected = true; }//update serial connection state
+  else{if ((long)(millis() - mbLast) > (long)(mbTimeout)){mb.setCoil(2, 0); serialConnected = false;}  }  //If no serial activity for longer than mbTimeout, declare disconnection
 
   mb.task(); // Modbus task, call early
 
   getCurrentPosition(); // Get current position
 
   //char input = MySerial.read();
-  if (mb.coil(3) == 1 && initFlag == false) {
+  if (mb.coil(1) == 1 && initFlag == false) {
     uint16_t input = mb.Hreg(2);
     handleInput(static_cast<char>(input));
     mb.setHreg(2, 0);
@@ -142,6 +134,7 @@ void loop() {
 }
 
 void handleInput(char input) {
+  mb.setCoil(1, 0); // Reset command flag
   switch(input) {
 
 /*    These functions are blocking, so they are not suitable for use with Modbus.

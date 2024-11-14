@@ -48,21 +48,44 @@ class Ui_MainWindow(object):
         # List of valve settings for each macro
         self.macro_settings = {
             "1": {
+                "Label": "Macro 1",
                 "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
                 "Timer": 1.0
             },
             "2": {
+                "Label": "Macro 2",
                 "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
                 "Timer": 1.0
             },
             "3": {
+                "Label": "Macro 3",
                 "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
                 "Timer": 1.0
             },
             "4": {
+                "Label": "Macro 4",
                 "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
                 "Timer": 1.0
             }
+        }
+
+        self.motor_macro_settings = {
+            "1": {
+                "Label": "Motor Macro 1",
+                "Position": 0
+                },
+            "2": {
+                "Label": "Motor Macro 2",
+                "Position": 0
+                },
+            "3": {
+                "Label": "Motor Macro 3",
+                "Position": 0
+                },
+            "4": {
+                "Label": "Motor Macro 4",
+                "Position": 0
+                }
         }
 
         # Initialise the prev valve states
@@ -71,6 +94,10 @@ class Ui_MainWindow(object):
         self.macro_editor = ValveMacroEditor(self)
         self.macro_editor.load_data()
         self.macro_settings = self.macro_editor.get_macro_data_dict()
+
+        self.motor_macro_editor = MotorMacroEditor(self)
+        self.motor_macro_editor.load_data()
+        self.motor_macro_settings = self.motor_macro_editor.get_macro_data_dict()
 
         self.vent_flag = False
 
@@ -561,6 +588,7 @@ class Ui_MainWindow(object):
         self.valveMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro1Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro1Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro1Button.setFont(font)
@@ -571,6 +599,7 @@ class Ui_MainWindow(object):
         self.valveMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro2Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro2Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro2Button.setFont(font)
@@ -581,6 +610,7 @@ class Ui_MainWindow(object):
         self.valveMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro3Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro3Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro3Button.setFont(font)
@@ -591,6 +621,7 @@ class Ui_MainWindow(object):
         self.valveMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro4Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro4Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro4Button.setFont(font)
@@ -774,6 +805,7 @@ class Ui_MainWindow(object):
         self.motorMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro4Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro4Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro4Button.setFont(font)
@@ -782,6 +814,7 @@ class Ui_MainWindow(object):
         self.motorMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro3Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro3Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro3Button.setFont(font)
@@ -798,6 +831,7 @@ class Ui_MainWindow(object):
         self.motorMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro1Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro1Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro1Button.setFont(font)
@@ -806,6 +840,7 @@ class Ui_MainWindow(object):
         self.motorMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro2Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro2Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro2Button.setFont(font)
@@ -822,6 +857,7 @@ class Ui_MainWindow(object):
         self.motorMacro5Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro5Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro5Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro5Button.setFont(font)
@@ -830,6 +866,7 @@ class Ui_MainWindow(object):
         self.motorMacro6Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro6Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro6Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro6Button.setFont(font)
@@ -1034,6 +1071,9 @@ class Ui_MainWindow(object):
         for i in range(4):
             getattr(self, f'valveMacro{i+1}Button').setText(self.macro_settings[str(i+1)]['Label'])
 
+        for i in range(6):
+            getattr(self, f'motorMacro{i+1}Button').setText(self.motor_macro_settings[str(i+1)]['Label'])
+
     def disconnect_ard(self):
         try:
             self.arduino_worker.send_command("RESET")
@@ -1089,7 +1129,7 @@ class Ui_MainWindow(object):
             if self.arduino_worker.isConnected():
                 self.ardConnected = True
                 # Start the watchdog timer that updates arduino connection status
-                self.setup_watchdog()
+                self.setup_arduino_watchdog()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
@@ -1766,7 +1806,7 @@ class Ui_MainWindow(object):
             self.saving = False
             return False
 
-    def setup_watchdog(self):
+    def setup_arduino_watchdog(self):
         self.watchdog = QtCore.QTimer()
         self.watchdog.timeout.connect(self.check_arduino_state)
         self.watchdog.start(500)
@@ -1778,53 +1818,76 @@ class Ui_MainWindow(object):
         if self.arduino_worker.controller.serial_connected == False:
             self.disconnect_ard()
 
-    def on_connectMotorButton_clicked(self):
-        logging.info("Connect motor button clicked")
+    def setup_motor_watchdog(self):
+        self.motor_watchdog = QtCore.QTimer()
+        self.motor_watchdog.timeout.connect(self.check_motor_state)
+        self.motor_watchdog.start(500)
+
+    def check_motor_state(self):
+        # logging.debug("Checking motor connection")
+        if self.motor_worker.is_connected() == False:   # type: ignore
+            self.motorConnected = False
+            self.UIUpdateMotorConnection()
+            self.motor_worker.running = False   # type: ignore
+
+    def on_motorConnectButton_clicked(self):
+        #logging.info("Connect motor button clicked")
         if self.motorConnected:
             self.motorConnected = False
             self.UIUpdateMotorConnection()
-            if self.motorController != None:
-                self.motorController.serial_connected = False
-                self.motorController.stop()
-                # self.motorController = None
+            if self.motor_worker != None:
+                self.motor_worker.running = False
+                self.motor_worker.shutdown_signal.emit()
+                # self.motor_worker = None
         else:
-            self.motorController = MotorController(
-                port=self.ardCOMPortSpinBox.value())
-            try:
-                self.motorController.start()
-                if self.motorController.serial_connected:
-                    self.motorConnected = True
-                    logging.info("Motor connected")
-                    self.UIUpdateMotorConnection()
-                else:
-                    logging.info("Motor failed to connect")
-                    self.motorConnected = False
-                    self.motorController.stop()
-                    self.motorController = None
-                    self.UIUpdateMotorConnection()
-            except Exception as e:
-                logging.error(e)
-                self.motorConnected = False
-                self.motorController.stop()
-                self.motorController = None
-                self.UIUpdateMotorConnection()
+            self.motor_worker = MotorWorker(parent = self, port = self.ardCOMPortSpinBox.value())
+            self.motor_worker.start()
 
-    def on_calibrateMotorButton_clicked(self):
+            self.connect_motor_signals()    # Connect the worker signals to appropriate slots
+
+            # Start the arduino time that read pressure readings every 500ms
+            self.motor_worker.start_timer()
+
+            # Check if the connection was successful with 5 sec timeout
+            timeout = 5  # Timeout in seconds
+            start_time = time.time()
+            while True:
+                # Check if the timeout has been reached
+                if (time.time() - start_time > timeout) or self.motor_worker.is_connected() == True:
+                    break
+                # Sleep for a short duration to prevent high CPU usage
+                time.sleep(0.1)
+
+            # Update the UI based on the connection status
+            if self.motor_worker.is_connected():
+                self.motorConnected = True
+                # Start the watchdog timer that updates arduino connection status
+                self.setup_arduino_watchdog()
+            else:
+                self.motorConnected = False
+                self.motor_worker.shutdown_signal.emit()
+                self.ardWarningLabel.setText("Connection failed")
+                self.ardWarningLabel.setStyleSheet("color: red")
+        self.UIUpdateMotorConnection()
+
+    def on_motorCalibrateButton_clicked(self):
         logging.info("Calibrate motor button clicked")
         if self.motorConnected:
-            self.motorController.calibrate()
+            self.motor_worker.calibrate_signal.emit()
 
-    def on_stopMotorButton_clicked(self):
+    def on_motorStopButton_clicked(self):
         logging.info("Stop motor button clicked")
         if self.motorConnected:
-            self.motorController.stop()
+            self.motor_worker.shutdown_signal.emit()
 
-    def on_moveToTargetButton_clicked(self):
+    def on_motorMoveToTargetButton_clicked(self):
         logging.info("Move to target button clicked")
         if self.motorConnected:
-            targetpos = float(self.targetMotorPosEdit.text())
-            self.motorController.move_to_target(
-                float(self.targetMotorPosEdit.text()))
+            try:
+                targetpos = int(self.targetMotorPosEdit.text()) #TODO: convert from mm to steps
+                self.motor_worker.command_signal.emit(targetpos)
+            except ValueError:
+                logging.error("Invalid target position")
 
     def add_step(self, step_type, time_length):
         step = Step(step_type, time_length)
@@ -1840,7 +1903,7 @@ class Ui_MainWindow(object):
                   step.time_length}")
 
     def edit_motor_macro(self):
-        pass
+        self.motor_macro_editor.exec()
 
     def edit_valve_macro(self):
         # dialog = ValveMacroEditor(self)
@@ -2002,7 +2065,33 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
 
     def UIUpdateMotorConnection(self):
-        pass
+        if self.motor_worker.is_connected():
+            self.motorConnectButton.setText("Disconnect")
+            if self.motor_worker.calibrated:
+                self.motorCalibrateButton.setEnabled(False)
+                self.motorWarningLabel.setText("Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: green")
+                self.toggle_motor_controls(True)
+            else:
+                self.motorCalibrateButton.setEnabled(True)
+                self.motorWarningLabel.setText("Not Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: red")
+                self.toggle_motor_controls(False)
+        else:
+            self.motorConnectButton.setText("Connect")
+            self.motorWarningLabel.setText("Not Connected")
+            self.motorWarningLabel.setStyleSheet("color: red")
+            self.motorCalibrateButton.setEnabled(False)
+            self.toggle_motor_controls(False)
+
+    def toggle_motor_controls(self, state):
+        self.motorStopButton.setEnabled(state)
+        self.motorMoveToTargetButton.setEnabled(state)
+        self.targetMotorPosEdit.setEnabled(state)
+        self.motorMacro1Button.setEnabled(state)
+        self.motorMacro2Button.setEnabled(state)
+        self.motorMacro3Button.setEnabled(state)
+        self.motorMacro4Button.setEnabled(state)
 
     def connect_arduino_signals(self):
         self.arduino_worker.data_signal.connect(
@@ -2013,6 +2102,11 @@ class Ui_MainWindow(object):
             self.arduino_worker.set_valve_states)
         self.arduino_worker.get_valve_signal.connect(
             self.arduino_worker.get_valve_states)
+        
+    def connect_motor_signals(self):
+        self.motor_worker.command_signal.connect(self.motor_worker.move_to_target)
+        self.motor_worker.shutdown_signal.connect(self.motor_worker.stop)
+        self.motor_worker.calibrate_signal.connect(self.motor_worker.calibrate)
 
 
 class Step:
@@ -2045,6 +2139,131 @@ class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
         self.widget.clear()
         super().close()
 
+class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+
+        self.setWindowTitle("Motor Macro Editor")
+        self.setGeometry(100, 100, 400, 170)
+        self.setFixedSize(400, 170)
+
+        # Create a table widget
+        self.table = QtWidgets.QTableWidget(self)
+        self.table.setRowCount(6)
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(
+            ["Macro No.", "Label", "Position"])
+
+        # Set layout
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(self.table)
+        self.setLayout(self.mainLayout)
+
+        # Determine the directory of the executable
+        self.executable_dir = os.path.dirname(sys.executable) if getattr(
+            sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+        # Load data from JSON file if it exists
+        self.load_data()
+
+        # Resize all columns to fit
+        self.table.resizeColumnsToContents()
+        # Resize the Label column
+        self.table.setColumnWidth(1, 130)  # Label column is now index 1
+
+    def load_data(self):
+        json_path = os.path.join("C:\\ssbubble", 'motor_macro_data.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                for i, macro in enumerate(data):
+                    # Macro No.
+                    item = QtWidgets.QTableWidgetItem(macro["Macro No."])
+                    # Make the item read-only
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(i, 0, item)
+                    # Label
+                    label_text = macro.get("Label", "")
+                    label_item = QtWidgets.QTableWidgetItem(label_text)
+                    self.table.setItem(i, 1, label_item)
+                    # Position SpinBox
+                    position_spinbox = QtWidgets.QSpinBox()
+                    position_spinbox.setRange(0, 2500000)  # Adjust range as needed
+                    position_val = macro.get("Position", 0)   # Default to 0
+                    position_spinbox.setValue(position_val)
+                    self.table.setCellWidget(i, 2, position_spinbox)
+            except (json.JSONDecodeError, KeyError, IndexError):
+                self.set_default_values()
+        else:
+            self.set_default_values()
+
+    def set_default_values(self):
+        for i in range(6):
+            # Macro No.
+            item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
+            # Make the item read-only
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 0, item)
+            # Label
+            label_item = QtWidgets.QTableWidgetItem(f"Motor Macro {i+1}")
+            self.table.setItem(i, 1, label_item)
+            # Position SpinBox
+            position_spinbox = QtWidgets.QSpinBox()
+            position_spinbox.setRange(0, 2500000)  # Adjust range as needed
+            position_spinbox.setValue(0)  # Default position value
+            self.table.setCellWidget(i, 2, position_spinbox)
+
+    def get_macro_data(self):
+        data = []
+        for row in range(self.table.rowCount()):
+            macro_number = self.table.item(row, 0).text()   # type: ignore
+            label_text = self.table.item(row, 1).text()     # type: ignore
+            position_spinbox = self.table.cellWidget(row, 2)
+            # Get Position value
+            position_value = position_spinbox.value() if position_spinbox else 0   # type: ignore
+            data.append({
+                "Macro No.": macro_number,
+                "Label": label_text,
+                "Position": position_value
+            })
+        return data
+
+    def get_macro_data_dict(self):
+        data = {}
+        for row in range(self.table.rowCount()):
+            macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
+            label_text = self.table.item(row, 1).text()        # type: ignore
+            position_spinbox = self.table.cellWidget(row, 2)
+            position_value = position_spinbox.value() if position_spinbox else 0   # type: ignore
+            data[macro_number] = {
+                "Label": label_text,
+                "Position": position_value
+            }
+        return data
+
+    def closeEvent(self, event):
+        # Update parent's macro_settings with the new data
+        self.parent.motor_macro_settings = self.get_macro_data_dict()
+        # Save data to JSON
+        data = self.get_macro_data()
+        json_path = os.path.join("C:\\ssbubble", 'motor_macro_data.json')
+        json_dir = os.path.dirname(json_path)
+
+        # Ensure the directory exists
+        if not os.path.exists(json_dir):
+            os.makedirs(json_dir)
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+
+        # Update the main window's buttons with the new labels
+        for i in range(6):
+            label = self.parent.motor_macro_settings[str(i+1)]['Label']
+            getattr(self.parent, f'motorMacro{i+1}Button').setText(label)
+
+        super().closeEvent(event)
+
 
 class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
     def __init__(self, parent):
@@ -2076,6 +2295,9 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
+        # Resize the Label column
+        self.table.setColumnWidth(1, 120)  # Label column is now index 1
+        # Resize the Timer column
         self.table.setColumnWidth(7, 80)  # Timer column is now index 7
 
     def load_data(self):
@@ -2374,25 +2596,56 @@ class ArduinoWorker(QtCore.QThread):
 
 
 class MotorWorker(QtCore.QThread):
-    command_signal = QtCore.pyqtSignal(str)
+    command_signal = QtCore.pyqtSignal(int)
+    shutdown_signal = QtCore.pyqtSignal()
+    calibrate_signal = QtCore.pyqtSignal()
 
-    def __init__(self, port):
+    def __init__(self, parent, port):
         super().__init__()
         self.motor = MotorController(port=port)
-        self.serial_connected = False
+        self.parent = parent
+        self.running = False
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.poll_position)
+        self.calibrated = False
 
+    @QtCore.pyqtSlot()
     def stop(self):
         """Stop the worker and the Arduino controller."""
         self.running = False
-        self.motor.stop()
+        self.motor.shutdown()
         self.quit()
         self.wait()
 
-    @QtCore.pyqtSlot(str)
-    def handle_command(self, command):
+    @QtCore.pyqtSlot()
+    def calibrate(self):
         """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
         if self.motor.serial_connected:
-            self.motor.send_command(command)
+            self.motor.calibrate()
+            logging.info("Calibrating motor, please wait")
+
+    def poll_position(self):
+        if self.running:
+            if self.motor.serial_connected:
+                self.calibrated = self.motor.check_calibrated()
+                if self.calibrated:
+                    position = self.motor.get_current_position()
+                    # TODO: convert from steps to mm
+                    self.parent.currentMotorPosEdit.setText(str(position))
+        else:
+            self.timer.stop()
+            self.stop()
+        
+    def is_connected(self):
+        return self.motor.serial_connected
+
+    @QtCore.pyqtSlot(int)
+    def move_to_target(self, target):   # TODO: convert from mm to steps
+        if self.motor.serial_connected:
+            self.motor.move_to_position(target)
+
+    def start_timer(self):
+        self.timer.start(500)
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
