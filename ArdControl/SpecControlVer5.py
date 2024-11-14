@@ -1160,42 +1160,8 @@ class Ui_MainWindow(object):
             if self.selectedMode == 1:
                 self.arduino_worker.send_command(
                     "TTLDISABLE")  # ensure tTL mode disabled
-                # Check if sequence gets loaded correctly
-                if self.load_sequence():
-                    logging.info("Sequence loaded successfully")
-                    logging.info("Starting sequence")
-                    # Calculate time to show on the labels
-                    self.calculate_sequence_time()
-                    self.currentStepTypeEdit.setText(
-                        self.step_types[self.steps[0].step_type])
-                    # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
-
-                    # Tell prospa that sequence was loaded successfully and is now running
-                    self.write_to_prospa(True)
-                    self.delete_sequence_file()
-
-                    # Update valve states for current step and start recurring timer
-                    self.update_step()
-
-                    # Update the UI
-                    self.UIUpdateArdConnection()
-                else:
-                    # If sequence loading fails, tell prospa to stop
-                    self.write_to_prospa(False)
-                    self.delete_sequence_file()
-
-                    self.disconnect_ard()
-
-                    # Update the UI
-                    self.ardWarningLabel.setText(
-                        "Error loading sequence file")
-                    self.ardWarningLabel.setStyleSheet("color: red")
-                    logging.error("Error loading sequence file")
-
-                    # Stop the arduino worker
-                    self.ardConnected = False
-                    self.arduino_worker.stop()
-                    self.UIUpdateArdConnection()
+                # begin sequence loading
+                self.find_file()
 
     def update_valve_button_states(self):
         special_cases = {
@@ -1306,8 +1272,20 @@ class Ui_MainWindow(object):
             self.total_sequence_time += step.time_length
         logging.info(f"Sequence length is {self.total_sequence_time} ms")
 
+    @QtCore.pyqtSlot()
+    def find_file(self):
+        self.file_timer = QtCore.QTimer()
+        self.file_timer.timeout.connect(self.find_file)
+        if os.path.exists(r"C:\ssbubble\sequence.txt"):
+            self.load_sequence()
+        else:
+            logging.info("Sequence file not found, checking again...")
+            self.file_timer.singleShot(500, self.find_file)
+            
+
     def load_sequence(self):
         """Load a sequence from a file."""
+
         try:
             # Get the file path
             self.steps = []  # initialise steps
@@ -1371,14 +1349,60 @@ class Ui_MainWindow(object):
                     # Simulate save button click
                     self.on_beginSaveButton_clicked()
 
-            return True  # Signal that sequence was loaded successfully
+            logging.info("Sequence loaded successfully")
+            logging.info("Starting sequence")
+            # Calculate time to show on the labels
+            self.calculate_sequence_time()
+            self.currentStepTypeEdit.setText(
+                self.step_types[self.steps[0].step_type])
+            # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
+
+            # Tell prospa that sequence was loaded successfully and is now running
+            self.write_to_prospa(True)
+            self.delete_sequence_file()
+
+            # Update valve states for current step and start recurring timer
+            self.update_step()
+
+            # Update the UI
+            self.UIUpdateArdConnection()
 
         except FileNotFoundError:
             logging.error("Sequence file not found")
-            return False    # Signal that sequence file was not found
+            self.write_to_prospa(False)
+            self.delete_sequence_file()
+
+            self.disconnect_ard()
+
+            # Update the UI
+            self.ardWarningLabel.setText(
+                "Error loading sequence file")
+            self.ardWarningLabel.setStyleSheet("color: red")
+            logging.error("Error loading sequence file")
+
+            # Stop the arduino worker
+            self.ardConnected = False
+            self.arduino_worker.stop()
+            self.UIUpdateArdConnection()
+
         except IOError as e:
             logging.error(f"Error reading sequence file: {e}")
-            return False    # Signal error when parsing sequence file
+            self.write_to_prospa(False)
+            self.delete_sequence_file()
+
+            self.disconnect_ard()
+
+            # Update the UI
+            self.ardWarningLabel.setText(
+                "Error loading sequence file")
+            self.ardWarningLabel.setStyleSheet("color: red")
+            logging.error("Error loading sequence file")
+
+            # Stop the arduino worker
+            self.ardConnected = False
+            self.arduino_worker.stop()
+            self.UIUpdateArdConnection()
+
 
     def write_to_prospa(self, start):
         """Write the file to Prospa."""
