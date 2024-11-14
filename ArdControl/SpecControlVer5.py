@@ -959,6 +959,18 @@ class Ui_MainWindow(object):
             self.on_valveMacro3Button_clicked)
         self.valveMacro4Button.clicked.connect(
             self.on_valveMacro4Button_clicked)
+        self.motorMacro1Button.clicked.connect(
+            self.on_motorMacro1Button_clicked)
+        self.motorMacro2Button.clicked.connect(
+            self.on_motorMacro2Button_clicked)
+        self.motorMacro3Button.clicked.connect(
+            self.on_motorMacro3Button_clicked)
+        self.motorMacro4Button.clicked.connect(
+            self.on_motorMacro4Button_clicked)
+        self.motorMacro5Button.clicked.connect(
+            self.on_motorMacro5Button_clicked)
+        self.motorMacro6Button.clicked.connect(
+            self.on_motorMacro6Button_clicked)
         self.devValveCheckbox.clicked.connect(self.on_devValveCheckbox_clicked)
 
         # Connect menu actions to their slots
