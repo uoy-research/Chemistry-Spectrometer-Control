@@ -1889,6 +1889,36 @@ class Ui_MainWindow(object):
             except ValueError:
                 logging.error("Invalid target position")
 
+    def on_motorMacro1Button_clicked(self):
+        logging.info("Motor macro 1 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["1"]["Position"])
+
+    def on_motorMacro2Button_clicked(self):
+        logging.info("Motor macro 2 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["2"]["Position"])
+
+    def on_motorMacro3Button_clicked(self):
+        logging.info("Motor macro 3 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["3"]["Position"])
+
+    def on_motorMacro4Button_clicked(self):
+        logging.info("Motor macro 4 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["4"]["Position"])
+
+    def on_motorMacro5Button_clicked(self):
+        logging.info("Motor macro 5 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["5"]["Position"])
+
+    def on_motorMacro6Button_clicked(self):
+        logging.info("Motor macro 6 button clicked")
+        if self.motorConnected:
+            self.motor_worker.command_signal.emit(self.motor_macro_settings["6"]["Position"])
+
     def add_step(self, step_type, time_length):
         step = Step(step_type, time_length)
         self.steps.append(step)
