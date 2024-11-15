@@ -1236,6 +1236,10 @@ class Ui_MainWindow(object):
                     # Update the valves with new step state
                     self.arduino_worker.set_valve_signal.emit(
                         self.valve_settings[self.current_step_type])
+                    
+                    # Update the motor position if motor_flag is True
+                    if self.motor_flag and self.current_step.motor_position != 0:
+                        self.motor_worker.command_signal.emit(self.current_step.motor_position)
 
                     # Log the step type and time
                     logging.info(f"Step {self.current_step_type} for {
@@ -1303,6 +1307,13 @@ class Ui_MainWindow(object):
                 sequence_string = raw_sequence[0].strip()
                 i = 0
 
+                # Check for capital 'M' in the sequence string
+                self.motor_flag = False
+                if 'M' in sequence_string:
+                    self.motor_flag = True
+                    sequence_string = sequence_string.replace('M', '')  # Remove 'M' from the sequence string
+
+
                 # Parse the sequence string
                 while i < len(sequence_string):
                     # Check for valid step types based on dictionaries in the class (at the top of the file)
@@ -1326,9 +1337,23 @@ class Ui_MainWindow(object):
                     if time_length <= 0:
                         logging.error("Invalid time length in sequence file")
                         return False
+                    
+                    # Get motor position if motor_flag is True
+                    motor_position = 0
+                    if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
+                        i += 1
+                        motor_position_str = ""
+                        while i < len(sequence_string) and sequence_string[i].isdigit():
+                            motor_position_str += sequence_string[i]
+                            i += 1
+                        try:
+                            motor_position = int(motor_position_str)
+                        except ValueError:
+                            logging.error("Invalid motor position in sequence file")
+                            return False
 
                     # Create a step object and add it to the list
-                    step = Step(step_type, time_length)
+                    step = Step(step_type, time_length, motor_position)
                     # logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
                     self.steps.append(step)
 
@@ -2176,9 +2201,10 @@ class Ui_MainWindow(object):
 
 
 class Step:
-    def __init__(self, step_type, time_length):
+    def __init__(self, step_type, time_length, motor_position = 0):
         self.step_type = step_type
         self.time_length = time_length
+        self.motor_position = motor_position
 
 
 class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
