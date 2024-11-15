@@ -1180,83 +1180,94 @@ class Ui_MainWindow(object):
     def update_step(self):
         # Check the connection
         if self.ardConnected:
-            # Get the current time
-            current_time = time.perf_counter()
+            if not self.motor_flag or (self.motor_worker.isRunning() and self.motor_worker.calibrated):
+                # Get the current time
+                current_time = time.perf_counter()
 
-            # Initialize last_update_time if it doesn't exist
-            if not hasattr(self, 'last_update_time'):
+                # Initialize last_update_time if it doesn't exist
+                if not hasattr(self, 'last_update_time'):
+                    self.last_update_time = current_time
+
+                # Calculate elapsed time in milliseconds
+                elapsed_time = (current_time - self.last_update_time) * 1000  # Convert to milliseconds
+
+                # Update last_update_time
                 self.last_update_time = current_time
 
-            # Calculate elapsed time in milliseconds
-            elapsed_time = (current_time - self.last_update_time) * 1000  # Convert to milliseconds
+                # Increment time trackers by elapsed time
+                self.sequence_running_time += elapsed_time
+                self.step_running_time += elapsed_time
 
-            # Update last_update_time
-            self.last_update_time = current_time
+                # Update the time labels
+                self.currentStepTimeEdit.setText(
+                    f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
+                self.stepsTimeRemainingLabel.setText(
+                    f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
 
-            # Increment time trackers by elapsed time
-            self.sequence_running_time += elapsed_time
-            self.step_running_time += elapsed_time
-            
-            # Update the time labels
-            self.currentStepTimeEdit.setText(
-                f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
-            self.stepsTimeRemainingLabel.setText(
-                f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+                # Check if the current step is complete
+                if self.step_running_time >= self.current_step_time:
+                    # Check if sequence has been initialized
+                    if self.seq_new == True:
+                        self.seq_new = False
+                    # If not, step is complete
+                    else:
+                        logging.info("Step complete")
 
-            # Check if the current step is complete
-            if self.step_running_time >= self.current_step_time:
-                # Check if sequence has been initialized
-                if self.seq_new == True:
-                    self.seq_new = False
-                # If not, step is complete
-                else:
-                    logging.info("Step complete")
+                    # Reset the step timer
+                    self.step_running_time = 0
 
-                # Reset the step timer
-                self.step_running_time = 0
+                    # Check if there are more steps
+                    if len(self.steps) == 0:
+                        # If not, sequence is complete
+                        self.ardWarningLabel.setText("Sequence complete")
+                        self.ardWarningLabel.setStyleSheet("color: green")
+                        self.currentStepTypeEdit.setText("")
+                        self.stepsRemainingLabel.setText("Steps: 0")
 
-                # Check if there are more steps
-                if len(self.steps) == 0:
-                    # If not, sequence is complete
-                    self.ardWarningLabel.setText("Sequence complete")
-                    self.ardWarningLabel.setStyleSheet("color: green")
-                    self.currentStepTypeEdit.setText("")
-                    self.stepsRemainingLabel.setText("Steps: 0")
+                        # Stop the timer to prevent this function from recurring
+                        self.stepTimer.stop()
 
-                    # Stop the timer to prevent this function from recurring
-                    self.stepTimer.stop()
+                        # Stop saving at the end of the sequence
+                        if self.saving:
+                            self.on_beginSaveButton_clicked()
 
-                    # Stop saving at the end of the sequence
-                    if self.saving:
-                        self.on_beginSaveButton_clicked()
+                        # Reset sequence init flag
+                        self.seq_new = True
+                        return
+                    else:
+                        # Get the next step
+                        self.current_step = self.steps.pop(0)
+                        # Get the key values
+                        self.current_step_time = self.current_step.time_length
+                        self.current_step_type = self.current_step.step_type
+                        # Update the labels
+                        self.currentStepTypeEdit.setText(
+                            self.step_types[self.current_step_type])
 
-                    # Reset sequence init flag
-                    self.seq_new = True
-                    return
-                else:
-                    # Get the next step
-                    self.current_step = self.steps.pop(0)
-                    # Get the key values
-                    self.current_step_time = self.current_step.time_length
-                    self.current_step_type = self.current_step.step_type
-                    # Update the labels
-                    self.currentStepTypeEdit.setText(
-                        self.step_types[self.current_step_type])
+                        self.stepsRemainingLabel.setText(
+                            f"Steps: {len(self.steps) + 1}")
 
-                    self.stepsRemainingLabel.setText(
-                        f"Steps: {len(self.steps) + 1}")
+                        # Update the valves with new step state
+                        self.arduino_worker.set_valve_signal.emit(
+                            self.valve_settings[self.current_step_type])
+                        
+                        # Update the motor position if motor_flag is True
+                        if self.motor_flag and self.current_step.motor_position != 0:
+                            self.motor_worker.command_signal.emit(self.current_step.motor_position)
 
-                    # Update the valves with new step state
-                    self.arduino_worker.set_valve_signal.emit(
-                        self.valve_settings[self.current_step_type])
-                    
-                    # Update the motor position if motor_flag is True
-                    if self.motor_flag and self.current_step.motor_position != 0:
-                        self.motor_worker.command_signal.emit(self.current_step.motor_position)
-
-                    # Log the step type and time
-                    logging.info(f"Step {self.current_step_type} for {
-                                 self.current_step_time} ms")
+                        # Log the step type and time
+                        logging.info(f"Step {self.current_step_type} for {
+                                    self.current_step_time} ms")
+            else:
+                # If motor is not ready, stop the timer and reset all labels
+                logging.error("Motor not connected and calibrated")
+                self.ardWarningLabel.setText("Motor not ready")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                self.stepTimer.stop()
+                self.currentStepTypeEdit.setText("")
+                self.stepsRemainingLabel.setText("Steps: 0")
+                self.currentStepTimeEdit.setText("0.00")
+                self.stepsTimeRemainingLabel.setText("Time: 0.00")
         else:
             # If arduino is not connected, stop the timer and reset all labels
             logging.error("Arduino not connected")
@@ -1294,7 +1305,44 @@ class Ui_MainWindow(object):
         self.file_timer = QtCore.QTimer()
         self.file_timer.timeout.connect(self.find_file)
         if os.path.exists(r"C:\ssbubble\sequence.txt"):
-            self.load_sequence()
+            logging.info("Sequence file found")
+            if(self.load_sequence()):
+                logging.info("Sequence loaded successfully")
+                logging.info("Starting sequence")
+                # Calculate time to show on the labels
+                self.calculate_sequence_time()
+                self.currentStepTypeEdit.setText(
+                    self.step_types[self.steps[0].step_type])
+                # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
+
+                # Tell prospa that sequence was loaded successfully and is now running
+                self.write_to_prospa(True)
+                self.delete_sequence_file()
+
+                # Update valve states for current step and start recurring timer
+                self.update_step()
+
+                # Update the UI
+                self.UIUpdateArdConnection()
+                self.ardWarningLabel.setText("Sequence running")
+            else:
+                self.write_to_prospa(False)
+                self.delete_sequence_file()
+
+                self.disconnect_ard()
+
+                # Update the UI
+                self.ardWarningLabel.setText(
+                    "Error loading sequence file")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                logging.error("Error loading sequence file")
+
+                # Stop the arduino worker
+                self.ardConnected = False
+                self.arduino_worker.stop()
+                self.UIUpdateArdConnection()
+                
+            self.file_timer.stop()
         else:
             logging.info("Sequence file not found, checking again...")
             self.file_timer.singleShot(500, self.find_file)
@@ -1326,6 +1374,10 @@ class Ui_MainWindow(object):
                     self.motor_flag = True
                     sequence_string = sequence_string.replace('M', '')  # Remove 'M' from the sequence string
 
+                if self.motor_flag:
+                    if not self.motor_worker.isRunning() or not self.motor_worker.calibrated:
+                        logging.error("Sequence requires motor, but motor is not ready")
+                        return False
 
                 # Parse the sequence string
                 while i < len(sequence_string):
@@ -1387,59 +1439,15 @@ class Ui_MainWindow(object):
                     # Simulate save button click
                     self.on_beginSaveButton_clicked()
 
-            logging.info("Sequence loaded successfully")
-            logging.info("Starting sequence")
-            # Calculate time to show on the labels
-            self.calculate_sequence_time()
-            self.currentStepTypeEdit.setText(
-                self.step_types[self.steps[0].step_type])
-            # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
-
-            # Tell prospa that sequence was loaded successfully and is now running
-            self.write_to_prospa(True)
-            self.delete_sequence_file()
-
-            # Update valve states for current step and start recurring timer
-            self.update_step()
-
-            # Update the UI
-            self.UIUpdateArdConnection()
+            return True
 
         except FileNotFoundError:
             logging.error("Sequence file not found")
-            self.write_to_prospa(False)
-            self.delete_sequence_file()
-
-            self.disconnect_ard()
-
-            # Update the UI
-            self.ardWarningLabel.setText(
-                "Error loading sequence file")
-            self.ardWarningLabel.setStyleSheet("color: red")
-            logging.error("Error loading sequence file")
-
-            # Stop the arduino worker
-            self.ardConnected = False
-            self.arduino_worker.stop()
-            self.UIUpdateArdConnection()
+            return False
 
         except IOError as e:
             logging.error(f"Error reading sequence file: {e}")
-            self.write_to_prospa(False)
-            self.delete_sequence_file()
-
-            self.disconnect_ard()
-
-            # Update the UI
-            self.ardWarningLabel.setText(
-                "Error loading sequence file")
-            self.ardWarningLabel.setStyleSheet("color: red")
-            logging.error("Error loading sequence file")
-
-            # Stop the arduino worker
-            self.ardConnected = False
-            self.arduino_worker.stop()
-            self.UIUpdateArdConnection()
+            return False
 
 
     def write_to_prospa(self, start):
