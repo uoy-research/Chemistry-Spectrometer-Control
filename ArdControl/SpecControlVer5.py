@@ -1180,10 +1180,23 @@ class Ui_MainWindow(object):
     def update_step(self):
         # Check the connection
         if self.ardConnected:
-            # Increment time tracker by 10ms
-            self.sequence_running_time += 10
-            self.step_running_time += 10
+            # Get the current time
+            current_time = time.perf_counter()
 
+            # Initialize last_update_time if it doesn't exist
+            if not hasattr(self, 'last_update_time'):
+                self.last_update_time = current_time
+
+            # Calculate elapsed time in milliseconds
+            elapsed_time = (current_time - self.last_update_time) * 1000  # Convert to milliseconds
+
+            # Update last_update_time
+            self.last_update_time = current_time
+
+            # Increment time trackers by elapsed time
+            self.sequence_running_time += elapsed_time
+            self.step_running_time += elapsed_time
+            
             # Update the time labels
             self.currentStepTimeEdit.setText(
                 f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
