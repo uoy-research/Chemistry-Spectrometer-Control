@@ -76,6 +76,8 @@ bool initFlag = false;
 const int intPin1 = 10; // This is the interrupt pin for the uStepper S32
 const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
 
+// Steps/mm= (200 steps/rev × 256 microsteps)/2mm pitch = 25,600 steps/mm
+
 // # +--------------------------+---------+-----------------------------------------+
 // # |         Coil/reg         | Address |                 Purpose                 |
 // # +--------------------------+---------+-----------------------------------------+
