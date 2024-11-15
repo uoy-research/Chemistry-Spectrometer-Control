@@ -138,7 +138,7 @@ class Ui_MainWindow(object):
         self.seq_new = True
 
         # Ensure the prospa file is removed - prospa must be activated once gui already open
-        self.delete_sequence_file()
+        # self.delete_sequence_file()
 
         """Create UI Widgets"""
         # Create the main window
@@ -1375,7 +1375,12 @@ class Ui_MainWindow(object):
                     sequence_string = sequence_string.replace('M', '')  # Remove 'M' from the sequence string
 
                 if self.motor_flag:
-                    if not self.motor_worker.isRunning() or not self.motor_worker.calibrated:
+                    try:
+                        if not self.motor_worker.isRunning() or not self.motor_worker.calibrated:
+                            logging.error("Sequence requires motor, but motor is not ready")
+                            return False
+                    except Exception as e:
+                        # logging.error(f"Error checking motor status: {e}")
                         logging.error("Sequence requires motor, but motor is not ready")
                         return False
 
