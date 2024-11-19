@@ -33,7 +33,7 @@ while True:
     print(f"Current position: {combined}")
     input("Press Enter to continue...")
 
-    instrument.write_bit(3, 1)  # writing 1 to toggle init flag
+    instrument.write_bit(1, 1)  # writing 1 to toggle command flag
     instrument.write_register(2, ord('c'))  # writing 'i' to command register
 
     calibrated = False
