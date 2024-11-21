@@ -99,6 +99,8 @@ class Ui_MainWindow(object):
         self.motor_macro_editor.load_data()
         self.motor_macro_settings = self.motor_macro_editor.get_macro_data_dict()
 
+        self.motor_connected = False
+
         self.vent_flag = False
 
         # Show debug logs
@@ -483,6 +485,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(11)
         self.motorCOMPortSpinBox.setFont(font)
+        self.motorCOMPortSpinBox.setValue(9)
         self.motorCOMPortSpinBox.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.motorCOMPortSpinBox.setObjectName("motorCOMPortSpinBox")
@@ -971,6 +974,15 @@ class Ui_MainWindow(object):
             self.on_motorMacro5Button_clicked)
         self.motorMacro6Button.clicked.connect(
             self.on_motorMacro6Button_clicked)
+        self.motorConnectButton.clicked.connect(
+            self.on_motorConnectButton_clicked)
+        self.motorCalibrateButton.clicked.connect(
+            self.on_motorCalibrateButton_clicked)
+        self.motorStopButton.clicked.connect(self.on_motorStopButton_clicked)
+        self.motorAscentButton.clicked.connect(self.on_motorAscentButton_clicked)
+        self.motorToTopButton.clicked.connect(self.on_motorToTopButton_clicked)
+        self.motorMoveToTargetButton.clicked.connect(
+            self.on_motorMoveToTargetButton_clicked)
         self.devValveCheckbox.clicked.connect(self.on_devValveCheckbox_clicked)
 
         # Connect menu actions to their slots
@@ -979,6 +991,7 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         self.update_controls()
+        
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -1180,7 +1193,7 @@ class Ui_MainWindow(object):
     def update_step(self):
         # Check the connection
         if self.ardConnected:
-            if not self.motor_flag or (self.motor_worker.isRunning() and self.motor_worker.calibrated):
+            if not self.motor_flag or (self.motor_worker.motor.serial_connected and self.motor_worker.calibrated):
                 # Get the current time
                 current_time = time.perf_counter()
 
@@ -1344,8 +1357,9 @@ class Ui_MainWindow(object):
                 
             self.file_timer.stop()
         else:
-            logging.info("Sequence file not found, checking again...")
-            self.file_timer.singleShot(500, self.find_file)
+            if self.ardConnected:
+                logging.info("Sequence file not found, checking again...")
+                self.file_timer.singleShot(500, self.find_file)
             
 
     def load_sequence(self):
@@ -1376,7 +1390,7 @@ class Ui_MainWindow(object):
 
                 if self.motor_flag:
                     try:
-                        if not self.motor_worker.isRunning() or not self.motor_worker.calibrated:
+                        if not self.motor_worker.motor.serial_connected or not self.motor_worker.calibrated:
                             logging.error("Sequence requires motor, but motor is not ready")
                             return False
                     except Exception as e:
@@ -1913,22 +1927,40 @@ class Ui_MainWindow(object):
     def check_motor_state(self):
         # logging.debug("Checking motor connection")
         if self.motor_worker.is_connected() == False:   # type: ignore
-            self.motorConnected = False
+            self.motor_connected = False
             self.UIUpdateMotorConnection()
             self.motor_worker.running = False   # type: ignore
 
+    def on_motorAscentButton_clicked(self):
+        logging.info("Motor Ascent button clicked")
+        if self.motor_connected:
+            self.motor_worker.ascent_signal.emit()
+
+    def on_motorToTopButton_clicked(self):
+        logging.info("Motor To Top button clicked")
+        if self.motor_connected:
+            self.motor_worker.top_signal.emit()
+
     def on_motorConnectButton_clicked(self):
         #logging.info("Connect motor button clicked")
-        if self.motorConnected:
-            self.motorConnected = False
+        if self.motor_connected:
+            logging.info("Disconnecting motor")
+            self.motor_connected = False
+            try:
+                if getattr(self, 'motor_worker', None) is not None:
+                    self.motor_worker.shutdown_signal.emit()
+                    # self.motor_worker = None
+                    self.motor_worker.running = False
+                    self.motor_worker.timer.stop()
+            except Exception as e:
+                pass
+            
             self.UIUpdateMotorConnection()
-            if self.motor_worker != None:
-                self.motor_worker.running = False
-                self.motor_worker.shutdown_signal.emit()
-                # self.motor_worker = None
         else:
-            self.motor_worker = MotorWorker(parent = self, port = self.ardCOMPortSpinBox.value())
-            self.motor_worker.start()
+            logging.info("Connecting motor")
+            logging.info(f"Motor COM port: {self.motorCOMPortSpinBox.value()}")
+            self.motor_worker = MotorWorker(parent = self, port = self.motorCOMPortSpinBox.value())
+            self.motor_worker.connect()
 
             self.connect_motor_signals()    # Connect the worker signals to appropriate slots
 
@@ -1947,11 +1979,13 @@ class Ui_MainWindow(object):
 
             # Update the UI based on the connection status
             if self.motor_worker.is_connected():
-                self.motorConnected = True
+                logging.info("Motor connected")
+                self.motor_connected = True
                 # Start the watchdog timer that updates arduino connection status
-                self.setup_arduino_watchdog()
+                self.setup_motor_watchdog()
             else:
-                self.motorConnected = False
+                logging.error("Motor connection failed")
+                self.motor_connected = False
                 self.motor_worker.shutdown_signal.emit()
                 self.ardWarningLabel.setText("Connection failed")
                 self.ardWarningLabel.setStyleSheet("color: red")
@@ -1959,17 +1993,17 @@ class Ui_MainWindow(object):
 
     def on_motorCalibrateButton_clicked(self):
         logging.info("Calibrate motor button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.calibrate_signal.emit()
 
     def on_motorStopButton_clicked(self):
         logging.info("Stop motor button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.shutdown_signal.emit()
 
     def on_motorMoveToTargetButton_clicked(self):
         logging.info("Move to target button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             try:
                 targetpos = int(self.targetMotorPosEdit.text()) #TODO: convert from mm to steps
                 self.motor_worker.command_signal.emit(targetpos)
@@ -1978,32 +2012,32 @@ class Ui_MainWindow(object):
 
     def on_motorMacro1Button_clicked(self):
         logging.info("Motor macro 1 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["1"]["Position"])
 
     def on_motorMacro2Button_clicked(self):
         logging.info("Motor macro 2 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["2"]["Position"])
 
     def on_motorMacro3Button_clicked(self):
         logging.info("Motor macro 3 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["3"]["Position"])
 
     def on_motorMacro4Button_clicked(self):
         logging.info("Motor macro 4 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["4"]["Position"])
 
     def on_motorMacro5Button_clicked(self):
         logging.info("Motor macro 5 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["5"]["Position"])
 
     def on_motorMacro6Button_clicked(self):
         logging.info("Motor macro 6 button clicked")
-        if self.motorConnected:
+        if self.motor_connected:
             self.motor_worker.command_signal.emit(self.motor_macro_settings["6"]["Position"])
 
     def add_step(self, step_type, time_length):
@@ -2182,7 +2216,7 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
 
     def UIUpdateMotorConnection(self):
-        if self.motor_worker.is_connected():
+        if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
             if self.motor_worker.calibrated:
                 self.motorCalibrateButton.setEnabled(False)
@@ -2204,11 +2238,15 @@ class Ui_MainWindow(object):
     def toggle_motor_controls(self, state):
         self.motorStopButton.setEnabled(state)
         self.motorMoveToTargetButton.setEnabled(state)
-        self.targetMotorPosEdit.setEnabled(state)
+        #self.targetMotorPosEdit.setEnabled(state)
         self.motorMacro1Button.setEnabled(state)
         self.motorMacro2Button.setEnabled(state)
         self.motorMacro3Button.setEnabled(state)
         self.motorMacro4Button.setEnabled(state)
+        self.motorMacro5Button.setEnabled(state)
+        self.motorMacro6Button.setEnabled(state)
+        self.motorAscentButton.setEnabled(state)
+        self.motorToTopButton.setEnabled(state)
 
     def connect_arduino_signals(self):
         self.arduino_worker.data_signal.connect(
@@ -2224,6 +2262,8 @@ class Ui_MainWindow(object):
         self.motor_worker.command_signal.connect(self.motor_worker.move_to_target)
         self.motor_worker.shutdown_signal.connect(self.motor_worker.stop)
         self.motor_worker.calibrate_signal.connect(self.motor_worker.calibrate)
+        self.motor_worker.ascent_signal.connect(self.motor_worker.ascent)
+        self.motor_worker.top_signal.connect(self.motor_worker.to_top)
 
 
 class Step:
@@ -2717,6 +2757,8 @@ class MotorWorker(QtCore.QThread):
     command_signal = QtCore.pyqtSignal(int)
     shutdown_signal = QtCore.pyqtSignal()
     calibrate_signal = QtCore.pyqtSignal()
+    ascent_signal = QtCore.pyqtSignal()
+    top_signal = QtCore.pyqtSignal()
 
     def __init__(self, parent, port):
         super().__init__()
@@ -2726,44 +2768,68 @@ class MotorWorker(QtCore.QThread):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll_position)
         self.calibrated = False
+        self.mutex = QtCore.QMutex()
 
     @QtCore.pyqtSlot()
     def stop(self):
-        """Stop the worker and the Arduino controller."""
-        self.running = False
-        self.motor.shutdown()
-        self.quit()
-        self.wait()
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                self.motor.shutdown()
 
     @QtCore.pyqtSlot()
     def calibrate(self):
-        """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
-        if self.motor.serial_connected:
-            self.motor.calibrate()
-            logging.info("Calibrating motor, please wait")
+        with QtCore.QMutexLocker(self.mutex):
+            """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
+            if self.motor.serial_connected:
+                self.motor.calibrate()
+                #logging.info("Calibrating motor, please wait")
 
     def poll_position(self):
-        if self.running:
-            if self.motor.serial_connected:
-                self.calibrated = self.motor.check_calibrated()
-                if self.calibrated:
-                    position = self.motor.get_current_position()
-                    # TODO: convert from steps to mm
-                    self.parent.currentMotorPosEdit.setText(str(position))
-        else:
-            self.timer.stop()
-            self.stop()
+        #logging.info("Polling motor position")
+        with QtCore.QMutexLocker(self.mutex):
+            if self.running:
+                if self.motor.serial_connected:
+                    self.calibrated = self.motor.check_calibrated()
+                    if self.calibrated:
+                        position = self.motor.get_current_position()
+                        logging.info(f"Current motor position: {position}")
+                        # TODO: convert from steps to mm
+                        self.parent.curMotorPosEdit.setText(str(position))
+                self.parent.UIUpdateMotorConnection()
+            else:
+                self.timer.stop()
+                self.stop()
         
     def is_connected(self):
         return self.motor.serial_connected
 
     @QtCore.pyqtSlot(int)
     def move_to_target(self, target):   # TODO: convert from mm to steps
-        if self.motor.serial_connected:
-            self.motor.move_to_position(target)
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info(f"Moving motor to position {target}")
+                self.motor.move_to_position(target)
 
     def start_timer(self):
         self.timer.start(500)
+
+    def connect(self):
+        self.motor.start()
+        self.running = True
+
+    @QtCore.pyqtSlot()
+    def ascent(self):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info("Ascent")
+                self.motor.ascent()
+
+    @QtCore.pyqtSlot()
+    def to_top(self):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info("To Top")
+                self.motor.to_top()
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -2792,10 +2858,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
 
-        if self.arduino_worker:
-            self.arduino_worker.stop()
-            if self.verbosity:
-                print("Controller stopped")
+        try:
+            if self.arduino_worker:
+                self.arduino_worker.stop()
+                if self.verbosity:
+                    print("Controller stopped")
+        except AttributeError:
+            pass
         if self.verbosity:
             print("Application is closing...")
 

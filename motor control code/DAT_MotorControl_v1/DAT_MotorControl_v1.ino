@@ -132,11 +132,12 @@ void loop() {
     uint16_t input = mb.Hreg(2);
     handleInput(static_cast<char>(input));
     mb.setHreg(2, 0);
+    mb.setCoil(1, 0); // Reset command flag
   }
 }
 
 void handleInput(char input) {
-  mb.setCoil(1, 0); // Reset command flag
+
   switch(input) {
 
 /*    These functions are blocking, so they are not suitable for use with Modbus.
@@ -195,6 +196,12 @@ void handleInput(char input) {
 
     case 't': // Sample to up position
       //Serial.println("Sample up!");
+      stepper.setCurrent(runCurrent);
+      stepper.setHoldCurrent(holdCurrent);
+      stepper.setMaxAcceleration(maxAcceleration);
+      stepper.setMaxDeceleration(maxDeceleration);
+      stepper.setBrakeMode(COOLBRAKE);
+      stepper.setMaxVelocity(maxVelocity);
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
@@ -248,6 +255,12 @@ void handleInput(char input) {
       break;
     case 'x': // Move to position
       //Serial.println("Moving to position!");
+      stepper.setCurrent(runCurrent);
+      stepper.setHoldCurrent(holdCurrent);
+      stepper.setMaxAcceleration(maxAcceleration);
+      stepper.setMaxDeceleration(maxDeceleration);
+      stepper.setBrakeMode(COOLBRAKE);
+      stepper.setMaxVelocity(maxVelocity);
       setPosition = getTargetPosition();
       setPosition = min(upPosition, (upPosition - setPosition));
       setPosition = max(downPosition, setPosition);
@@ -261,10 +274,18 @@ void handleInput(char input) {
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
 
-      stepper.movePosition(10000000);
+      stepper.moveSteps(10000000);
       initFlag = 1;
       break;
-
+    case 'u': // Slow ascent
+      stepper.setCurrent(runCurrent);
+      stepper.setHoldCurrent(holdCurrent);
+      stepper.setMaxAcceleration(maxAcceleration/2);
+      stepper.setMaxDeceleration(maxDeceleration/2);
+      stepper.setBrakeMode(COOLBRAKE);
+      stepper.setMaxVelocity(maxVelocity/2);
+      //setPosition = upPosition;
+      stepper.movePosition(0);
     default:
       //Serial.println("LOG: Invalid input");
       break;
@@ -310,8 +331,8 @@ void getCurrentPosition(){
   int32_t currentPosition = stepper.getPosition();  // Get current position
   uint16_t high, low; // Declare high and low word
   disassemble(currentPosition, high, low);  // Disassemble current position into two uint16_t
-  mb.setIreg(5, high); // Add high word to input register 4
-  mb.setIreg(6, low);  // Add low word to input register 5
+  mb.setHreg(5, high); // Add high word to input register 4
+  mb.setHreg(6, low);  // Add low word to input register 5
 }
 
 void addCoils(){

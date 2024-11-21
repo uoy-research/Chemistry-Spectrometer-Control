@@ -33,9 +33,10 @@ while True:
     print(f"Current position: {combined}")
     input("Press Enter to continue...")
 
-    instrument.write_bit(1, 1)  # writing 1 to toggle command flag
     instrument.write_register(2, ord('c'))  # writing 'i' to command register
-
+    time.sleep(1)
+    instrument.write_bit(1, 1)  # writing 1 to toggle command flag
+    
     calibrated = False
     while calibrated == False:
         try:
@@ -49,6 +50,8 @@ while True:
                 combined -= 0x100000000
             print(high_word, low_word)
             print(f"Current position: {combined}")
+            command = instrument.read_bit(1, 1)  # reading command flag
+            print(f"Calibrated: {calibrated}, Command: {command}")
 
         except Exception as e:
             print("Not read", e)
@@ -91,6 +94,8 @@ while True:
 
         try:
             instrument.write_register(2, ord('x'))
+            time.sleep(1)
+            instrument.write_bit(1, 1)  # writing 1 to toggle command flag    
         except:
             print("Not written x2")
             pass
