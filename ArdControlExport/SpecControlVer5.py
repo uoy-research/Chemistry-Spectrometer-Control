@@ -2569,8 +2569,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()   # type: ignore
             label_text = self.table.item(row, 1).text()     # type: ignore
             valve_states = [self.table.cellWidget(
-                # V1 to V5 #type: ignore
-                row, col).currentText() for col in range(2, 7)]
+                # V1 to V5
+                row, col).currentText() for col in range(2, 7)] #type: ignore
             # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
             timer_spinbox = self.table.cellWidget(row, 7)
@@ -2590,8 +2590,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             label_text = self.table.item(row, 1).text()        # type: ignore
             valve_states = [self.table.cellWidget(
-                # V1 to V5 #type: ignore
-                row, col).currentText() for col in range(2, 7)]
+                # V1 to V5 
+                row, col).currentText() for col in range(2, 7)] #type: ignore
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
@@ -2819,7 +2819,7 @@ class MotorWorker(QtCore.QThread):
         self.timer.timeout.connect(self.poll_position)
         self.calibrated = False
         self.mutex = QtCore.QMutex()
-        self.top_position = -100
+        self.top_position = "INIT"
 
     @QtCore.pyqtSlot()
     def stop(self):
@@ -2842,10 +2842,11 @@ class MotorWorker(QtCore.QThread):
                 if self.motor.serial_connected:
                     self.calibrated = self.motor.check_calibrated()
                     if self.calibrated:
-                        if self.top_position == -100:
+                        if self.top_position == "INIT":
                             self.top_position = self.motor.get_top_position()
                             logging.info(f"Top position: {self.top_position}")
                         position = self.motor.get_current_position()
+                        position = int(self.top_position) - position
                         position = self.steps_to_mm(position)
                         logging.info(f"Current motor position: {position}")
                         self.parent.curMotorPosEdit.setText(str(position))
