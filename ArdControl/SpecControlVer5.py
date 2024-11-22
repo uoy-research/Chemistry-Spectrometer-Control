@@ -1270,7 +1270,7 @@ class Ui_MainWindow(object):
                             self.valve_settings[self.current_step_type])
 
                         # Update the motor position if motor_flag is True
-                        if self.motor_flag and self.current_step.motor_position != 0:
+                        if self.motor_flag and self.current_step.motor_position >= 0:
                             self.motor_worker.command_signal.emit(
                                 self.current_step.motor_position)
 
@@ -1435,14 +1435,18 @@ class Ui_MainWindow(object):
                     if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
                         i += 1
                         motor_position_str = ""
+                        # Check for negative sign
+                        if i < len(sequence_string) and sequence_string[i] == '-':
+                            motor_position_str += sequence_string[i]
+                            i += 1
+                        # Collect digits
                         while i < len(sequence_string) and sequence_string[i].isdigit():
                             motor_position_str += sequence_string[i]
                             i += 1
                         try:
                             motor_position = int(motor_position_str)
                         except ValueError:
-                            logging.error(
-                                "Invalid motor position in sequence file")
+                            logging.error("Invalid motor position in sequence file")
                             return False
 
                     # Create a step object and add it to the list
@@ -2232,6 +2236,24 @@ class Ui_MainWindow(object):
         else:
             self.savePathEdit.setEnabled(True)
             self.selectSavePathButton.setEnabled(True)
+        if self.motor_connected:
+            self.motorConnectButton.setText("Disconnect")
+            if self.motor_worker.calibrated:
+                self.motorCalibrateButton.setEnabled(False)
+                self.motorWarningLabel.setText("Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: green")
+                self.toggle_motor_controls(True)
+            else:
+                self.motorCalibrateButton.setEnabled(True)
+                self.motorWarningLabel.setText("Not Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: red")
+                self.toggle_motor_controls(False)
+        else:
+            self.motorConnectButton.setText("Connect")
+            self.motorWarningLabel.setText("Not Connected")
+            self.motorWarningLabel.setStyleSheet("color: red")
+            self.motorCalibrateButton.setEnabled(False)
+            self.toggle_motor_controls(False)
 
     def UIUpdateMotorConnection(self):
         if self.motor_connected:
@@ -2807,8 +2829,8 @@ class MotorWorker(QtCore.QThread):
 
     @QtCore.pyqtSlot()
     def calibrate(self):
+        """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
         with QtCore.QMutexLocker(self.mutex):
-            """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
             if self.motor.serial_connected:
                 self.motor.calibrate()
                 # logging.info("Calibrating motor, please wait")
@@ -2826,7 +2848,6 @@ class MotorWorker(QtCore.QThread):
                         position = self.motor.get_current_position()
                         position = self.steps_to_mm(position)
                         logging.info(f"Current motor position: {position}")
-                        # TODO: convert from steps to mm
                         self.parent.curMotorPosEdit.setText(str(position))
                 self.parent.UIUpdateMotorConnection()
             else:
@@ -2837,7 +2858,7 @@ class MotorWorker(QtCore.QThread):
         return self.motor.serial_connected
 
     @QtCore.pyqtSlot(int)
-    def move_to_target(self, target):   # TODO: convert from mm to steps
+    def move_to_target(self, target):
         with QtCore.QMutexLocker(self.mutex):
             if self.motor.serial_connected:
                 logging.info(f"Moving motor to position {target}")

@@ -23,6 +23,9 @@ class Ui_MainWindow(object):
 
         # Initialise variables
 
+        # how frequently the valve states are checked (ms)
+        self.valveCheckInterval = 50
+
         # List of valve settings for each step type
         self.valve_settings = {
             'd': [0, 0, 0, 0, 0, 2, 2, 2],
@@ -45,20 +48,43 @@ class Ui_MainWindow(object):
         # List of valve settings for each macro
         self.macro_settings = {
             "1": {
+                "Label": "Macro 1",
                 "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
                 "Timer": 1.0
             },
             "2": {
+                "Label": "Macro 2",
                 "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
                 "Timer": 1.0
             },
             "3": {
+                "Label": "Macro 3",
                 "Valves": [1, 1, 1, 1, 1, 2, 2, 2],
                 "Timer": 1.0
             },
             "4": {
+                "Label": "Macro 4",
                 "Valves": [0, 0, 0, 0, 0, 2, 2, 2],
                 "Timer": 1.0
+            }
+        }
+
+        self.motor_macro_settings = {
+            "1": {
+                "Label": "Motor Macro 1",
+                "Position": 0
+            },
+            "2": {
+                "Label": "Motor Macro 2",
+                "Position": 0
+            },
+            "3": {
+                "Label": "Motor Macro 3",
+                "Position": 0
+            },
+            "4": {
+                "Label": "Motor Macro 4",
+                "Position": 0
             }
         }
 
@@ -68,6 +94,14 @@ class Ui_MainWindow(object):
         self.macro_editor = ValveMacroEditor(self)
         self.macro_editor.load_data()
         self.macro_settings = self.macro_editor.get_macro_data_dict()
+
+        self.motor_macro_editor = MotorMacroEditor(self)
+        self.motor_macro_editor.load_data()
+        self.motor_macro_settings = self.motor_macro_editor.get_macro_data_dict()
+
+        self.motor_connected = False
+
+        self.vent_flag = False
 
         # Show debug logs
         self.verbosity = False
@@ -106,7 +140,7 @@ class Ui_MainWindow(object):
         self.seq_new = True
 
         # Ensure the prospa file is removed - prospa must be activated once gui already open
-        self.delete_sequence_file()
+        # self.delete_sequence_file()
 
         """Create UI Widgets"""
         # Create the main window
@@ -314,6 +348,19 @@ class Ui_MainWindow(object):
         self.ValveLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.ValveLabel.setObjectName("ValveLabel")
         self.valveLayout.addWidget(self.ValveLabel, 0, 0, 1, 1)
+
+        self.devValveCheckbox = QtWidgets.QCheckBox(
+            parent=self.gridLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(9)
+        self.devValveCheckbox.setFont(font)
+        self.devValveCheckbox.setTristate(False)
+        self.devValveCheckbox.setObjectName("devValveCheckbox")
+        self.devValveCheckbox.setChecked(False)
+        self.devValveCheckbox.setText("Enable\nControls")
+        self.valveLayout.addWidget(
+            self.devValveCheckbox, 1, 0, 1, 1, QtCore.Qt.AlignmentFlag.AlignHCenter)
+
         self.showValvesCheckbox = QtWidgets.QCheckBox(
             parent=self.gridLayoutWidget)
         font = QtGui.QFont()
@@ -408,6 +455,7 @@ class Ui_MainWindow(object):
         self.Valve3Button.hide()
         self.Valve4Button.hide()
         self.Valve5Button.hide()
+        self.devValveCheckbox.hide()
 
         # Create the motor layout
         self.verticalLayoutWidget_2 = QtWidgets.QWidget(
@@ -439,6 +487,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(11)
         self.motorCOMPortSpinBox.setFont(font)
+        self.motorCOMPortSpinBox.setValue(9)
         self.motorCOMPortSpinBox.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.motorCOMPortSpinBox.setObjectName("motorCOMPortSpinBox")
@@ -509,7 +558,7 @@ class Ui_MainWindow(object):
         self.quickVentButton.setFont(font)
         self.quickVentButton.setObjectName("quickVentButton")
         self.quickVentButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.quickVentButton, 0, 0, 1, 1)
+        self.monitorLayout.addWidget(self.quickVentButton, 9, 0, 1, 1)
 
         self.slowVentButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -519,7 +568,7 @@ class Ui_MainWindow(object):
         self.slowVentButton.setFont(font)
         self.slowVentButton.setObjectName("slowVentButton")
         self.slowVentButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.slowVentButton, 0, 1, 1, 1)
+        self.monitorLayout.addWidget(self.slowVentButton, 9, 1, 1, 1)
 
         self.buildPressureButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -529,7 +578,7 @@ class Ui_MainWindow(object):
         self.buildPressureButton.setFont(font)
         self.buildPressureButton.setObjectName("buildPressureButton")
         self.buildPressureButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.buildPressureButton, 1, 0, 1, 1)
+        self.monitorLayout.addWidget(self.buildPressureButton, 6, 1, 1, 1)
 
         self.switchGasButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
@@ -539,47 +588,51 @@ class Ui_MainWindow(object):
         self.switchGasButton.setFont(font)
         self.switchGasButton.setObjectName("switchGasButton")
         self.switchGasButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.switchGasButton, 1, 1, 1, 1)
+        self.monitorLayout.addWidget(self.switchGasButton, 6, 0, 1, 1)
 
         self.valveMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro1Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro1Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro1Button.setFont(font)
         self.valveMacro1Button.setObjectName("valveMacro1Button")
         # self.valveMacro1Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro1Button, 2, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro1Button, 7, 0, 1, 1)
 
         self.valveMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro2Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro2Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro2Button.setFont(font)
         self.valveMacro2Button.setObjectName("valveMacro2Button")
         # self.valveMacro2Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro2Button, 2, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro2Button, 7, 1, 1, 1)
 
         self.valveMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro3Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro3Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro3Button.setFont(font)
         self.valveMacro3Button.setObjectName("valveMacro3Button")
         # self.valveMacro3Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro3Button, 3, 0, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro3Button, 8, 0, 1, 1)
 
         self.valveMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.valveMacro4Button.setMinimumSize(QtCore.QSize(0, 25))
+        self.valveMacro4Button.setMaximumWidth(125)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.valveMacro4Button.setFont(font)
         self.valveMacro4Button.setObjectName("valveMacro4Button")
         # self.valveMacro4Button.setCheckable(True)
-        self.monitorLayout.addWidget(self.valveMacro4Button, 3, 1, 1, 1)
+        self.monitorLayout.addWidget(self.valveMacro4Button, 8, 1, 1, 1)
 
         # Create the pressure radio buttons
         self.pressure4RadioButton = QtWidgets.QRadioButton(
@@ -591,7 +644,7 @@ class Ui_MainWindow(object):
         self.pressure4RadioButton.setAutoExclusive(False)
         self.pressure4RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure4RadioButton, 5, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure4RadioButton, 1, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure2RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -601,7 +654,7 @@ class Ui_MainWindow(object):
         self.pressure2RadioButton.setAutoExclusive(False)
         self.pressure2RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure2RadioButton, 4, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure2RadioButton, 0, 1, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure1RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -611,7 +664,7 @@ class Ui_MainWindow(object):
         self.pressure1RadioButton.setAutoExclusive(False)
         self.pressure1RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure1RadioButton, 4, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure1RadioButton, 0, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.pressure3RadioButton = QtWidgets.QRadioButton(
             parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
@@ -621,7 +674,7 @@ class Ui_MainWindow(object):
         self.pressure3RadioButton.setAutoExclusive(False)
         self.pressure3RadioButton.setChecked(True)
         self.monitorLayout.addWidget(
-            self.pressure3RadioButton, 5, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+            self.pressure3RadioButton, 1, 0, 1, 1, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
         # Create the save path buttons
         self.selectSavePathButton = QtWidgets.QPushButton(
@@ -631,13 +684,13 @@ class Ui_MainWindow(object):
         font.setPointSize(10)
         self.selectSavePathButton.setFont(font)
         self.selectSavePathButton.setObjectName("selectSavePathButton")
-        self.monitorLayout.addWidget(self.selectSavePathButton, 6, 0, 1, 1)
+        self.monitorLayout.addWidget(self.selectSavePathButton, 2, 0, 1, 1)
         self.savePathEdit = QtWidgets.QLineEdit(parent=self.gridLayoutWidget_2)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.savePathEdit.setFont(font)
         self.savePathEdit.setObjectName("savePathEdit")
-        self.monitorLayout.addWidget(self.savePathEdit, 7, 0, 1, 2)
+        self.monitorLayout.addWidget(self.savePathEdit, 3, 0, 1, 2)
         self.beginSaveButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.beginSaveButton.setMinimumSize(QtCore.QSize(0, 25))
@@ -646,7 +699,7 @@ class Ui_MainWindow(object):
         self.beginSaveButton.setFont(font)
         self.beginSaveButton.setObjectName("beginSaveButton")
         self.beginSaveButton.setCheckable(True)
-        self.monitorLayout.addWidget(self.beginSaveButton, 6, 1, 1, 1)
+        self.monitorLayout.addWidget(self.beginSaveButton, 2, 1, 1, 1)
 
         # Create the bubble time widgets
         self.bubbleTimeLabel = QtWidgets.QLabel(parent=self.gridLayoutWidget_2)
@@ -656,7 +709,7 @@ class Ui_MainWindow(object):
         self.bubbleTimeLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
                                           QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeLabel.setObjectName("bubbleTimeLabel")
-        self.monitorLayout.addWidget(self.bubbleTimeLabel, 9, 0, 1, 1)
+        self.monitorLayout.addWidget(self.bubbleTimeLabel, 4, 0, 1, 1)
         self.quickBubbleButton = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_2)
         self.quickBubbleButton.setMinimumSize(QtCore.QSize(0, 25))
@@ -665,7 +718,7 @@ class Ui_MainWindow(object):
         self.quickBubbleButton.setFont(font)
         self.quickBubbleButton.setCheckable(True)
         self.quickBubbleButton.setObjectName("quickBubbleButton")
-        self.monitorLayout.addWidget(self.quickBubbleButton, 8, 0, 1, 2)
+        self.monitorLayout.addWidget(self.quickBubbleButton, 5, 0, 1, 2)
 
         self.bubbleTimeDoubleSpinBox = QtWidgets.QDoubleSpinBox(
             parent=self.gridLayoutWidget_2)
@@ -674,7 +727,7 @@ class Ui_MainWindow(object):
         self.bubbleTimeDoubleSpinBox.setObjectName("bubbleTimeDoubleSpinBox")
         self.bubbleTimeDoubleSpinBox.setMinimum(0.0)
         self.bubbleTimeDoubleSpinBox.setValue(5.00)
-        self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 9, 1, 1, 1)
+        self.monitorLayout.addWidget(self.bubbleTimeDoubleSpinBox, 4, 1, 1, 1)
 
         # Create the motor position layout
         self.gridLayoutWidget_3 = QtWidgets.QWidget(parent=self.centralwidget)
@@ -757,6 +810,7 @@ class Ui_MainWindow(object):
         self.motorMacro4Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro4Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro4Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro4Button.setFont(font)
@@ -765,6 +819,7 @@ class Ui_MainWindow(object):
         self.motorMacro3Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro3Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro3Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro3Button.setFont(font)
@@ -781,6 +836,7 @@ class Ui_MainWindow(object):
         self.motorMacro1Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro1Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro1Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro1Button.setFont(font)
@@ -789,6 +845,7 @@ class Ui_MainWindow(object):
         self.motorMacro2Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro2Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro2Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro2Button.setFont(font)
@@ -805,6 +862,7 @@ class Ui_MainWindow(object):
         self.motorMacro5Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro5Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro5Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro5Button.setFont(font)
@@ -813,6 +871,7 @@ class Ui_MainWindow(object):
         self.motorMacro6Button = QtWidgets.QPushButton(
             parent=self.gridLayoutWidget_4)
         self.motorMacro6Button.setMinimumSize(QtCore.QSize(0, 35))
+        self.motorMacro6Button.setMaximumWidth(135)
         font = QtGui.QFont()
         font.setPointSize(10)
         self.motorMacro6Button.setFont(font)
@@ -905,6 +964,29 @@ class Ui_MainWindow(object):
             self.on_valveMacro3Button_clicked)
         self.valveMacro4Button.clicked.connect(
             self.on_valveMacro4Button_clicked)
+        self.motorMacro1Button.clicked.connect(
+            self.on_motorMacro1Button_clicked)
+        self.motorMacro2Button.clicked.connect(
+            self.on_motorMacro2Button_clicked)
+        self.motorMacro3Button.clicked.connect(
+            self.on_motorMacro3Button_clicked)
+        self.motorMacro4Button.clicked.connect(
+            self.on_motorMacro4Button_clicked)
+        self.motorMacro5Button.clicked.connect(
+            self.on_motorMacro5Button_clicked)
+        self.motorMacro6Button.clicked.connect(
+            self.on_motorMacro6Button_clicked)
+        self.motorConnectButton.clicked.connect(
+            self.on_motorConnectButton_clicked)
+        self.motorCalibrateButton.clicked.connect(
+            self.on_motorCalibrateButton_clicked)
+        self.motorStopButton.clicked.connect(self.on_motorStopButton_clicked)
+        self.motorAscentButton.clicked.connect(
+            self.on_motorAscentButton_clicked)
+        self.motorToTopButton.clicked.connect(self.on_motorToTopButton_clicked)
+        self.motorMoveToTargetButton.clicked.connect(
+            self.on_motorMoveToTargetButton_clicked)
+        self.devValveCheckbox.clicked.connect(self.on_devValveCheckbox_clicked)
 
         # Connect menu actions to their slots
         self.editMotorMacroAction.triggered.connect(self.edit_motor_macro)
@@ -1012,6 +1094,15 @@ class Ui_MainWindow(object):
         self.stepsTimeRemainingLabel.setText(
             _translate("MainWindow", "Time: "))
 
+        # Update the main window's buttons with the new labels
+        for i in range(4):
+            getattr(self, f'valveMacro{
+                    i+1}Button').setText(self.macro_settings[str(i+1)]['Label'])
+
+        for i in range(6):
+            getattr(self, f'motorMacro{
+                    i+1}Button').setText(self.motor_macro_settings[str(i+1)]['Label'])
+
     def disconnect_ard(self):
         try:
             self.arduino_worker.send_command("RESET")
@@ -1067,7 +1158,7 @@ class Ui_MainWindow(object):
             if self.arduino_worker.isConnected():
                 self.ardConnected = True
                 # Start the watchdog timer that updates arduino connection status
-                self.setup_watchdog()
+                self.setup_arduino_watchdog()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
@@ -1086,42 +1177,8 @@ class Ui_MainWindow(object):
             if self.selectedMode == 1:
                 self.arduino_worker.send_command(
                     "TTLDISABLE")  # ensure tTL mode disabled
-                # Check if sequence gets loaded correctly
-                if self.load_sequence():
-                    logging.info("Sequence loaded successfully")
-                    logging.info("Starting sequence")
-                    # Calculate time to show on the labels
-                    self.calculate_sequence_time()
-                    self.currentStepTypeEdit.setText(
-                        self.step_types[self.steps[0].step_type])
-                    # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
-
-                    # Tell prospa that sequence was loaded successfully and is now running
-                    self.write_to_prospa(True)
-                    self.delete_sequence_file()
-
-                    # Update valve states for current step and start recurring timer
-                    self.update_step()
-
-                    # Update the UI
-                    self.UIUpdateArdConnection()
-                else:
-                    # If sequence loading fails, tell prospa to stop
-                    self.write_to_prospa(False)
-                    self.delete_sequence_file()
-
-                    self.disconnect_ard()
-
-                    # Update the UI
-                    self.ardWarningLabel.setText(
-                        "Error loading sequence file")
-                    self.ardWarningLabel.setStyleSheet("color: red")
-                    logging.error("Error loading sequence file")
-
-                    # Stop the arduino worker
-                    self.ardConnected = False
-                    self.arduino_worker.stop()
-                    self.UIUpdateArdConnection()
+                # begin sequence loading
+                self.find_file()
 
     def update_valve_button_states(self):
         special_cases = {
@@ -1135,78 +1192,101 @@ class Ui_MainWindow(object):
             if i in special_cases:
                 special_cases[i].setChecked(self.valveStates[i] == 1)
 
-        if self.valveStates[2] == 1 and self.valveStates[4] == 1:
-            self.slowVentButton.setChecked(self.valveStates[3] == 1)
-            self.quickVentButton.setChecked(self.valveStates[3] != 1)
-        else:
-            self.quickVentButton.setChecked(False)
-            self.slowVentButton.setChecked(False)
-
     """Recurring function that updates the current step and valve states as well as the time labels."""
 
     def update_step(self):
         # Check the connection
         if self.ardConnected:
-            # Increment time tracker by 10ms
-            self.sequence_running_time += 10
-            self.step_running_time += 10
+            if not self.motor_flag or (self.motor_worker.motor.serial_connected and self.motor_worker.calibrated):
+                # Get the current time
+                current_time = time.perf_counter()
 
-            # Update the time labels
-            self.currentStepTimeEdit.setText(
-                f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
-            self.stepsTimeRemainingLabel.setText(
-                f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
+                # Initialize last_update_time if it doesn't exist
+                if not hasattr(self, 'last_update_time'):
+                    self.last_update_time = current_time
 
-            # Check if the current step is complete
-            if self.step_running_time >= self.current_step_time:
-                # Check if sequence has been initialized
-                if self.seq_new == True:
-                    self.seq_new = False
-                # If not, step is complete
-                else:
-                    logging.info("Step complete")
+                # Calculate elapsed time in milliseconds
+                # Convert to milliseconds
+                elapsed_time = (current_time - self.last_update_time) * 1000
 
-                # Reset the step timer
-                self.step_running_time = 0
+                # Update last_update_time
+                self.last_update_time = current_time
 
-                # Check if there are more steps
-                if len(self.steps) == 0:
-                    # If not, sequence is complete
-                    self.ardWarningLabel.setText("Sequence complete")
-                    self.ardWarningLabel.setStyleSheet("color: green")
-                    self.currentStepTypeEdit.setText("")
-                    self.stepsRemainingLabel.setText("Steps: 0")
+                # Increment time trackers by elapsed time
+                self.sequence_running_time += elapsed_time
+                self.step_running_time += elapsed_time
 
-                    # Stop the timer to prevent this function from recurring
-                    self.stepTimer.stop()
+                # Update the time labels
+                self.currentStepTimeEdit.setText(
+                    f"{(self.current_step_time - self.step_running_time) / 1000:.2f}")
+                self.stepsTimeRemainingLabel.setText(
+                    f"Time: {(self.total_sequence_time - self.sequence_running_time) / 1000:.2f}")
 
-                    # Stop saving at the end of the sequence
-                    if self.saving:
-                        self.on_beginSaveButton_clicked()
+                # Check if the current step is complete
+                if self.step_running_time >= self.current_step_time:
+                    # Check if sequence has been initialized
+                    if self.seq_new == True:
+                        self.seq_new = False
+                    # If not, step is complete
+                    else:
+                        logging.info("Step complete")
 
-                    # Reset sequence init flag
-                    self.seq_new = True
-                    return
-                else:
-                    # Get the next step
-                    self.current_step = self.steps.pop(0)
-                    # Get the key values
-                    self.current_step_time = self.current_step.time_length
-                    self.current_step_type = self.current_step.step_type
-                    # Update the labels
-                    self.currentStepTypeEdit.setText(
-                        self.step_types[self.current_step_type])
+                    # Reset the step timer
+                    self.step_running_time = 0
 
-                    self.stepsRemainingLabel.setText(
-                        f"Steps: {len(self.steps) + 1}")
+                    # Check if there are more steps
+                    if len(self.steps) == 0:
+                        # If not, sequence is complete
+                        self.ardWarningLabel.setText("Sequence complete")
+                        self.ardWarningLabel.setStyleSheet("color: green")
+                        self.currentStepTypeEdit.setText("")
+                        self.stepsRemainingLabel.setText("Steps: 0")
 
-                    # Update the valves with new step state
-                    self.arduino_worker.set_valve_signal.emit(
-                        self.valve_settings[self.current_step_type])
+                        # Stop the timer to prevent this function from recurring
+                        self.stepTimer.stop()
 
-                    # Log the step type and time
-                    logging.info(f"Step {self.current_step_type} for {
-                                 self.current_step_time} ms")
+                        # Stop saving at the end of the sequence
+                        if self.saving:
+                            self.on_beginSaveButton_clicked()
+
+                        # Reset sequence init flag
+                        self.seq_new = True
+                        return
+                    else:
+                        # Get the next step
+                        self.current_step = self.steps.pop(0)
+                        # Get the key values
+                        self.current_step_time = self.current_step.time_length
+                        self.current_step_type = self.current_step.step_type
+                        # Update the labels
+                        self.currentStepTypeEdit.setText(
+                            self.step_types[self.current_step_type])
+
+                        self.stepsRemainingLabel.setText(
+                            f"Steps: {len(self.steps) + 1}")
+
+                        # Update the valves with new step state
+                        self.arduino_worker.set_valve_signal.emit(
+                            self.valve_settings[self.current_step_type])
+
+                        # Update the motor position if motor_flag is True
+                        if self.motor_flag and self.current_step.motor_position != 0:
+                            self.motor_worker.command_signal.emit(
+                                self.current_step.motor_position)
+
+                        # Log the step type and time
+                        logging.info(f"Step {self.current_step_type} for {
+                            self.current_step_time} ms")
+            else:
+                # If motor is not ready, stop the timer and reset all labels
+                logging.error("Motor not connected and calibrated")
+                self.ardWarningLabel.setText("Motor not ready")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                self.stepTimer.stop()
+                self.currentStepTypeEdit.setText("")
+                self.stepsRemainingLabel.setText("Steps: 0")
+                self.currentStepTimeEdit.setText("0.00")
+                self.stepsTimeRemainingLabel.setText("Time: 0.00")
         else:
             # If arduino is not connected, stop the timer and reset all labels
             logging.error("Arduino not connected")
@@ -1239,8 +1319,57 @@ class Ui_MainWindow(object):
             self.total_sequence_time += step.time_length
         logging.info(f"Sequence length is {self.total_sequence_time} ms")
 
+    @QtCore.pyqtSlot()
+    def find_file(self):
+        self.file_timer = QtCore.QTimer()
+        self.file_timer.timeout.connect(self.find_file)
+        if os.path.exists(r"C:\ssbubble\sequence.txt"):
+            logging.info("Sequence file found")
+            if (self.load_sequence()):
+                logging.info("Sequence loaded successfully")
+                logging.info("Starting sequence")
+                # Calculate time to show on the labels
+                self.calculate_sequence_time()
+                self.currentStepTypeEdit.setText(
+                    self.step_types[self.steps[0].step_type])
+                # logging.info(f"Step {self.steps[0].step_type} for {self.steps[0].time_length} ms")
+
+                # Tell prospa that sequence was loaded successfully and is now running
+                self.write_to_prospa(True)
+                self.delete_sequence_file()
+
+                # Update valve states for current step and start recurring timer
+                self.update_step()
+
+                # Update the UI
+                self.UIUpdateArdConnection()
+                self.ardWarningLabel.setText("Sequence running")
+            else:
+                self.write_to_prospa(False)
+                self.delete_sequence_file()
+
+                self.disconnect_ard()
+
+                # Update the UI
+                self.ardWarningLabel.setText(
+                    "Error loading sequence file")
+                self.ardWarningLabel.setStyleSheet("color: red")
+                logging.error("Error loading sequence file")
+
+                # Stop the arduino worker
+                self.ardConnected = False
+                self.arduino_worker.stop()
+                self.UIUpdateArdConnection()
+
+            self.file_timer.stop()
+        else:
+            if self.ardConnected:
+                logging.info("Sequence file not found, checking again...")
+                self.file_timer.singleShot(500, self.find_file)
+
     def load_sequence(self):
         """Load a sequence from a file."""
+
         try:
             # Get the file path
             self.steps = []  # initialise steps
@@ -1257,6 +1386,25 @@ class Ui_MainWindow(object):
                 seq_save_path = raw_sequence[1].strip()
                 sequence_string = raw_sequence[0].strip()
                 i = 0
+
+                # Check for capital 'M' in the sequence string
+                self.motor_flag = False
+                if 'M' in sequence_string:
+                    self.motor_flag = True
+                    sequence_string = sequence_string.replace(
+                        'M', '')  # Remove 'M' from the sequence string
+
+                if self.motor_flag:
+                    try:
+                        if not self.motor_worker.motor.serial_connected or not self.motor_worker.calibrated:
+                            logging.error(
+                                "Sequence requires motor, but motor is not ready")
+                            return False
+                    except Exception as e:
+                        # logging.error(f"Error checking motor status: {e}")
+                        logging.error(
+                            "Sequence requires motor, but motor is not ready")
+                        return False
 
                 # Parse the sequence string
                 while i < len(sequence_string):
@@ -1282,8 +1430,23 @@ class Ui_MainWindow(object):
                         logging.error("Invalid time length in sequence file")
                         return False
 
+                    # Get motor position if motor_flag is True
+                    motor_position = 0
+                    if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
+                        i += 1
+                        motor_position_str = ""
+                        while i < len(sequence_string) and sequence_string[i].isdigit():
+                            motor_position_str += sequence_string[i]
+                            i += 1
+                        try:
+                            motor_position = int(motor_position_str)
+                        except ValueError:
+                            logging.error(
+                                "Invalid motor position in sequence file")
+                            return False
+
                     # Create a step object and add it to the list
-                    step = Step(step_type, time_length)
+                    step = Step(step_type, time_length, motor_position)
                     # logging.info("Step loaded: " + str(step.step_type) + " " + str(step.time_length))
                     self.steps.append(step)
 
@@ -1304,14 +1467,15 @@ class Ui_MainWindow(object):
                     # Simulate save button click
                     self.on_beginSaveButton_clicked()
 
-            return True  # Signal that sequence was loaded successfully
+            return True
 
         except FileNotFoundError:
             logging.error("Sequence file not found")
-            return False    # Signal that sequence file was not found
+            return False
+
         except IOError as e:
             logging.error(f"Error reading sequence file: {e}")
-            return False    # Signal error when parsing sequence file
+            return False
 
     def write_to_prospa(self, start):
         """Write the file to Prospa."""
@@ -1372,7 +1536,7 @@ class Ui_MainWindow(object):
     """Toggle valve 1"""
 
     def on_Valve1Button_clicked(self):
-        logging.debug("Valve 1 button clicked")
+        # logging.debug("Valve 1 button clicked")
         # Update the valve states
         self.update_valve_states()
         # Check if the arduino is connected
@@ -1390,7 +1554,7 @@ class Ui_MainWindow(object):
                 self.Valve1Button.setChecked(False)
 
     def on_Valve2Button_clicked(self):
-        logging.info("Valve 2 button clicked")
+        # logging.info("Valve 2 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[1]) == 0:
@@ -1405,7 +1569,7 @@ class Ui_MainWindow(object):
                 self.Valve2Button.setChecked(False)
 
     def on_Valve3Button_clicked(self):
-        logging.info("Valve 3 button clicked")
+        # logging.info("Valve 3 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[2]) == 0:
@@ -1420,7 +1584,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.setChecked(False)
 
     def on_Valve4Button_clicked(self):
-        logging.info("Valve 4 button clicked")
+        # logging.info("Valve 4 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[3]) == 0:
@@ -1435,7 +1599,7 @@ class Ui_MainWindow(object):
                 self.Valve4Button.setChecked(False)
 
     def on_Valve5Button_clicked(self):
-        logging.info("Valve 5 button clicked")
+        # logging.info("Valve 5 button clicked")
         self.update_valve_states()
         if self.ardConnected:
             if int(self.valveStates[4]) == 0:
@@ -1448,6 +1612,9 @@ class Ui_MainWindow(object):
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 2, 2, 2, 0, 2, 2, 2])
                 self.Valve5Button.setChecked(False)
+
+    def on_devValveCheckbox_clicked(self):
+        self.update_controls()
 
     '''
     def on_Valve6Button_clicked(self):
@@ -1538,14 +1705,20 @@ class Ui_MainWindow(object):
         logging.debug("Quick vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.valveStates[2] == 1 and self.valveStates[4] == 1:
+            if self.vent_flag:
                 self.quickVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 0, 2, 0, 2, 2, 2])
+                    self.previous_valve_states)
+                self.toggle_valve_controls(True)
+                self.vent_flag = False
             else:
+                self.previous_valve_states = self.valveStates.copy()
                 self.quickVentButton.setChecked(True)
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 2, 1, 2, 1, 2, 2, 2])
+                self.toggle_valve_controls(False)
+                self.quickVentButton.setEnabled(True)
+                self.vent_flag = True
         self.update_valve_states()
         self.update_valve_button_states()
 
@@ -1553,14 +1726,20 @@ class Ui_MainWindow(object):
         logging.debug("Slow vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.valveStates[2] == 1 and self.valveStates[3] == 1 and self.valveStates[4] == 1:
+            if self.vent_flag:
                 self.slowVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 0, 0, 0, 2, 2, 2])
+                    self.previous_valve_states)
+                self.toggle_valve_controls(True)
+                self.vent_flag = False
             else:
                 self.slowVentButton.setChecked(True)
+                self.previous_valve_states = self.valveStates.copy()
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 2, 1, 1, 1, 2, 2, 2])
+                self.toggle_valve_controls(False)
+                self.slowVentButton.setEnabled(True)
+                self.vent_flag = True
         self.update_valve_states()
         self.update_valve_button_states()
 
@@ -1587,12 +1766,14 @@ class Ui_MainWindow(object):
     def on_quickBubbleButton_clicked(self):
         if self.ardConnected:
             if not self.bubbleTimer.isActive():
+                self.previous_valve_states = self.valveStates.copy()
                 self.arduino_worker.set_valve_signal.emit(
                     [2, 1, 1, 1, 2, 2, 2, 2])
                 duration = int(float(self.bubbleTimeDoubleSpinBox.text())*1000)
                 self.bubbleTimer.start(duration)
                 logging.info(f"Quick bubble for {duration} ms")
                 self.quickBubbleButton.setChecked(True)
+                self.toggle_valve_controls(False)
             else:
                 logging.info("Already bubbling")
                 self.quickBubbleButton.setChecked(True)
@@ -1607,6 +1788,8 @@ class Ui_MainWindow(object):
                 self.previous_valve_states)
             self.update_valve_states()
             self.update_valve_button_states()
+        if self.quickBubbleButton.isChecked():
+            self.quickBubbleButton.setChecked(False)
         # Enable all controls
         self.toggle_valve_controls(True)
         # Stop and disconnect the timer
@@ -1734,7 +1917,7 @@ class Ui_MainWindow(object):
             self.saving = False
             return False
 
-    def setup_watchdog(self):
+    def setup_arduino_watchdog(self):
         self.watchdog = QtCore.QTimer()
         self.watchdog.timeout.connect(self.check_arduino_state)
         self.watchdog.start(500)
@@ -1746,53 +1929,134 @@ class Ui_MainWindow(object):
         if self.arduino_worker.controller.serial_connected == False:
             self.disconnect_ard()
 
-    def on_connectMotorButton_clicked(self):
-        logging.info("Connect motor button clicked")
-        if self.motorConnected:
-            self.motorConnected = False
+    def setup_motor_watchdog(self):
+        self.motor_watchdog = QtCore.QTimer()
+        self.motor_watchdog.timeout.connect(self.check_motor_state)
+        self.motor_watchdog.start(500)
+
+    def check_motor_state(self):
+        # logging.debug("Checking motor connection")
+        if self.motor_worker.is_connected() == False:   # type: ignore
+            self.motor_connected = False
             self.UIUpdateMotorConnection()
-            if self.motorController != None:
-                self.motorController.serial_connected = False
-                self.motorController.stop()
-                # self.motorController = None
-        else:
-            self.motorController = MotorController(
-                port=self.ardCOMPortSpinBox.value())
+            self.motor_worker.running = False   # type: ignore
+
+    def on_motorAscentButton_clicked(self):
+        logging.info("Motor Ascent button clicked")
+        if self.motor_connected:
+            self.motor_worker.ascent_signal.emit()
+
+    def on_motorToTopButton_clicked(self):
+        logging.info("Motor To Top button clicked")
+        if self.motor_connected:
+            self.motor_worker.top_signal.emit()
+
+    def on_motorConnectButton_clicked(self):
+        # logging.info("Connect motor button clicked")
+        if self.motor_connected:
+            logging.info("Disconnecting motor")
+            self.motor_connected = False
             try:
-                self.motorController.start()
-                if self.motorController.serial_connected:
-                    self.motorConnected = True
-                    logging.info("Motor connected")
-                    self.UIUpdateMotorConnection()
-                else:
-                    logging.info("Motor failed to connect")
-                    self.motorConnected = False
-                    self.motorController.stop()
-                    self.motorController = None
-                    self.UIUpdateMotorConnection()
+                if getattr(self, 'motor_worker', None) is not None:
+                    self.motor_worker.shutdown_signal.emit()
+                    # self.motor_worker = None
+                    self.motor_worker.running = False
+                    self.motor_worker.timer.stop()
             except Exception as e:
-                logging.error(e)
-                self.motorConnected = False
-                self.motorController.stop()
-                self.motorController = None
-                self.UIUpdateMotorConnection()
+                pass
 
-    def on_calibrateMotorButton_clicked(self):
+            self.UIUpdateMotorConnection()
+        else:
+            logging.info("Connecting motor")
+            logging.info(f"Motor COM port: {self.motorCOMPortSpinBox.value()}")
+            self.motor_worker = MotorWorker(
+                parent=self, port=self.motorCOMPortSpinBox.value())
+            self.motor_worker.connect()
+
+            self.connect_motor_signals()    # Connect the worker signals to appropriate slots
+
+            # Start the arduino time that read pressure readings every 500ms
+            self.motor_worker.start_timer()
+
+            # Check if the connection was successful with 5 sec timeout
+            timeout = 5  # Timeout in seconds
+            start_time = time.time()
+            while True:
+                # Check if the timeout has been reached
+                if (time.time() - start_time > timeout) or self.motor_worker.is_connected() == True:
+                    break
+                # Sleep for a short duration to prevent high CPU usage
+                time.sleep(0.1)
+
+            # Update the UI based on the connection status
+            if self.motor_worker.is_connected():
+                logging.info("Motor connected")
+                self.motor_connected = True
+                # Start the watchdog timer that updates arduino connection status
+                self.setup_motor_watchdog()
+            else:
+                logging.error("Motor connection failed")
+                self.motor_connected = False
+                self.motor_worker.shutdown_signal.emit()
+                self.ardWarningLabel.setText("Connection failed")
+                self.ardWarningLabel.setStyleSheet("color: red")
+        self.UIUpdateMotorConnection()
+
+    def on_motorCalibrateButton_clicked(self):
         logging.info("Calibrate motor button clicked")
-        if self.motorConnected:
-            self.motorController.calibrate()
+        if self.motor_connected:
+            self.motor_worker.calibrate_signal.emit()
 
-    def on_stopMotorButton_clicked(self):
+    def on_motorStopButton_clicked(self):
         logging.info("Stop motor button clicked")
-        if self.motorConnected:
-            self.motorController.stop()
+        if self.motor_connected:
+            self.motor_worker.shutdown_signal.emit()
 
-    def on_moveToTargetButton_clicked(self):
+    def on_motorMoveToTargetButton_clicked(self):
         logging.info("Move to target button clicked")
-        if self.motorConnected:
-            targetpos = float(self.targetMotorPosEdit.text())
-            self.motorController.move_to_target(
-                float(self.targetMotorPosEdit.text()))
+        if self.motor_connected:
+            try:
+                # TODO: convert from mm to steps
+                targetpos = int(self.targetMotorPosEdit.text())
+                self.motor_worker.command_signal.emit(targetpos)
+            except ValueError:
+                logging.error("Invalid target position")
+
+    def on_motorMacro1Button_clicked(self):
+        logging.info("Motor macro 1 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["1"]["Position"])
+
+    def on_motorMacro2Button_clicked(self):
+        logging.info("Motor macro 2 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["2"]["Position"])
+
+    def on_motorMacro3Button_clicked(self):
+        logging.info("Motor macro 3 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["3"]["Position"])
+
+    def on_motorMacro4Button_clicked(self):
+        logging.info("Motor macro 4 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["4"]["Position"])
+
+    def on_motorMacro5Button_clicked(self):
+        logging.info("Motor macro 5 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["5"]["Position"])
+
+    def on_motorMacro6Button_clicked(self):
+        logging.info("Motor macro 6 button clicked")
+        if self.motor_connected:
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["6"]["Position"])
 
     def add_step(self, step_type, time_length):
         step = Step(step_type, time_length)
@@ -1808,7 +2072,7 @@ class Ui_MainWindow(object):
                   step.time_length}")
 
     def edit_motor_macro(self):
-        pass
+        self.motor_macro_editor.exec()
 
     def edit_valve_macro(self):
         # dialog = ValveMacroEditor(self)
@@ -1852,11 +2116,19 @@ class Ui_MainWindow(object):
             # self.selectSavePathButton.setEnabled(True)
             if self.selectedMode == 0:
                 # Toggle valve controls
-                self.Valve1Button.setEnabled(True)
-                self.Valve2Button.setEnabled(True)
-                self.Valve3Button.setEnabled(True)
-                self.Valve4Button.setEnabled(True)
-                self.Valve5Button.setEnabled(True)
+                self.devValveCheckbox.setEnabled(True)
+                if self.devValveCheckbox.isChecked():
+                    self.Valve1Button.setEnabled(True)
+                    self.Valve2Button.setEnabled(True)
+                    self.Valve3Button.setEnabled(True)
+                    self.Valve4Button.setEnabled(True)
+                    self.Valve5Button.setEnabled(True)
+                else:
+                    self.Valve1Button.setEnabled(False)
+                    self.Valve2Button.setEnabled(False)
+                    self.Valve3Button.setEnabled(False)
+                    self.Valve4Button.setEnabled(False)
+                    self.Valve5Button.setEnabled(False)
                 # self.Valve6Button.setEnabled(True)
                 # self.Valve7Button.setEnabled(True)
                 # self.Valve8Button.setEnabled(True)
@@ -1876,6 +2148,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.show()
                 self.Valve4Button.show()
                 self.Valve5Button.show()
+                self.devValveCheckbox.show()
                 self.currentStepTimeEdit.hide()
                 self.currentStepTypeEdit.hide()
                 self.stepsRemainingLabel.hide()
@@ -1889,6 +2162,7 @@ class Ui_MainWindow(object):
                 self.Valve3Button.setEnabled(False)
                 self.Valve4Button.setEnabled(False)
                 self.Valve5Button.setEnabled(False)
+                self.devValveCheckbox.setEnabled(False)
                 # self.Valve6Button.setEnabled(False)
                 # self.Valve7Button.setEnabled(False)
                 # self.Valve8Button.setEnabled(False)
@@ -1909,6 +2183,7 @@ class Ui_MainWindow(object):
                     self.Valve3Button.hide()
                     self.Valve4Button.hide()
                     self.Valve5Button.hide()
+                    self.devValveCheckbox.hide()
                     self.currentStepTimeEdit.show()
                     self.currentStepTypeEdit.show()
                     self.stepsRemainingLabel.show()
@@ -1927,6 +2202,7 @@ class Ui_MainWindow(object):
             self.Valve3Button.setEnabled(False)
             self.Valve4Button.setEnabled(False)
             self.Valve5Button.setEnabled(False)
+            self.devValveCheckbox.setEnabled(False)
             # self.Valve6Button.setEnabled(False)
             # self.Valve7Button.setEnabled(False)
             # self.Valve8Button.setEnabled(False)
@@ -1956,9 +2232,57 @@ class Ui_MainWindow(object):
         else:
             self.savePathEdit.setEnabled(True)
             self.selectSavePathButton.setEnabled(True)
+        if self.motor_connected:
+            self.motorConnectButton.setText("Disconnect")
+            if self.motor_worker.calibrated:
+                self.motorCalibrateButton.setEnabled(False)
+                self.motorWarningLabel.setText("Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: green")
+                self.toggle_motor_controls(True)
+            else:
+                self.motorCalibrateButton.setEnabled(True)
+                self.motorWarningLabel.setText("Not Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: red")
+                self.toggle_motor_controls(False)
+        else:
+            self.motorConnectButton.setText("Connect")
+            self.motorWarningLabel.setText("Not Connected")
+            self.motorWarningLabel.setStyleSheet("color: red")
+            self.motorCalibrateButton.setEnabled(False)
+            self.toggle_motor_controls(False)
 
     def UIUpdateMotorConnection(self):
-        pass
+        if self.motor_connected:
+            self.motorConnectButton.setText("Disconnect")
+            if self.motor_worker.calibrated:
+                self.motorCalibrateButton.setEnabled(False)
+                self.motorWarningLabel.setText("Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: green")
+                self.toggle_motor_controls(True)
+            else:
+                self.motorCalibrateButton.setEnabled(True)
+                self.motorWarningLabel.setText("Not Calibrated")
+                self.motorWarningLabel.setStyleSheet("color: red")
+                self.toggle_motor_controls(False)
+        else:
+            self.motorConnectButton.setText("Connect")
+            self.motorWarningLabel.setText("Not Connected")
+            self.motorWarningLabel.setStyleSheet("color: red")
+            self.motorCalibrateButton.setEnabled(False)
+            self.toggle_motor_controls(False)
+
+    def toggle_motor_controls(self, state):
+        self.motorStopButton.setEnabled(state)
+        self.motorMoveToTargetButton.setEnabled(state)
+        # self.targetMotorPosEdit.setEnabled(state)
+        self.motorMacro1Button.setEnabled(state)
+        self.motorMacro2Button.setEnabled(state)
+        self.motorMacro3Button.setEnabled(state)
+        self.motorMacro4Button.setEnabled(state)
+        self.motorMacro5Button.setEnabled(state)
+        self.motorMacro6Button.setEnabled(state)
+        self.motorAscentButton.setEnabled(state)
+        self.motorToTopButton.setEnabled(state)
 
     def connect_arduino_signals(self):
         self.arduino_worker.data_signal.connect(
@@ -1970,11 +2294,20 @@ class Ui_MainWindow(object):
         self.arduino_worker.get_valve_signal.connect(
             self.arduino_worker.get_valve_states)
 
+    def connect_motor_signals(self):
+        self.motor_worker.command_signal.connect(
+            self.motor_worker.move_to_target)
+        self.motor_worker.shutdown_signal.connect(self.motor_worker.stop)
+        self.motor_worker.calibrate_signal.connect(self.motor_worker.calibrate)
+        self.motor_worker.ascent_signal.connect(self.motor_worker.ascent)
+        self.motor_worker.top_signal.connect(self.motor_worker.to_top)
+
 
 class Step:
-    def __init__(self, step_type, time_length):
+    def __init__(self, step_type, time_length, motor_position=0):
         self.step_type = step_type
         self.time_length = time_length
+        self.motor_position = motor_position
 
 
 class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
@@ -2002,21 +2335,21 @@ class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
         super().close()
 
 
-class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
+class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
 
-        self.setWindowTitle("Valve Macro Editor")
-        self.setGeometry(100, 100, 650, 190)
-        self.setFixedSize(500, 180)
+        self.setWindowTitle("Motor Macro Editor")
+        self.setGeometry(100, 100, 400, 170)
+        self.setFixedSize(400, 170)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
-        self.table.setRowCount(4)
-        self.table.setColumnCount(7)
+        self.table.setRowCount(6)
+        self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(
-            ["Macro No.", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
+            ["Macro No.", "Label", "Position"])
 
         # Set layout
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -2032,8 +2365,138 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
+        # Resize the Label column
+        self.table.setColumnWidth(1, 130)  # Label column is now index 1
 
-        self.table.setColumnWidth(6, 80)
+    def load_data(self):
+        json_path = os.path.join("C:\\ssbubble", 'motor_macro_data.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                for i, macro in enumerate(data):
+                    # Macro No.
+                    item = QtWidgets.QTableWidgetItem(macro["Macro No."])
+                    # Make the item read-only
+                    item.setFlags(item.flags() & ~
+                                  QtCore.Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(i, 0, item)
+                    # Label
+                    label_text = macro.get("Label", "")
+                    label_item = QtWidgets.QTableWidgetItem(label_text)
+                    self.table.setItem(i, 1, label_item)
+                    # Position SpinBox
+                    position_spinbox = QtWidgets.QSpinBox()
+                    # Adjust range as needed
+                    position_spinbox.setRange(0, 2500000)
+                    position_val = macro.get("Position", 0)   # Default to 0
+                    position_spinbox.setValue(position_val)
+                    self.table.setCellWidget(i, 2, position_spinbox)
+            except (json.JSONDecodeError, KeyError, IndexError):
+                self.set_default_values()
+        else:
+            self.set_default_values()
+
+    def set_default_values(self):
+        for i in range(6):
+            # Macro No.
+            item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
+            # Make the item read-only
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 0, item)
+            # Label
+            label_item = QtWidgets.QTableWidgetItem(f"Motor Macro {i+1}")
+            self.table.setItem(i, 1, label_item)
+            # Position SpinBox
+            position_spinbox = QtWidgets.QSpinBox()
+            position_spinbox.setRange(0, 2500000)  # Adjust range as needed
+            position_spinbox.setValue(0)  # Default position value
+            self.table.setCellWidget(i, 2, position_spinbox)
+
+    def get_macro_data(self):
+        data = []
+        for row in range(self.table.rowCount()):
+            macro_number = self.table.item(row, 0).text()   # type: ignore
+            label_text = self.table.item(row, 1).text()     # type: ignore
+            position_spinbox = self.table.cellWidget(row, 2)
+            # Get Position value
+            position_value = position_spinbox.value() if position_spinbox else 0   # type: ignore
+            data.append({
+                "Macro No.": macro_number,
+                "Label": label_text,
+                "Position": position_value
+            })
+        return data
+
+    def get_macro_data_dict(self):
+        data = {}
+        for row in range(self.table.rowCount()):
+            macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
+            label_text = self.table.item(row, 1).text()        # type: ignore
+            position_spinbox = self.table.cellWidget(row, 2)
+            position_value = position_spinbox.value() if position_spinbox else 0   # type: ignore
+            data[macro_number] = {
+                "Label": label_text,
+                "Position": position_value
+            }
+        return data
+
+    def closeEvent(self, event):
+        # Update parent's macro_settings with the new data
+        self.parent.motor_macro_settings = self.get_macro_data_dict()
+        # Save data to JSON
+        data = self.get_macro_data()
+        json_path = os.path.join("C:\\ssbubble", 'motor_macro_data.json')
+        json_dir = os.path.dirname(json_path)
+
+        # Ensure the directory exists
+        if not os.path.exists(json_dir):
+            os.makedirs(json_dir)
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=4)
+
+        # Update the main window's buttons with the new labels
+        for i in range(6):
+            label = self.parent.motor_macro_settings[str(i+1)]['Label']
+            getattr(self.parent, f'motorMacro{i+1}Button').setText(label)
+
+        super().closeEvent(event)
+
+
+class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+
+        self.setWindowTitle("Valve Macro Editor")
+        self.setGeometry(100, 100, 650, 190)
+        self.setFixedSize(623, 170)  # Adjusted width to accommodate new column
+
+        # Create a table widget
+        self.table = QtWidgets.QTableWidget(self)
+        self.table.setRowCount(4)
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(
+            ["Macro No.", "Label", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
+
+        # Set layout
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(self.table)
+        self.setLayout(self.mainLayout)
+
+        # Determine the directory of the executable
+        self.executable_dir = os.path.dirname(sys.executable) if getattr(
+            sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+        # Load data from JSON file if it exists
+        self.load_data()
+
+        # Resize all columns to fit
+        self.table.resizeColumnsToContents()
+        # Resize the Label column
+        self.table.setColumnWidth(1, 120)  # Label column is now index 1
+        # Resize the Timer column
+        self.table.setColumnWidth(7, 80)  # Timer column is now index 7
 
     def load_data(self):
         json_path = os.path.join("C:\\ssbubble", 'valve_macro_data.json')
@@ -2048,9 +2511,14 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     item.setFlags(item.flags() & ~
                                   QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
+                    # Label
+                    label_text = macro.get("Label", "")
+                    label_item = QtWidgets.QTableWidgetItem(label_text)
+                    self.table.setItem(i, 1, label_item)
                     # Valve States
                     # Only process the first 5 values
-                    for j, state in enumerate(macro["Valves"][:5], start=1):
+                    # start from column 2
+                    for j, state in enumerate(macro["Valves"][:5], start=2):
                         combo = QtWidgets.QComboBox()
                         combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
@@ -2062,7 +2530,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     timer_val = macro.get("Timer", 1.0)   # Default to 1 second
                     timer_spinbox.setValue(timer_val)
                     # Timer column index is 7
-                    self.table.setCellWidget(i, 6, timer_spinbox)
+                    self.table.setCellWidget(i, 7, timer_spinbox)
             except (json.JSONDecodeError, KeyError, IndexError):
                 self.set_default_values()
         else:
@@ -2075,8 +2543,11 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             # Make the item read-only
             item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 0, item)
+            # Label
+            label_item = QtWidgets.QTableWidgetItem("")
+            self.table.setItem(i, 1, label_item)
             # Valve States
-            for j in range(1, 6):  # Columns 1 to 5 for V1 to V5
+            for j in range(2, 7):  # Columns 2 to 6 for V1 to V5
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed", "Ignore"])
                 combo.setCurrentIndex(1)  # Default to "Closed"
@@ -2086,24 +2557,24 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             timer_spinbox.setRange(0.1, 3600)
             timer_spinbox.setSingleStep(0.1)
             timer_spinbox.setValue(1.0)  # Default timer value
-            self.table.setCellWidget(i, 6, timer_spinbox)
+            self.table.setCellWidget(i, 7, timer_spinbox)
 
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()   # type: ignore
-            valve_states = [self.table.cellWidget(  # V1 to V5
-                row, col).currentText() for col in range(1, 6)]  # type: ignore
-
-            # Add 2 for the last 3 valves
+            label_text = self.table.item(row, 1).text()     # type: ignore
+            valve_states = [self.table.cellWidget(
+                # V1 to V5 #type: ignore
+                row, col).currentText() for col in range(2, 7)]
+            # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
-            timer_spinbox = self.table.cellWidget(
-                row, 6)   # Default to 1 second
-
+            timer_spinbox = self.table.cellWidget(row, 7)
             # Get Timer value
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0   # type: ignore
             data.append({
                 "Macro No.": macro_number,
+                "Label": label_text,
                 "Valves": valve_states,
                 "Timer": timer_value
             })
@@ -2113,17 +2584,19 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         data = {}
         for row in range(self.table.rowCount()):
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
-            valve_states = [self.table.cellWidget(              # V1 to V5
-                row, col).currentText() for col in range(1, 6)]  # type: ignore
+            label_text = self.table.item(row, 1).text()        # type: ignore
+            valve_states = [self.table.cellWidget(
+                # V1 to V5 #type: ignore
+                row, col).currentText() for col in range(2, 7)]
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
             valve_states_numeric.extend([2, 2, 2])
             # Get Timer value
-            timer_spinbox = self.table.cellWidget(row, 6)
-            # Default to 1 second    # type: ignore
+            timer_spinbox = self.table.cellWidget(row, 7)
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0   # type: ignore
             data[macro_number] = {
+                "Label": label_text,
                 "Valves": valve_states_numeric,
                 "Timer": timer_value
             }
@@ -2142,6 +2615,12 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             os.makedirs(json_dir)
         with open(json_path, 'w') as f:
             json.dump(data, f, indent=4)
+
+        # Update the main window's buttons with the new labels
+        for i in range(4):
+            getattr(self.parent, f'valveMacro{
+                    i+1}Button').setText(self.parent.macro_settings[str(i+1)]['Label'])
+
         super().closeEvent(event)
 
 
@@ -2149,6 +2628,8 @@ class RealTimePlot(FigureCanvasQTAgg):
     def __init__(self, parent):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
+
+        self.max_points = 500
 
         # Initialize data
         self.p1_data = []
@@ -2167,8 +2648,8 @@ class RealTimePlot(FigureCanvasQTAgg):
         self.line4, = self.ax.plot([], [], lw=2, color="purple")
 
         # Set plot limits and labels
-        self.ax.set_xlim(0, 100)
-        self.ax.set_ylim(0, 10)
+        self.ax.set_xlim(0, self.max_points)
+        self.ax.set_ylim(0, 11)
         self.ax.set_xlabel('Time')
         self.ax.set_ylabel('mBar')
 
@@ -2177,19 +2658,42 @@ class RealTimePlot(FigureCanvasQTAgg):
         if pressure_values:
             # Update x_data and y_data with the newest value
             # Append new x (time) point
-            self.x_data.append(len(self.x_data))
+            if self.x_data == []:
+                self.x_data.append(0)
+            else:
+                self.x_data.append(self.x_data[-1] + 1)
+
+            # Limit the x_data size
+            if len(self.x_data) > self.max_points:
+                self.x_data = self.x_data[-self.max_points:]
 
             # Convert and append new y (pressure) points
             for i in range(4):
                 pressure_values[i] = (
                     float(pressure_values[i]) - 203.53) / 0.8248 / 100
-                getattr(self, f'p{i+1}_data').append(pressure_values[i])
+                p_data = getattr(self, f'p{i+1}_data')
+                p_data.append(pressure_values[i])
+
+                # Limit the p_data size
+                if len(p_data) > self.max_points:
+                    setattr(self, f'p{i+1}_data', p_data[-self.max_points:])
 
             # check this for time lag
             if self.parent.saving:
                 with open(self.parent.save_path, "a") as f:
                     f.write(f"{time.strftime('%H:%M:%S')}, {pressure_values[0]}, {
                             pressure_values[1]}, {pressure_values[2]}, {pressure_values[3]}\n")
+
+            # Check if venting is complete
+            if self.parent.vent_flag:
+                logging.info(f"Pressure 3: {pressure_values[2]}")
+                if pressure_values[2] < 0.1:
+                    self.parent.arduino_worker.set_valve_signal.emit(
+                        self.parent.previous_valve_states)
+                    self.parent.vent_flag = False
+                    self.parent.quickVentButton.setChecked(False)
+                    self.parent.slowVentButton.setChecked(False)
+                    self.parent.toggle_valve_controls(True)
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
@@ -2210,8 +2714,10 @@ class RealTimePlot(FigureCanvasQTAgg):
                 self.line4.set_data([], [])
 
             # Adjust limits if necessary
-            if len(self.x_data) > 100:
-                self.ax.set_xlim(self.x_data[-100], self.x_data[-1])
+            if len(self.x_data) >= self.max_points:
+                self.ax.set_xlim(self.x_data[0], self.x_data[-1])
+            # Ensure y lim
+            self.ax.set_ylim(0, 11)
 
             # Redraw the canvas with the new data
             self.draw()
@@ -2239,7 +2745,7 @@ class ArduinoWorker(QtCore.QThread):
         self.controller.start()
 
     def start_timer(self):
-        self.timer.start(500)
+        self.timer.start(self.parent.valveCheckInterval)
 
     def stop_timer(self):
         self.timer.stop()
@@ -2294,25 +2800,94 @@ class ArduinoWorker(QtCore.QThread):
 
 
 class MotorWorker(QtCore.QThread):
-    command_signal = QtCore.pyqtSignal(str)
+    command_signal = QtCore.pyqtSignal(int)
+    shutdown_signal = QtCore.pyqtSignal()
+    calibrate_signal = QtCore.pyqtSignal()
+    ascent_signal = QtCore.pyqtSignal()
+    top_signal = QtCore.pyqtSignal()
 
-    def __init__(self, port):
+    def __init__(self, parent, port):
         super().__init__()
         self.motor = MotorController(port=port)
-        self.serial_connected = False
-
-    def stop(self):
-        """Stop the worker and the Arduino controller."""
+        self.parent = parent
         self.running = False
-        self.motor.stop()
-        self.quit()
-        self.wait()
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.poll_position)
+        self.calibrated = False
+        self.mutex = QtCore.QMutex()
+        self.top_position = -100
 
-    @QtCore.pyqtSlot(str)
-    def handle_command(self, command):
+    @QtCore.pyqtSlot()
+    def stop(self):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                self.motor.shutdown()
+
+    @QtCore.pyqtSlot()
+    def calibrate(self):
         """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
-        if self.motor.serial_connected:
-            self.motor.send_command(command)
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                self.motor.calibrate()
+                # logging.info("Calibrating motor, please wait")
+
+    def poll_position(self):
+        # logging.info("Polling motor position")
+        with QtCore.QMutexLocker(self.mutex):
+            if self.running:
+                if self.motor.serial_connected:
+                    self.calibrated = self.motor.check_calibrated()
+                    if self.calibrated:
+                        if self.top_position == -100:
+                            self.top_position = self.motor.get_top_position()
+                            logging.info(f"Top position: {self.top_position}")
+                        position = self.motor.get_current_position()
+                        position = self.steps_to_mm(position)
+                        logging.info(f"Current motor position: {position}")
+                        self.parent.curMotorPosEdit.setText(str(position))
+                self.parent.UIUpdateMotorConnection()
+            else:
+                self.timer.stop()
+                self.stop()
+
+    def is_connected(self):
+        return self.motor.serial_connected
+
+    @QtCore.pyqtSlot(int)
+    def move_to_target(self, target):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info(f"Moving motor to position {target}")
+                target = self.mm_to_steps(target)
+                self.motor.move_to_position(target)
+
+    def start_timer(self):
+        self.timer.start(500)
+
+    def connect(self):
+        self.motor.start()
+        self.running = True
+
+    @QtCore.pyqtSlot()
+    def ascent(self):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info("Ascent")
+                self.motor.ascent()
+
+    @QtCore.pyqtSlot()
+    def to_top(self):
+        with QtCore.QMutexLocker(self.mutex):
+            if self.motor.serial_connected:
+                logging.info("To Top")
+                self.motor.to_top()
+
+    def steps_to_mm(self, steps):
+        # 1mm = 1600 steps
+        return steps / 1600
+
+    def mm_to_steps(self, mm):
+        return mm * 1600
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -2341,10 +2916,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
 
-        if self.arduino_worker:
-            self.arduino_worker.stop()
-            if self.verbosity:
-                print("Controller stopped")
+        try:
+            if self.arduino_worker:
+                self.arduino_worker.stop()
+                if self.verbosity:
+                    print("Controller stopped")
+        except AttributeError:
+            pass
         if self.verbosity:
             print("Application is closing...")
 
