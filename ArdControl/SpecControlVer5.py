@@ -2569,8 +2569,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()   # type: ignore
             label_text = self.table.item(row, 1).text()     # type: ignore
             valve_states = [self.table.cellWidget(
-                # V1 to V5 #type: ignore
-                row, col).currentText() for col in range(2, 7)]
+                # V1 to V5
+                row, col).currentText() for col in range(2, 7)] #type: ignore
             # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
             timer_spinbox = self.table.cellWidget(row, 7)
@@ -2590,8 +2590,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             label_text = self.table.item(row, 1).text()        # type: ignore
             valve_states = [self.table.cellWidget(
-                # V1 to V5 #type: ignore
-                row, col).currentText() for col in range(2, 7)]
+                # V1 to V5 
+                row, col).currentText() for col in range(2, 7)] #type: ignore
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
