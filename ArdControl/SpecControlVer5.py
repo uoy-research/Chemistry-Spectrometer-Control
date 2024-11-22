@@ -2819,7 +2819,7 @@ class MotorWorker(QtCore.QThread):
         self.timer.timeout.connect(self.poll_position)
         self.calibrated = False
         self.mutex = QtCore.QMutex()
-        self.top_position = -100
+        self.top_position = "INIT"
 
     @QtCore.pyqtSlot()
     def stop(self):
@@ -2842,10 +2842,11 @@ class MotorWorker(QtCore.QThread):
                 if self.motor.serial_connected:
                     self.calibrated = self.motor.check_calibrated()
                     if self.calibrated:
-                        if self.top_position == -100:
+                        if self.top_position == "INIT":
                             self.top_position = self.motor.get_top_position()
                             logging.info(f"Top position: {self.top_position}")
                         position = self.motor.get_current_position()
+                        position = int(self.top_position) - position
                         position = self.steps_to_mm(position)
                         logging.info(f"Current motor position: {position}")
                         self.parent.curMotorPosEdit.setText(str(position))
