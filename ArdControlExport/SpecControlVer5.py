@@ -1270,7 +1270,7 @@ class Ui_MainWindow(object):
                             self.valve_settings[self.current_step_type])
 
                         # Update the motor position if motor_flag is True
-                        if self.motor_flag and self.current_step.motor_position != 0:
+                        if self.motor_flag and self.current_step.motor_position >= 0:
                             self.motor_worker.command_signal.emit(
                                 self.current_step.motor_position)
 
@@ -1435,14 +1435,18 @@ class Ui_MainWindow(object):
                     if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
                         i += 1
                         motor_position_str = ""
+                        # Check for negative sign
+                        if i < len(sequence_string) and sequence_string[i] == '-':
+                            motor_position_str += sequence_string[i]
+                            i += 1
+                        # Collect digits
                         while i < len(sequence_string) and sequence_string[i].isdigit():
                             motor_position_str += sequence_string[i]
                             i += 1
                         try:
                             motor_position = int(motor_position_str)
                         except ValueError:
-                            logging.error(
-                                "Invalid motor position in sequence file")
+                            logging.error("Invalid motor position in sequence file")
                             return False
 
                     # Create a step object and add it to the list
