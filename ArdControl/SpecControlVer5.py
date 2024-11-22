@@ -73,19 +73,19 @@ class Ui_MainWindow(object):
             "1": {
                 "Label": "Motor Macro 1",
                 "Position": 0
-                },
+            },
             "2": {
                 "Label": "Motor Macro 2",
                 "Position": 0
-                },
+            },
             "3": {
                 "Label": "Motor Macro 3",
                 "Position": 0
-                },
+            },
             "4": {
                 "Label": "Motor Macro 4",
                 "Position": 0
-                }
+            }
         }
 
         # Initialise the prev valve states
@@ -349,7 +349,8 @@ class Ui_MainWindow(object):
         self.ValveLabel.setObjectName("ValveLabel")
         self.valveLayout.addWidget(self.ValveLabel, 0, 0, 1, 1)
 
-        self.devValveCheckbox = QtWidgets.QCheckBox(parent=self.gridLayoutWidget)
+        self.devValveCheckbox = QtWidgets.QCheckBox(
+            parent=self.gridLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(9)
         self.devValveCheckbox.setFont(font)
@@ -357,7 +358,8 @@ class Ui_MainWindow(object):
         self.devValveCheckbox.setObjectName("devValveCheckbox")
         self.devValveCheckbox.setChecked(False)
         self.devValveCheckbox.setText("Enable\nControls")
-        self.valveLayout.addWidget(self.devValveCheckbox, 1, 0, 1, 1, QtCore.Qt.AlignmentFlag.AlignHCenter)
+        self.valveLayout.addWidget(
+            self.devValveCheckbox, 1, 0, 1, 1, QtCore.Qt.AlignmentFlag.AlignHCenter)
 
         self.showValvesCheckbox = QtWidgets.QCheckBox(
             parent=self.gridLayoutWidget)
@@ -979,7 +981,8 @@ class Ui_MainWindow(object):
         self.motorCalibrateButton.clicked.connect(
             self.on_motorCalibrateButton_clicked)
         self.motorStopButton.clicked.connect(self.on_motorStopButton_clicked)
-        self.motorAscentButton.clicked.connect(self.on_motorAscentButton_clicked)
+        self.motorAscentButton.clicked.connect(
+            self.on_motorAscentButton_clicked)
         self.motorToTopButton.clicked.connect(self.on_motorToTopButton_clicked)
         self.motorMoveToTargetButton.clicked.connect(
             self.on_motorMoveToTargetButton_clicked)
@@ -991,7 +994,6 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         self.update_controls()
-        
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -1091,13 +1093,15 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Steps: "))
         self.stepsTimeRemainingLabel.setText(
             _translate("MainWindow", "Time: "))
-        
+
         # Update the main window's buttons with the new labels
         for i in range(4):
-            getattr(self, f'valveMacro{i+1}Button').setText(self.macro_settings[str(i+1)]['Label'])
+            getattr(self, f'valveMacro{
+                    i+1}Button').setText(self.macro_settings[str(i+1)]['Label'])
 
         for i in range(6):
-            getattr(self, f'motorMacro{i+1}Button').setText(self.motor_macro_settings[str(i+1)]['Label'])
+            getattr(self, f'motorMacro{
+                    i+1}Button').setText(self.motor_macro_settings[str(i+1)]['Label'])
 
     def disconnect_ard(self):
         try:
@@ -1202,7 +1206,8 @@ class Ui_MainWindow(object):
                     self.last_update_time = current_time
 
                 # Calculate elapsed time in milliseconds
-                elapsed_time = (current_time - self.last_update_time) * 1000  # Convert to milliseconds
+                # Convert to milliseconds
+                elapsed_time = (current_time - self.last_update_time) * 1000
 
                 # Update last_update_time
                 self.last_update_time = current_time
@@ -1263,14 +1268,15 @@ class Ui_MainWindow(object):
                         # Update the valves with new step state
                         self.arduino_worker.set_valve_signal.emit(
                             self.valve_settings[self.current_step_type])
-                        
+
                         # Update the motor position if motor_flag is True
                         if self.motor_flag and self.current_step.motor_position != 0:
-                            self.motor_worker.command_signal.emit(self.current_step.motor_position)
+                            self.motor_worker.command_signal.emit(
+                                self.current_step.motor_position)
 
                         # Log the step type and time
                         logging.info(f"Step {self.current_step_type} for {
-                                    self.current_step_time} ms")
+                            self.current_step_time} ms")
             else:
                 # If motor is not ready, stop the timer and reset all labels
                 logging.error("Motor not connected and calibrated")
@@ -1319,7 +1325,7 @@ class Ui_MainWindow(object):
         self.file_timer.timeout.connect(self.find_file)
         if os.path.exists(r"C:\ssbubble\sequence.txt"):
             logging.info("Sequence file found")
-            if(self.load_sequence()):
+            if (self.load_sequence()):
                 logging.info("Sequence loaded successfully")
                 logging.info("Starting sequence")
                 # Calculate time to show on the labels
@@ -1354,13 +1360,12 @@ class Ui_MainWindow(object):
                 self.ardConnected = False
                 self.arduino_worker.stop()
                 self.UIUpdateArdConnection()
-                
+
             self.file_timer.stop()
         else:
             if self.ardConnected:
                 logging.info("Sequence file not found, checking again...")
                 self.file_timer.singleShot(500, self.find_file)
-            
 
     def load_sequence(self):
         """Load a sequence from a file."""
@@ -1386,16 +1391,19 @@ class Ui_MainWindow(object):
                 self.motor_flag = False
                 if 'M' in sequence_string:
                     self.motor_flag = True
-                    sequence_string = sequence_string.replace('M', '')  # Remove 'M' from the sequence string
+                    sequence_string = sequence_string.replace(
+                        'M', '')  # Remove 'M' from the sequence string
 
                 if self.motor_flag:
                     try:
                         if not self.motor_worker.motor.serial_connected or not self.motor_worker.calibrated:
-                            logging.error("Sequence requires motor, but motor is not ready")
+                            logging.error(
+                                "Sequence requires motor, but motor is not ready")
                             return False
                     except Exception as e:
                         # logging.error(f"Error checking motor status: {e}")
-                        logging.error("Sequence requires motor, but motor is not ready")
+                        logging.error(
+                            "Sequence requires motor, but motor is not ready")
                         return False
 
                 # Parse the sequence string
@@ -1421,7 +1429,7 @@ class Ui_MainWindow(object):
                     if time_length <= 0:
                         logging.error("Invalid time length in sequence file")
                         return False
-                    
+
                     # Get motor position if motor_flag is True
                     motor_position = 0
                     if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
@@ -1433,7 +1441,8 @@ class Ui_MainWindow(object):
                         try:
                             motor_position = int(motor_position_str)
                         except ValueError:
-                            logging.error("Invalid motor position in sequence file")
+                            logging.error(
+                                "Invalid motor position in sequence file")
                             return False
 
                     # Create a step object and add it to the list
@@ -1467,7 +1476,6 @@ class Ui_MainWindow(object):
         except IOError as e:
             logging.error(f"Error reading sequence file: {e}")
             return False
-
 
     def write_to_prospa(self, start):
         """Write the file to Prospa."""
@@ -1699,7 +1707,8 @@ class Ui_MainWindow(object):
         if self.ardConnected:
             if self.vent_flag:
                 self.quickVentButton.setChecked(False)
-                self.arduino_worker.set_valve_signal.emit(self.previous_valve_states)
+                self.arduino_worker.set_valve_signal.emit(
+                    self.previous_valve_states)
                 self.toggle_valve_controls(True)
                 self.vent_flag = False
             else:
@@ -1719,7 +1728,8 @@ class Ui_MainWindow(object):
         if self.ardConnected:
             if self.vent_flag:
                 self.slowVentButton.setChecked(False)
-                self.arduino_worker.set_valve_signal.emit(self.previous_valve_states)
+                self.arduino_worker.set_valve_signal.emit(
+                    self.previous_valve_states)
                 self.toggle_valve_controls(True)
                 self.vent_flag = False
             else:
@@ -1942,7 +1952,7 @@ class Ui_MainWindow(object):
             self.motor_worker.top_signal.emit()
 
     def on_motorConnectButton_clicked(self):
-        #logging.info("Connect motor button clicked")
+        # logging.info("Connect motor button clicked")
         if self.motor_connected:
             logging.info("Disconnecting motor")
             self.motor_connected = False
@@ -1954,12 +1964,13 @@ class Ui_MainWindow(object):
                     self.motor_worker.timer.stop()
             except Exception as e:
                 pass
-            
+
             self.UIUpdateMotorConnection()
         else:
             logging.info("Connecting motor")
             logging.info(f"Motor COM port: {self.motorCOMPortSpinBox.value()}")
-            self.motor_worker = MotorWorker(parent = self, port = self.motorCOMPortSpinBox.value())
+            self.motor_worker = MotorWorker(
+                parent=self, port=self.motorCOMPortSpinBox.value())
             self.motor_worker.connect()
 
             self.connect_motor_signals()    # Connect the worker signals to appropriate slots
@@ -2005,7 +2016,8 @@ class Ui_MainWindow(object):
         logging.info("Move to target button clicked")
         if self.motor_connected:
             try:
-                targetpos = int(self.targetMotorPosEdit.text()) #TODO: convert from mm to steps
+                # TODO: convert from mm to steps
+                targetpos = int(self.targetMotorPosEdit.text())
                 self.motor_worker.command_signal.emit(targetpos)
             except ValueError:
                 logging.error("Invalid target position")
@@ -2013,32 +2025,38 @@ class Ui_MainWindow(object):
     def on_motorMacro1Button_clicked(self):
         logging.info("Motor macro 1 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["1"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["1"]["Position"])
 
     def on_motorMacro2Button_clicked(self):
         logging.info("Motor macro 2 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["2"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["2"]["Position"])
 
     def on_motorMacro3Button_clicked(self):
         logging.info("Motor macro 3 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["3"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["3"]["Position"])
 
     def on_motorMacro4Button_clicked(self):
         logging.info("Motor macro 4 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["4"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["4"]["Position"])
 
     def on_motorMacro5Button_clicked(self):
         logging.info("Motor macro 5 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["5"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["5"]["Position"])
 
     def on_motorMacro6Button_clicked(self):
         logging.info("Motor macro 6 button clicked")
         if self.motor_connected:
-            self.motor_worker.command_signal.emit(self.motor_macro_settings["6"]["Position"])
+            self.motor_worker.command_signal.emit(
+                self.motor_macro_settings["6"]["Position"])
 
     def add_step(self, step_type, time_length):
         step = Step(step_type, time_length)
@@ -2110,7 +2128,7 @@ class Ui_MainWindow(object):
                     self.Valve2Button.setEnabled(False)
                     self.Valve3Button.setEnabled(False)
                     self.Valve4Button.setEnabled(False)
-                    self.Valve5Button.setEnabled(False)                
+                    self.Valve5Button.setEnabled(False)
                 # self.Valve6Button.setEnabled(True)
                 # self.Valve7Button.setEnabled(True)
                 # self.Valve8Button.setEnabled(True)
@@ -2238,7 +2256,7 @@ class Ui_MainWindow(object):
     def toggle_motor_controls(self, state):
         self.motorStopButton.setEnabled(state)
         self.motorMoveToTargetButton.setEnabled(state)
-        #self.targetMotorPosEdit.setEnabled(state)
+        # self.targetMotorPosEdit.setEnabled(state)
         self.motorMacro1Button.setEnabled(state)
         self.motorMacro2Button.setEnabled(state)
         self.motorMacro3Button.setEnabled(state)
@@ -2257,9 +2275,10 @@ class Ui_MainWindow(object):
             self.arduino_worker.set_valve_states)
         self.arduino_worker.get_valve_signal.connect(
             self.arduino_worker.get_valve_states)
-        
+
     def connect_motor_signals(self):
-        self.motor_worker.command_signal.connect(self.motor_worker.move_to_target)
+        self.motor_worker.command_signal.connect(
+            self.motor_worker.move_to_target)
         self.motor_worker.shutdown_signal.connect(self.motor_worker.stop)
         self.motor_worker.calibrate_signal.connect(self.motor_worker.calibrate)
         self.motor_worker.ascent_signal.connect(self.motor_worker.ascent)
@@ -2267,7 +2286,7 @@ class Ui_MainWindow(object):
 
 
 class Step:
-    def __init__(self, step_type, time_length, motor_position = 0):
+    def __init__(self, step_type, time_length, motor_position=0):
         self.step_type = step_type
         self.time_length = time_length
         self.motor_position = motor_position
@@ -2296,6 +2315,7 @@ class QTextEditLogger(logging.Handler, QtCore.QObject):  # Console window
     def close(self):
         self.widget.clear()
         super().close()
+
 
 class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
     def __init__(self, parent):
@@ -2340,7 +2360,8 @@ class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
                     # Macro No.
                     item = QtWidgets.QTableWidgetItem(macro["Macro No."])
                     # Make the item read-only
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                    item.setFlags(item.flags() & ~
+                                  QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
                     # Label
                     label_text = macro.get("Label", "")
@@ -2348,7 +2369,8 @@ class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
                     self.table.setItem(i, 1, label_item)
                     # Position SpinBox
                     position_spinbox = QtWidgets.QSpinBox()
-                    position_spinbox.setRange(0, 2500000)  # Adjust range as needed
+                    # Adjust range as needed
+                    position_spinbox.setRange(0, 2500000)
                     position_val = macro.get("Position", 0)   # Default to 0
                     position_spinbox.setValue(position_val)
                     self.table.setCellWidget(i, 2, position_spinbox)
@@ -2468,7 +2490,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     # Macro No.
                     item = QtWidgets.QTableWidgetItem(macro["Macro No."])
                     # Make the item read-only
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                    item.setFlags(item.flags() & ~
+                                  QtCore.Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(i, 0, item)
                     # Label
                     label_text = macro.get("Label", "")
@@ -2476,7 +2499,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
                     self.table.setItem(i, 1, label_item)
                     # Valve States
                     # Only process the first 5 values
-                    for j, state in enumerate(macro["Valves"][:5], start=2):  # start from column 2
+                    # start from column 2
+                    for j, state in enumerate(macro["Valves"][:5], start=2):
                         combo = QtWidgets.QComboBox()
                         combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
@@ -2523,7 +2547,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()   # type: ignore
             label_text = self.table.item(row, 1).text()     # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(2, 7)]  # V1 to V5 #type: ignore
+                # V1 to V5 #type: ignore
+                row, col).currentText() for col in range(2, 7)]
             # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
             timer_spinbox = self.table.cellWidget(row, 7)
@@ -2543,7 +2568,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             label_text = self.table.item(row, 1).text()        # type: ignore
             valve_states = [self.table.cellWidget(
-                row, col).currentText() for col in range(2, 7)]  # V1 to V5 #type: ignore
+                # V1 to V5 #type: ignore
+                row, col).currentText() for col in range(2, 7)]
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
@@ -2574,7 +2600,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
         # Update the main window's buttons with the new labels
         for i in range(4):
-            getattr(self.parent, f'valveMacro{i+1}Button').setText(self.parent.macro_settings[str(i+1)]['Label'])
+            getattr(self.parent, f'valveMacro{
+                    i+1}Button').setText(self.parent.macro_settings[str(i+1)]['Label'])
 
         super().closeEvent(event)
 
@@ -2638,12 +2665,13 @@ class RealTimePlot(FigureCanvasQTAgg):
                 with open(self.parent.save_path, "a") as f:
                     f.write(f"{time.strftime('%H:%M:%S')}, {pressure_values[0]}, {
                             pressure_values[1]}, {pressure_values[2]}, {pressure_values[3]}\n")
-                    
+
             # Check if venting is complete
             if self.parent.vent_flag:
                 logging.info(f"Pressure 3: {pressure_values[2]}")
                 if pressure_values[2] < 0.1:
-                    self.parent.arduino_worker.set_valve_signal.emit(self.parent.previous_valve_states)
+                    self.parent.arduino_worker.set_valve_signal.emit(
+                        self.parent.previous_valve_states)
                     self.parent.vent_flag = False
                     self.parent.quickVentButton.setChecked(False)
                     self.parent.slowVentButton.setChecked(False)
@@ -2769,6 +2797,7 @@ class MotorWorker(QtCore.QThread):
         self.timer.timeout.connect(self.poll_position)
         self.calibrated = False
         self.mutex = QtCore.QMutex()
+        self.top_position = -100
 
     @QtCore.pyqtSlot()
     def stop(self):
@@ -2782,16 +2811,20 @@ class MotorWorker(QtCore.QThread):
             """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
             if self.motor.serial_connected:
                 self.motor.calibrate()
-                #logging.info("Calibrating motor, please wait")
+                # logging.info("Calibrating motor, please wait")
 
     def poll_position(self):
-        #logging.info("Polling motor position")
+        # logging.info("Polling motor position")
         with QtCore.QMutexLocker(self.mutex):
             if self.running:
                 if self.motor.serial_connected:
                     self.calibrated = self.motor.check_calibrated()
                     if self.calibrated:
+                        if self.top_position == -100:
+                            self.top_position = self.motor.get_top_position()
+                            logging.info(f"Top position: {self.top_position}")
                         position = self.motor.get_current_position()
+                        position = self.steps_to_mm(position)
                         logging.info(f"Current motor position: {position}")
                         # TODO: convert from steps to mm
                         self.parent.curMotorPosEdit.setText(str(position))
@@ -2799,7 +2832,7 @@ class MotorWorker(QtCore.QThread):
             else:
                 self.timer.stop()
                 self.stop()
-        
+
     def is_connected(self):
         return self.motor.serial_connected
 
@@ -2808,6 +2841,7 @@ class MotorWorker(QtCore.QThread):
         with QtCore.QMutexLocker(self.mutex):
             if self.motor.serial_connected:
                 logging.info(f"Moving motor to position {target}")
+                target = self.mm_to_steps(target)
                 self.motor.move_to_position(target)
 
     def start_timer(self):
@@ -2830,6 +2864,13 @@ class MotorWorker(QtCore.QThread):
             if self.motor.serial_connected:
                 logging.info("To Top")
                 self.motor.to_top()
+
+    def steps_to_mm(self, steps):
+        # 1mm = 1600 steps
+        return steps / 1600
+
+    def mm_to_steps(self, mm):
+        return mm * 1600
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):

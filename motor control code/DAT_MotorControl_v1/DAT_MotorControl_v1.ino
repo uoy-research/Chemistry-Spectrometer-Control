@@ -86,6 +86,8 @@ const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
 // # | ,                        | ,       | desired motor position                  |
 // # | Current Position Reg     | 5-6     | two hold registers used to contain the  |
 // # | ,                        | ,       | current motor position                  |
+// # | Top Position Reg         | 7-8     | two hold registers used to contain the  |
+// # | ,                        | ,       | top motor position                      |
 // # | Command Coil             | 1       | Flag to show if command is waiting      |                
 // # | Calibration Coil         | 2       | Flag to show if motor is calibrated     |
 // # | Init Coil                | 3       | Flag to show if serial comms established|                
@@ -302,6 +304,7 @@ void topInterrupt(){
   //upPosition = topPosition - 100000;
   if (initFlag == 1){
     topPosition  = stepper.getPosition();
+    setTopPosition(topPosition);
     //Serial.print("Top position: "); Serial.println(topPosition);
     upPosition = topPosition - 100000;
     downPosition = topPosition - 2475000; // define down pos once calibrated
@@ -331,8 +334,8 @@ void getCurrentPosition(){
   int32_t currentPosition = stepper.getPosition();  // Get current position
   uint16_t high, low; // Declare high and low word
   disassemble(currentPosition, high, low);  // Disassemble current position into two uint16_t
-  mb.setHreg(5, high); // Add high word to input register 4
-  mb.setHreg(6, low);  // Add low word to input register 5
+  mb.setHreg(5, high); // Add high word to input register 5
+  mb.setHreg(6, low);  // Add low word to input register 6
 }
 
 void addCoils(){
@@ -341,6 +344,8 @@ void addCoils(){
   mb.addHreg(4, 0);
   mb.addHreg(5, 0);
   mb.addHreg(6, 0);
+  mb.addHreg(7, 0);
+  mb.addHreg(8, 0);
   mb.addCoil(1, 0);
   mb.addCoil(2, 0);
   mb.addCoil(3, 0);
@@ -356,4 +361,11 @@ int32_t combine(uint16_t high, uint16_t low) {
 void disassemble(int32_t combined, uint16_t &high, uint16_t &low) {
     high = static_cast<uint16_t>((combined >> 16) & 0xFFFF);
     low = static_cast<uint16_t>(combined & 0xFFFF);
+}
+
+void setTopPosition(int32_t topPosition){
+  uint16_t high, low;
+  disassemble(topPosition, high, low);
+  mb.setHreg(7, high);
+  mb.setHreg(8, low);
 }

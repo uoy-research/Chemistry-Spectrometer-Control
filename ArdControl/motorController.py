@@ -80,7 +80,8 @@ class MotorController:
             time.sleep(1)
             # writing 'c' to command register
             try:
-                self.instrument.write_bit(1, 1)  # writing 1 to toggle command flag # type: ignore
+                # writing 1 to toggle command flag # type: ignore
+                self.instrument.write_bit(1, 1)
                 self.serial_connected = True
                 logging.info("Calibrating motor, please wait")
             except Exception as e:
@@ -89,13 +90,12 @@ class MotorController:
         except Exception as e:
             logging.error("Couldn't calibrate motor: %s", e)
             self.serial_connected = False
-            
 
     def check_calibrated(self):
         try:
             # reading calibration status
             calibrated = self.instrument.read_bit(2, 1)  # type: ignore
-            #logging.info(f"Calibrated: {calibrated}")
+            # logging.info(f"Calibrated: {calibrated}")
             self.serial_connected = True
         except Exception as e:
             logging.error("Couldn't read calibration status: %s", e)
@@ -175,3 +175,15 @@ class MotorController:
             logging.error("Couldn't move to top: %s", e)
             self.serial_connected = False
             pass
+
+    def get_top_position(self):
+        try:
+            readings = self.instrument.read_registers(  # type: ignore
+                7, 2, 3)
+            top_position = self.assemble(readings[0], readings[1])
+            self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't read top position: %s", e)
+            self.serial_connected = False
+            pass
+        return top_position
