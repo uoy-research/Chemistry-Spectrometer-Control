@@ -67,7 +67,7 @@ const unsigned long baudrate = 9600;
 // ModbusSerial object
 ModbusSerial mb (MySerial, SlaveId, TxenPin);
 
-unsigned long mbTimeout = 200000; //timeout length for no comms
+unsigned long mbTimeout = 2000; //timeout length for no comms
 unsigned long mbLast = 0; //time of last modbus command
 
 bool serialConnected = false;
@@ -264,7 +264,7 @@ void handleInput(char input) {
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
       setPosition = getTargetPosition();
-      setPosition = min(upPosition, (upPosition - setPosition));
+      setPosition = min(topPosition, (topPosition - setPosition));
       setPosition = max(downPosition, setPosition);
       stepper.movePosition(setPosition);
       break;
@@ -354,6 +354,9 @@ void addCoils(){
 // Doing high word first
 // Function to combine two uint16_t into a signed 32-bit int
 int32_t combine(uint16_t high, uint16_t low) {
+    if high >= 0x8000 {
+        high = high - 0x10000;
+    }
     return (static_cast<int32_t>(high) << 16) | low;
 }
 

@@ -46,6 +46,7 @@ class MotorController:
             self.instrument = minimalmodbus.Instrument(f"COM{self.port}", 11)
             self.instrument.serial.baudrate = self.baudrate    # type: ignore
             self.instrument.serial.timeout = 3   # type: ignore
+            # self.instrument.close_port_after_each_call = True
             time.sleep(2)  # Wait for the connection to be established
             self.instrument.write_bit(3, 1)  # writing 1 to toggle init flag
             self.serial_connected = True
@@ -80,8 +81,8 @@ class MotorController:
             time.sleep(1)
             # writing 'c' to command register
             try:
-                # writing 1 to toggle command flag # type: ignore
-                self.instrument.write_bit(1, 1)
+                # writing 1 to toggle command flag 
+                self.instrument.write_bit(1, 1)# type: ignore
                 self.serial_connected = True
                 logging.info("Calibrating motor, please wait")
             except Exception as e:
@@ -152,8 +153,10 @@ class MotorController:
         return high, low
 
     def assemble(self, high, low):
-        combined = ((high & 0xFFFF) << 16) | (low & 0xFFFF)
-        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+        # Adjust high word for negative values
+        if high >= 0x8000:
+            high -= 0x10000
+        combined = (high << 16) | (low & 0xFFFF)
         return combined
 
     def ascent(self):
@@ -187,3 +190,15 @@ class MotorController:
             self.serial_connected = False
             pass
         return top_position
+
+    def reset(self):
+        try:
+            self.instrument.write_register(2, ord('e'))  # type: ignore
+            self.instrument.write_bit(1, 1)  # type: ignore
+            self.serial_connected = True
+        except Exception as e:
+            logging.error("Couldn't reset motor: %s", e)
+            self.serial_connected = False
+            pass
+        finally:
+            self.instrument.serial.close()  # type: ignore

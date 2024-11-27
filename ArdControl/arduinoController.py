@@ -74,7 +74,8 @@ class ArduinoController:
         try:
             self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
             self.arduino.serial.baudrate = self.baudrate    # type: ignore
-            self.arduino.serial.timeout = 3   # type: ignore
+            self.arduino.serial.timeout = 3   # type: ignore    
+            # self.arduino.close_port_after_each_call = True
             time.sleep(2)  # Wait for the connection to be established
             self.readings = self.arduino.read_registers(
                 0, 4, 4)    # type: ignore
@@ -129,6 +130,9 @@ class ArduinoController:
         except:
             logging.error("Failed to reset system")
             self.serial_connected = False
+        finally:
+            self.arduino.serial.close()  # type: ignore
+        
 
     def send_depressurise(self):
         try:
@@ -145,4 +149,9 @@ class ArduinoController:
         return self.arduino.read_bit(16, 1) # type: ignore
     
     def disableTTL(self):
-        self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+        try:
+            self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+            self.serial_connected = True
+        except:
+            logging.error("Failed to disable TTL")
+            self.serial_connected = False
