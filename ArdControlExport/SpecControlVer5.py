@@ -2838,22 +2838,31 @@ class MotorWorker(QtCore.QThread):
     def poll_position(self):
         # logging.info("Polling motor position")
         with QtCore.QMutexLocker(self.mutex):
-            if self.running:
-                if self.motor.serial_connected:
-                    self.calibrated = self.motor.check_calibrated()
-                    if self.calibrated:
-                        if self.top_position == "INIT":
-                            self.top_position = self.motor.get_top_position()
-                            logging.info(f"Top position: {self.top_position}")
-                        position = self.motor.get_current_position()
-                        position = int(self.top_position) - position
-                        position = self.steps_to_mm(position)
-                        logging.info(f"Current motor position: {position}")
-                        self.parent.curMotorPosEdit.setText(str(position))
-                self.parent.UIUpdateMotorConnection()
-            else:
+            try:
+                if self.running:
+                    if self.motor.serial_connected:
+                        self.calibrated = self.motor.check_calibrated()
+                        if self.calibrated:
+                            if self.top_position == "INIT":
+                                self.top_position = self.motor.get_top_position()
+                                logging.info(f"Top position: {self.top_position}")
+                            position = self.motor.get_current_position()
+                            position = (int(self.top_position) - int(position))
+                            position = self.steps_to_mm(position)
+                            logging.info(f"Current motor position: {position}")
+                            self.parent.curMotorPosEdit.setText(str(position))
+                    self.parent.UIUpdateMotorConnection()
+                else:
+                    self.timer.stop()
+                    self.running = False
+                    self.motor.reset()
+                    #self.stop()
+            except Exception as e:
+                logging.error(f"Error polling motor position: {e}")
                 self.timer.stop()
-                self.stop()
+                self.running = False
+                self.motor.reset()
+                #self.stop()
 
     def is_connected(self):
         return self.motor.serial_connected
