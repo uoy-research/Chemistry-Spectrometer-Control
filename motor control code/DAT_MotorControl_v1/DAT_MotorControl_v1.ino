@@ -264,7 +264,7 @@ void handleInput(char input) {
       stepper.setBrakeMode(COOLBRAKE);
       stepper.setMaxVelocity(maxVelocity);
       setPosition = getTargetPosition();
-      setPosition = min(topPosition, (topPosition - setPosition));
+      setPosition = min(upPosition, (upPosition - setPosition));
       setPosition = max(downPosition, setPosition);
       stepper.movePosition(setPosition);
       break;
@@ -304,9 +304,10 @@ void topInterrupt(){
   //upPosition = topPosition - 100000;
   if (initFlag == 1){
     topPosition  = stepper.getPosition();
-    setTopPosition(topPosition);
+    
     //Serial.print("Top position: "); Serial.println(topPosition);
     upPosition = topPosition - 100000;
+    setTopPosition(upPosition);
     downPosition = topPosition - 2475000; // define down pos once calibrated
     setPosition = upPosition;
     stepper.movePosition(setPosition);
@@ -354,7 +355,7 @@ void addCoils(){
 // Doing high word first
 // Function to combine two uint16_t into a signed 32-bit int
 int32_t combine(uint16_t high, uint16_t low) {
-    if high >= 0x8000 {
+    if (high >= 0x8000) {
         high = high - 0x10000;
     }
     return (static_cast<int32_t>(high) << 16) | low;
