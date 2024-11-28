@@ -136,6 +136,13 @@ void loop() {
     mb.setHreg(2, 0);
     mb.setCoil(1, 0); // Reset command flag
   }
+  else if (mb.coil(2) == 1) {
+    int32_t currentPos = combine(mb.Hreg(5), mb.Hreg(6));
+    int32_t desiredPos = combine(mb.Hreg(3), mb.Hreg(4));
+    if (currentPos == desiredPos) {
+        noSpeed();
+    }
+  }
 }
 
 void handleInput(char input) {
@@ -166,7 +173,7 @@ void handleInput(char input) {
       stepper.setMaxAcceleration(maxAcceleration);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
+      stepper.setMaxVelocity(maxVelocity/4);
       //Serial.println("Finding top position!");
 
       
@@ -274,7 +281,7 @@ void handleInput(char input) {
       stepper.setMaxAcceleration(maxAcceleration);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
+      stepper.setMaxVelocity(maxVelocity/4);
 
       stepper.moveSteps(10000000);
       initFlag = 1;
@@ -310,10 +317,12 @@ void topInterrupt(){
     setTopPosition(upPosition);
     downPosition = topPosition - 2475000; // define down pos once calibrated
     setPosition = upPosition;
+    delay(10);
     stepper.movePosition(setPosition);
     mb.setCoil(2, 1); // Set calibration flag to true
     initFlag = 0;
   }
+  noSpeed();
 }
 
 void botInterrupt(){
@@ -323,6 +332,7 @@ void botInterrupt(){
   }
   stepper.stop(HARD);
   downPosition = stepper.getPosition();
+  noSpeed();
 }
 
 int32_t getTargetPosition(){
@@ -372,4 +382,13 @@ void setTopPosition(int32_t topPosition){
   disassemble(topPosition, high, low);
   mb.setHreg(7, high);
   mb.setHreg(8, low);
+}
+
+void noSpeed() {
+  stepper.setCurrent(standby_runCurrent);
+  stepper.setHoldCurrent(standby_holdCurrent);
+  stepper.setMaxAcceleration(standby_maxAcceleration);
+  stepper.setMaxDeceleration(standby_maxDeceleration);
+  stepper.setBrakeMode(FREEWHEELBRAKE);
+  stepper.setMaxVelocity(standby_maxVelocity);
 }

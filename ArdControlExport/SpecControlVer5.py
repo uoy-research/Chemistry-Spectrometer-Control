@@ -2849,7 +2849,7 @@ class MotorWorker(QtCore.QThread):
                             position = self.motor.get_current_position()
                             position = (int(self.top_position) - int(position))
                             position = self.steps_to_mm(position)
-                            logging.info(f"Current motor position: {position}")
+                            # logging.info(f"Current motor position: {position}")
                             self.parent.curMotorPosEdit.setText(str(position))
                     self.parent.UIUpdateMotorConnection()
                 else:

@@ -1942,7 +1942,7 @@ class Ui_MainWindow(object):
         # logging.debug("Checking motor connection")
         if self.motor_worker.is_connected() == False:   # type: ignore
             self.motor_connected = False
-            self.UIUpdateMotorConnection()
+            self.UIUpdateArdConnection()
             self.motor_worker.running = False   # type: ignore
 
     def on_motorAscentButton_clicked(self):
@@ -1969,7 +1969,7 @@ class Ui_MainWindow(object):
             except Exception as e:
                 pass
 
-            self.UIUpdateMotorConnection()
+            self.UIUpdateArdConnection()
         else:
             logging.info("Connecting motor")
             logging.info(f"Motor COM port: {self.motorCOMPortSpinBox.value()}")
@@ -2004,7 +2004,7 @@ class Ui_MainWindow(object):
                 self.motor_worker.shutdown_signal.emit()
                 self.ardWarningLabel.setText("Connection failed")
                 self.ardWarningLabel.setStyleSheet("color: red")
-        self.UIUpdateMotorConnection()
+        self.UIUpdateArdConnection()
 
     def on_motorCalibrateButton_clicked(self):
         logging.info("Calibrate motor button clicked")
@@ -2238,7 +2238,9 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
         if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
-            if self.motor_worker.calibrated:
+            logging.info("Motor connected")
+            logging.info(f"Calibrated? {self.motor_worker.calibrated}")
+            if self.motor_worker.calibrated == 1:
                 self.motorCalibrateButton.setEnabled(False)
                 self.motorWarningLabel.setText("Calibrated")
                 self.motorWarningLabel.setStyleSheet("color: green")
@@ -2254,11 +2256,12 @@ class Ui_MainWindow(object):
             self.motorWarningLabel.setStyleSheet("color: red")
             self.motorCalibrateButton.setEnabled(False)
             self.toggle_motor_controls(False)
-
+    
+    """
     def UIUpdateMotorConnection(self):
         if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
-            if self.motor_worker.calibrated:
+            if self.motor_worker.calibrated >= 1:
                 self.motorCalibrateButton.setEnabled(False)
                 self.motorWarningLabel.setText("Calibrated")
                 self.motorWarningLabel.setStyleSheet("color: green")
@@ -2274,7 +2277,7 @@ class Ui_MainWindow(object):
             self.motorWarningLabel.setStyleSheet("color: red")
             self.motorCalibrateButton.setEnabled(False)
             self.toggle_motor_controls(False)
-
+"""
     def toggle_motor_controls(self, state):
         self.motorStopButton.setEnabled(state)
         self.motorMoveToTargetButton.setEnabled(state)
@@ -2832,6 +2835,7 @@ class MotorWorker(QtCore.QThread):
         """Handle command signals to control the Arduino (e.g., turn on/off valves)."""
         with QtCore.QMutexLocker(self.mutex):
             if self.motor.serial_connected:
+                self.top_position = "INIT"
                 self.motor.calibrate()
                 # logging.info("Calibrating motor, please wait")
 
@@ -2851,7 +2855,7 @@ class MotorWorker(QtCore.QThread):
                             position = self.steps_to_mm(position)
                             # logging.info(f"Current motor position: {position}")
                             self.parent.curMotorPosEdit.setText(str(position))
-                    self.parent.UIUpdateMotorConnection()
+                    self.parent.UIUpdateArdConnection()
                 else:
                     self.timer.stop()
                     self.running = False
@@ -2876,7 +2880,7 @@ class MotorWorker(QtCore.QThread):
                 self.motor.move_to_position(target)
 
     def start_timer(self):
-        self.timer.start(500)
+        self.timer.start(10)
 
     def connect(self):
         self.motor.start()
