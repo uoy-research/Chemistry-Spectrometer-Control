@@ -81,8 +81,8 @@ class MotorController:
             time.sleep(1)
             # writing 'c' to command register
             try:
-                # writing 1 to toggle command flag 
-                self.instrument.write_bit(1, 1)# type: ignore
+                # writing 1 to toggle command flag
+                self.instrument.write_bit(1, 1)  # type: ignore
                 self.serial_connected = True
                 logging.info("Calibrating motor, please wait")
             except Exception as e:
@@ -201,4 +201,5 @@ class MotorController:
             self.serial_connected = False
             pass
         finally:
-            self.instrument.serial.close()  # type: ignore
+            if hasattr(self, 'instrument') and self.instrument:
+                self.instrument.serial.close()  # type: ignore

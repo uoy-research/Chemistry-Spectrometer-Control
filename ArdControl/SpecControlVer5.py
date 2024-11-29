@@ -1144,15 +1144,27 @@ class Ui_MainWindow(object):
             # Start the arduino time that read pressure readings every 500ms
             self.arduino_worker.start_timer()
 
-            # Check if the connection was successful with 5 sec timeout
-            timeout = 5  # Timeout in seconds
-            start_time = time.time()
-            while True:
-                # Check if the timeout has been reached
-                if (time.time() - start_time > timeout) or self.arduino_worker.isConnected() == True:
-                    break
-                # Sleep for a short duration to prevent high CPU usage
-                time.sleep(0.1)
+            # Create an event loop
+            loop = QtCore.QEventLoop()
+
+            # Define a function to check connection status
+            def check_connection():
+                if self.arduino_worker.isConnected():
+                    loop.quit()  # Exit event loop if connected
+
+            # Set up a timer to periodically check connection
+            connection_timer = QtCore.QTimer()
+            connection_timer.timeout.connect(check_connection)
+            connection_timer.start(100)  # Check every 100 ms
+
+            # Set a timeout to exit the event loop after the specified time
+            QtCore.QTimer.singleShot(5000, loop.quit)  # Timeout after 5000 ms
+
+            # Start the event loop
+            loop.exec()
+
+            # Stop the connection timer
+            connection_timer.stop()
 
             # Update the UI based on the connection status
             if self.arduino_worker.isConnected():
@@ -1446,7 +1458,8 @@ class Ui_MainWindow(object):
                         try:
                             motor_position = int(motor_position_str)
                         except ValueError:
-                            logging.error("Invalid motor position in sequence file")
+                            logging.error(
+                                "Invalid motor position in sequence file")
                             return False
 
                     # Create a step object and add it to the list
@@ -1982,15 +1995,27 @@ class Ui_MainWindow(object):
             # Start the arduino time that read pressure readings every 500ms
             self.motor_worker.start_timer()
 
-            # Check if the connection was successful with 5 sec timeout
-            timeout = 5  # Timeout in seconds
-            start_time = time.time()
-            while True:
-                # Check if the timeout has been reached
-                if (time.time() - start_time > timeout) or self.motor_worker.is_connected() == True:
-                    break
-                # Sleep for a short duration to prevent high CPU usage
-                time.sleep(0.1)
+            # Create an event loop
+            loop = QtCore.QEventLoop()
+
+            # Define a function to check connection status
+            def check_connection():
+                if self.motor_worker.is_connected():
+                    loop.quit()  # Exit event loop if connected
+
+            # Set up a timer to periodically check connection
+            connection_timer = QtCore.QTimer()
+            connection_timer.timeout.connect(check_connection)
+            connection_timer.start(100)  # Check every 100 ms
+
+            # Set a timeout to exit the event loop after the specified time
+            QtCore.QTimer.singleShot(5000, loop.quit)  # Timeout after 5000 ms
+
+            # Start the event loop
+            loop.exec()
+
+            # Stop the connection timer
+            connection_timer.stop()
 
             # Update the UI based on the connection status
             if self.motor_worker.is_connected():
@@ -2256,7 +2281,7 @@ class Ui_MainWindow(object):
             self.motorWarningLabel.setStyleSheet("color: red")
             self.motorCalibrateButton.setEnabled(False)
             self.toggle_motor_controls(False)
-    
+
     """
     def UIUpdateMotorConnection(self):
         if self.motor_connected:
@@ -2278,6 +2303,7 @@ class Ui_MainWindow(object):
             self.motorCalibrateButton.setEnabled(False)
             self.toggle_motor_controls(False)
 """
+
     def toggle_motor_controls(self, state):
         self.motorStopButton.setEnabled(state)
         self.motorMoveToTargetButton.setEnabled(state)
@@ -2573,7 +2599,7 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             label_text = self.table.item(row, 1).text()     # type: ignore
             valve_states = [self.table.cellWidget(
                 # V1 to V5
-                row, col).currentText() for col in range(2, 7)] #type: ignore
+                row, col).currentText() for col in range(2, 7)]  # type: ignore
             # Add "Closed" for the last 3 valves
             valve_states.extend(["Closed", "Closed", "Closed"])
             timer_spinbox = self.table.cellWidget(row, 7)
@@ -2593,8 +2619,8 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
             macro_number = self.table.item(row, 0).text()[-1]  # type: ignore
             label_text = self.table.item(row, 1).text()        # type: ignore
             valve_states = [self.table.cellWidget(
-                # V1 to V5 
-                row, col).currentText() for col in range(2, 7)] #type: ignore
+                # V1 to V5
+                row, col).currentText() for col in range(2, 7)]  # type: ignore
             valve_states_numeric = [
                 1 if state == "Open" else 0 if state == "Closed" else 2 for state in valve_states]
             # Add 2 for the last 3 valves
@@ -2849,7 +2875,8 @@ class MotorWorker(QtCore.QThread):
                         if self.calibrated:
                             if self.top_position == "INIT":
                                 self.top_position = self.motor.get_top_position()
-                                logging.info(f"Top position: {self.top_position}")
+                                logging.info(f"Top position: {
+                                             self.top_position}")
                             position = self.motor.get_current_position()
                             position = (int(self.top_position) - int(position))
                             position = self.steps_to_mm(position)
@@ -2860,13 +2887,13 @@ class MotorWorker(QtCore.QThread):
                     self.timer.stop()
                     self.running = False
                     self.motor.reset()
-                    #self.stop()
+                    # self.stop()
             except Exception as e:
                 logging.error(f"Error polling motor position: {e}")
                 self.timer.stop()
                 self.running = False
                 self.motor.reset()
-                #self.stop()
+                # self.stop()
 
     def is_connected(self):
         return self.motor.serial_connected
