@@ -239,17 +239,13 @@ void handleInput(char input) {
 
     case 'y': // Move upwards by 5 mm
       //Serial.println("Moving upwards by 5 mm!");
-      stepper.setCurrent(runCurrent);
-      stepper.setHoldCurrent(holdCurrent);
-      stepper.setMaxAcceleration(maxAcceleration);
-      stepper.setMaxDeceleration(maxDeceleration);
-      stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
-      stepper.moveAngle(360);
+      slowSpeed();
+      stepper.moveAngle(225);
       break;
 
     case 'z': // Move downwards by 5 mm
       //Serial.println("Moving downwards by 5 mm!");
+      slowSpeed();
       stepper.moveAngle(-225);
       break;
 
@@ -287,7 +283,7 @@ void handleInput(char input) {
       stepper.setMaxAcceleration(maxAcceleration);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity/2);
+      stepper.setMaxVelocity(maxVelocity/4);
 
       stepper.moveSteps(10000000);
       initFlag = 1;
@@ -298,7 +294,7 @@ void handleInput(char input) {
       stepper.setMaxAcceleration(maxAcceleration/2);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
+      stepper.setMaxVelocity(maxVelocity/2);
       //setPosition = upPosition;
       stepper.moveSteps(10000000);
     default:
@@ -417,4 +413,13 @@ void fastSpeed() {
   stepper.setMaxDeceleration(maxDeceleration);
   stepper.setBrakeMode(COOLBRAKE);
   stepper.setMaxVelocity(maxVelocity);
+}
+
+void slowSpeed() {
+  stepper.setCurrent(runCurrent);
+  stepper.setHoldCurrent(holdCurrent);
+  stepper.setMaxAcceleration(maxAcceleration/2);
+  stepper.setMaxDeceleration(maxDeceleration);
+  stepper.setBrakeMode(COOLBRAKE);
+  stepper.setMaxVelocity(maxVelocity/2);
 }

@@ -1105,9 +1105,8 @@ class Ui_MainWindow(object):
 
     def disconnect_ard(self):
         try:
-            self.arduino_worker.send_command("RESET")
+            self.arduino_worker.command_signal.emit("RESET")
             self.arduino_worker.stop_timer()
-            self.arduino_worker.stop()
         except Exception:
             pass
         if self.watchdog != None:
@@ -1178,17 +1177,17 @@ class Ui_MainWindow(object):
                 self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
+            time.sleep(1)
+
             # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
-                self.arduino_worker.send_command(
-                    "TTLDISABLE")  # ensure tTL mode disabled
+                self.arduino_worker.command_signal.emit("TTLDISABLE") # ensure tTL mode disabled
                 self.update_valve_states()
                 self.update_valve_button_states()
 
             # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
-                self.arduino_worker.send_command(
-                    "TTLDISABLE")  # ensure tTL mode disabled
+                self.arduino_worker.command_signal.emit("TTLDISABLE") # ensure tTL mode disabled
                 # begin sequence loading
                 self.find_file()
 
@@ -2772,6 +2771,7 @@ class ArduinoWorker(QtCore.QThread):
         self.parent = parent
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll_readings)
+        self.mutex = QtCore.QMutex()
 
     def run(self):
         """Run the Arduino controller in a background thread."""
@@ -2784,13 +2784,14 @@ class ArduinoWorker(QtCore.QThread):
         self.timer.stop()
 
     def stop(self):
-        """Stop the worker and the Arduino controller."""
-        self.running = False
-        # if last step was pressurised then depressurise?
-        self.controller.send_reset()
-        self.controller.serial_connected = False
-        self.quit()
-        self.wait(1)
+        with QtCore.QMutexLocker(self.mutex):
+            """Stop the worker and the Arduino controller."""
+            self.running = False
+            # if last step was pressurised then depressurise?
+            self.controller.send_reset()
+            self.controller.serial_connected = False
+            self.quit()
+            self.wait(100)
 
     def isConnected(self):
         # logging.info(f"Connection is {self.controller.serial_connected}")
@@ -2798,38 +2799,43 @@ class ArduinoWorker(QtCore.QThread):
 
     @QtCore.pyqtSlot()
     def get_valve_states(self):
-        self.parent.valveStates = self.controller.get_valve_states()
-        self.valve_states_updated.emit()
+        with QtCore.QMutexLocker(self.mutex):
+            self.parent.valveStates = self.controller.get_valve_states()
+            self.valve_states_updated.emit()
 
     def poll_readings(self):
         if self.controller.serial_connected:
-            if self.controller.get_readings():
-                data = self.controller.readings  # Get new readings from Arduino
-                # Emit signal with data to update the graph
-                self.data_signal.emit(data)
-            # mode = self.controller.get_mode()
-            # ttl_state = self.controller.get_ttl_state()
-            # logging.info(f"mode: {mode} ttl: {ttl_state}")
+            with QtCore.QMutexLocker(self.mutex):
+                if self.controller.get_readings():
+                    data = self.controller.readings  # Get new readings from Arduino
+                    # Emit signal with data to update the graph
+                    self.data_signal.emit(data)
+                # mode = self.controller.get_mode()
+                # ttl_state = self.controller.get_ttl_state()
+                # logging.info(f"mode: {mode} ttl: {ttl_state}")
 
     def depressurise(self):
-        self.controller.send_depressurise()
+        with QtCore.QMutexLocker(self.mutex):
+            self.controller.send_depressurise()
 
     def set_valve_states(self, states):
-        self.controller.set_valves(states)
+        with QtCore.QMutexLocker(self.mutex):
+            self.controller.set_valves(states)
 
     def send_command(self, command):
-        if command == "RESET":
-            self.controller.send_reset()
-            logging.info("Resetting Arduino")
-        elif command == "QUICK_VENT":
-            self.controller.send_depressurise()
-            logging.info("Depressurising Arduino")
-        elif command == "RESTART":
-            self.controller.start()
-        elif command == "TTLDISABLE":
-            self.controller.disableTTL()
-        else:
-            logging.info("Invalid command for arduino")
+        with QtCore.QMutexLocker(self.mutex):
+            if command == "RESET":
+                self.controller.send_reset()
+                logging.info("Resetting Arduino")
+            elif command == "QUICK_VENT":
+                self.controller.send_depressurise()
+                logging.info("Depressurising Arduino")
+            elif command == "RESTART":
+                self.controller.start()
+            elif command == "TTLDISABLE":
+                self.controller.disableTTL()
+            else:
+                logging.info("Invalid command for arduino")
 
 
 class MotorWorker(QtCore.QThread):
