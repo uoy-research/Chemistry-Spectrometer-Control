@@ -1762,7 +1762,7 @@ class Ui_MainWindow(object):
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
-        logging.debug("Begin save button clicked")
+        #logging.debug("Begin save button clicked")
         if self.ardConnected:
             if self.saving:
                 self.saving = False
@@ -2263,8 +2263,8 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
         if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
-            logging.info("Motor connected")
-            logging.info(f"Calibrated? {self.motor_worker.calibrated}")
+            #logging.info("Motor connected")
+            #logging.info(f"Calibrated? {self.motor_worker.calibrated}")
             if self.motor_worker.calibrated == 1:
                 self.motorCalibrateButton.setEnabled(False)
                 self.motorWarningLabel.setText("Calibrated")
@@ -2875,8 +2875,8 @@ class MotorWorker(QtCore.QThread):
                         if self.calibrated:
                             if self.top_position == "INIT":
                                 self.top_position = self.motor.get_top_position()
-                                logging.info(f"Top position: {
-                                             self.top_position}")
+                                #logging.info(f"Top position: {
+                                #             self.top_position}")
                             position = self.motor.get_current_position()
                             position = (int(self.top_position) - int(position))
                             position = self.steps_to_mm(position)
@@ -2928,11 +2928,11 @@ class MotorWorker(QtCore.QThread):
                 self.motor.to_top()
 
     def steps_to_mm(self, steps):
-        # 1mm = 1600 steps
-        return steps / 1600
+        # 1mm = 6400 steps
+        return steps / 6400
 
     def mm_to_steps(self, mm):
-        return mm * 1600
+        return mm * 6400
 
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):

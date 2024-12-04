@@ -38,10 +38,10 @@ const byte SlaveId = 11;
 /* Motor parameters */
 double runCurrent = 100; // Motor run current, % of maximum
 double holdCurrent = 10;  // Motor hold current, % of maximum
-double brakeCurrent = 10; // Motor brake current, % of maximum
+double brakeCurrent = 100; // Motor brake current, % of maximum
 float maxAcceleration = 23250; // Motor acceleration, steps/s^2
 float maxDeceleration = 23250; // Motor deceleration, steps/s^2
-int maxVelocity = 6500; // Motor maximum velocity, steps/s
+int maxVelocity = 6500/2; // Motor maximum velocity, steps/s
 int stallSensitivity = 0; // Stall sensitivity, arbitrary (-64 - +63), lower number = higher sensitivity
 
 /* Motor standby parameters */
@@ -239,7 +239,13 @@ void handleInput(char input) {
 
     case 'y': // Move upwards by 5 mm
       //Serial.println("Moving upwards by 5 mm!");
-      stepper.moveAngle(225);
+      stepper.setCurrent(runCurrent);
+      stepper.setHoldCurrent(holdCurrent);
+      stepper.setMaxAcceleration(maxAcceleration);
+      stepper.setMaxDeceleration(maxDeceleration);
+      stepper.setBrakeMode(COOLBRAKE);
+      stepper.setMaxVelocity(maxVelocity);
+      stepper.moveAngle(360);
       break;
 
     case 'z': // Move downwards by 5 mm
@@ -281,7 +287,7 @@ void handleInput(char input) {
       stepper.setMaxAcceleration(maxAcceleration);
       stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity/4);
+      stepper.setMaxVelocity(maxVelocity/2);
 
       stepper.moveSteps(10000000);
       initFlag = 1;
@@ -290,11 +296,11 @@ void handleInput(char input) {
       stepper.setCurrent(runCurrent);
       stepper.setHoldCurrent(holdCurrent);
       stepper.setMaxAcceleration(maxAcceleration/2);
-      stepper.setMaxDeceleration(maxDeceleration/2);
+      stepper.setMaxDeceleration(maxDeceleration);
       stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity/2);
+      stepper.setMaxVelocity(maxVelocity);
       //setPosition = upPosition;
-      stepper.movePosition(0);
+      stepper.moveSteps(10000000);
     default:
       //Serial.println("LOG: Invalid input");
       break;
@@ -303,8 +309,9 @@ void handleInput(char input) {
 
 void topInterrupt(){
   stepper.stop(HARD);
+  fastSpeed();
   while(digitalRead(intPin1) == HIGH){
-    stepper.moveAngle(-25);
+    stepper.moveAngle(-1);
   }
   stepper.stop(HARD);
   //topPosition  = stepper.getPosition();
@@ -318,7 +325,9 @@ void topInterrupt(){
     downPosition = topPosition - 2475000; // define down pos once calibrated
     setPosition = upPosition;
     delay(10);
-    stepper.movePosition(setPosition);
+    setTargetPosition(0);
+    mb.setCoil(1, 1); // New Command - Move to setPosition
+    mb.setHreg(2, 'x'); // Reset command register
     mb.setCoil(2, 1); // Set calibration flag to true
     initFlag = 0;
   }
@@ -327,8 +336,9 @@ void topInterrupt(){
 
 void botInterrupt(){
   stepper.stop(HARD);
+  fastSpeed();
   while(digitalRead(intPin2) == HIGH){
-    stepper.moveAngle(25);
+    stepper.moveAngle(1);
   }
   stepper.stop(HARD);
   downPosition = stepper.getPosition();
@@ -341,11 +351,20 @@ int32_t getTargetPosition(){
   return combine(high, low);
 }
 
+void setTargetPosition(int32_t targetPosition){
+  int16_t high;
+  uint16_t low;
+  disassemble(targetPosition, high, low);
+  mb.setHreg(3, static_cast<uint16_t>(high));
+  mb.setHreg(4, low);
+}
+
 void getCurrentPosition(){
   int32_t currentPosition = stepper.getPosition();  // Get current position
-  uint16_t high, low; // Declare high and low word
-  disassemble(currentPosition, high, low);  // Disassemble current position into two uint16_t
-  mb.setHreg(5, high); // Add high word to input register 5
+  int16_t high;
+  uint16_t low; // Declare high and low words
+  disassemble(currentPosition, high, low);  // Disassemble current position
+  mb.setHreg(5, static_cast<uint16_t>(high)); 
   mb.setHreg(6, low);  // Add low word to input register 6
 }
 
@@ -364,23 +383,21 @@ void addCoils(){
 
 // Doing high word first
 // Function to combine two uint16_t into a signed 32-bit int
-int32_t combine(uint16_t high, uint16_t low) {
-    if (high >= 0x8000) {
-        high = high - 0x10000;
-    }
+int32_t combine(int16_t high, uint16_t low) {
     return (static_cast<int32_t>(high) << 16) | low;
 }
 
 // Function to disassemble a signed 32-bit int into two uint16_t
-void disassemble(int32_t combined, uint16_t &high, uint16_t &low) {
-    high = static_cast<uint16_t>((combined >> 16) & 0xFFFF);
+void disassemble(int32_t combined, int16_t &high, uint16_t &low) {
+    high = static_cast<int16_t>(combined >> 16);
     low = static_cast<uint16_t>(combined & 0xFFFF);
 }
 
 void setTopPosition(int32_t topPosition){
-  uint16_t high, low;
+  int16_t high;
+  uint16_t low;
   disassemble(topPosition, high, low);
-  mb.setHreg(7, high);
+  mb.setHreg(7, static_cast<uint16_t>(high));
   mb.setHreg(8, low);
 }
 
@@ -391,4 +408,13 @@ void noSpeed() {
   stepper.setMaxDeceleration(standby_maxDeceleration);
   stepper.setBrakeMode(FREEWHEELBRAKE);
   stepper.setMaxVelocity(standby_maxVelocity);
+}
+
+void fastSpeed() {
+  stepper.setCurrent(runCurrent);
+  stepper.setHoldCurrent(holdCurrent);
+  stepper.setMaxAcceleration(maxAcceleration);
+  stepper.setMaxDeceleration(maxDeceleration);
+  stepper.setBrakeMode(COOLBRAKE);
+  stepper.setMaxVelocity(maxVelocity);
 }

@@ -5,6 +5,7 @@ import time
 import csv
 import os
 import minimalmodbus
+import ctypes
 
 # 25,600 microsteps per millimeter
 
@@ -81,8 +82,8 @@ class MotorController:
             time.sleep(1)
             # writing 'c' to command register
             try:
-                # writing 1 to toggle command flag 
-                self.instrument.write_bit(1, 1)# type: ignore
+                # writing 1 to toggle command flag
+                self.instrument.write_bit(1, 1)  # type: ignore
                 self.serial_connected = True
                 logging.info("Calibrating motor, please wait")
             except Exception as e:
@@ -153,9 +154,7 @@ class MotorController:
         return high, low
 
     def assemble(self, high, low):
-        # Adjust high word for negative values
-        if high >= 0x8000:
-            high -= 0x10000
+        high = ctypes.c_int16(high).value   # Convert high to signed int16
         combined = (high << 16) | (low & 0xFFFF)
         return combined
 
@@ -201,4 +200,5 @@ class MotorController:
             self.serial_connected = False
             pass
         finally:
-            self.instrument.serial.close()  # type: ignore
+            if hasattr(self, 'instrument') and self.instrument:
+                self.instrument.serial.close()  # type: ignore

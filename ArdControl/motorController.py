@@ -5,6 +5,7 @@ import time
 import csv
 import os
 import minimalmodbus
+import ctypes
 
 # 25,600 microsteps per millimeter
 
@@ -153,9 +154,7 @@ class MotorController:
         return high, low
 
     def assemble(self, high, low):
-        # Adjust high word for negative values
-        if high >= 0x8000:
-            high -= 0x10000
+        high = ctypes.c_int16(high).value   # Convert high to signed int16
         combined = (high << 16) | (low & 0xFFFF)
         return combined
 

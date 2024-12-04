@@ -93,12 +93,23 @@ while True:
         print(combined)
 
         try:
-            instrument.write_register(2, ord('x'))
+            instrument.write_register(2, ord('y'))
             time.sleep(1)
             instrument.write_bit(1, 1)  # writing 1 to toggle command flag    
         except:
             print("Not written x2")
             pass
+
+        time.sleep(2)
+        readings = instrument.read_registers(
+            5, 2, 3)  # reading current position
+        high_word = readings[0]
+        low_word = readings[1]
+        combined = (high_word << 16) | low_word
+        if combined >= 0x80000000:
+            combined -= 0x100000000
+        print(high_word, low_word)
+        print(f"Current position: {combined}")
 
 
 def disassemble(combined):

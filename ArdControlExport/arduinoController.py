@@ -74,7 +74,7 @@ class ArduinoController:
         try:
             self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
             self.arduino.serial.baudrate = self.baudrate    # type: ignore
-            self.arduino.serial.timeout = 3   # type: ignore    
+            self.arduino.serial.timeout = 3   # type: ignore
             # self.arduino.close_port_after_each_call = True
             time.sleep(2)  # Wait for the connection to be established
             self.readings = self.arduino.read_registers(
@@ -116,7 +116,8 @@ class ArduinoController:
                     self.arduino.write_bit(i, valve_states[i])  # type: ignore
             self.serial_connected = True
             """
-            write_states = [self.valve_states[i] if valve_states[i] == 2 else valve_states[i] for i in range(8)]
+            write_states = [self.valve_states[i] if valve_states[i]
+                            == 2 else valve_states[i] for i in range(8)]
             self.arduino.write_bits(0, write_states)  # type: ignore
             self.serial_connected = True
         except:
@@ -131,8 +132,8 @@ class ArduinoController:
             logging.error("Failed to reset system")
             self.serial_connected = False
         finally:
-            self.arduino.serial.close()  # type: ignore
-        
+            if hasattr(self.arduino, 'serial'):
+                self.arduino.serial.close()  # type: ignore
 
     def send_depressurise(self):
         try:
@@ -144,10 +145,10 @@ class ArduinoController:
 
     def get_mode(self):
         return self.mode
-    
+
     def get_ttl_state(self):
-        return self.arduino.read_bit(16, 1) # type: ignore
-    
+        return self.arduino.read_bit(16, 1)  # type: ignore
+
     def disableTTL(self):
         try:
             self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
