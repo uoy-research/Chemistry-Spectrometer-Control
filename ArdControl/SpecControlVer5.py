@@ -1181,13 +1181,15 @@ class Ui_MainWindow(object):
 
             # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
-                self.arduino_worker.command_signal.emit("TTLDISABLE") # ensure tTL mode disabled
+                self.arduino_worker.command_signal.emit(
+                    "TTLDISABLE")  # ensure tTL mode disabled
                 self.update_valve_states()
                 self.update_valve_button_states()
 
             # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
-                self.arduino_worker.command_signal.emit("TTLDISABLE") # ensure tTL mode disabled
+                self.arduino_worker.command_signal.emit(
+                    "TTLDISABLE")  # ensure tTL mode disabled
                 # begin sequence loading
                 self.find_file()
 
@@ -1252,6 +1254,8 @@ class Ui_MainWindow(object):
                         self.ardWarningLabel.setStyleSheet("color: green")
                         self.currentStepTypeEdit.setText("")
                         self.stepsRemainingLabel.setText("Steps: 0")
+                        self.stepsTimeRemainingLabel.setText("Time: 0.00")
+                        self.currentStepTimeEdit.setText("0.00")
 
                         # Stop the timer to prevent this function from recurring
                         self.stepTimer.stop()
@@ -1286,7 +1290,7 @@ class Ui_MainWindow(object):
                                 self.current_step.motor_position)
 
                         # Log the step type and time
-                        logging.info(f"Step {self.current_step_type} for {
+                        logging.info(f"Step {self.step_types[self.current_step_type]} for {
                             self.current_step_time} ms")
             else:
                 # If motor is not ready, stop the timer and reset all labels
@@ -1322,8 +1326,8 @@ class Ui_MainWindow(object):
 
     def calculate_sequence_time(self):
         """Calculate the total time of the sequence."""
-        self.sequence_running_time = -10
-        self.step_running_time = -10
+        self.sequence_running_time = -10/1000
+        self.step_running_time = -10/1000
         self.total_sequence_time = 0
         self.current_step_time = 0
         for step in self.steps:
@@ -1761,7 +1765,7 @@ class Ui_MainWindow(object):
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
-        #logging.debug("Begin save button clicked")
+        # logging.debug("Begin save button clicked")
         if self.ardConnected:
             if self.saving:
                 self.saving = False
@@ -2262,8 +2266,8 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
         if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
-            #logging.info("Motor connected")
-            #logging.info(f"Calibrated? {self.motor_worker.calibrated}")
+            # logging.info("Motor connected")
+            # logging.info(f"Calibrated? {self.motor_worker.calibrated}")
             if self.motor_worker.calibrated == 1:
                 self.motorCalibrateButton.setEnabled(False)
                 self.motorWarningLabel.setText("Calibrated")
@@ -2373,8 +2377,8 @@ class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
         self.parent = parent
 
         self.setWindowTitle("Motor Macro Editor")
-        self.setGeometry(100, 100, 400, 170)
-        self.setFixedSize(400, 170)
+        self.setGeometry(100, 100, 300, 230)
+        self.setFixedSize(300, 230)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
@@ -2881,7 +2885,7 @@ class MotorWorker(QtCore.QThread):
                         if self.calibrated:
                             if self.top_position == "INIT":
                                 self.top_position = self.motor.get_top_position()
-                                #logging.info(f"Top position: {
+                                # logging.info(f"Top position: {
                                 #             self.top_position}")
                             position = self.motor.get_current_position()
                             position = (int(self.top_position) - int(position))
