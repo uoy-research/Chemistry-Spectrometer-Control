@@ -58,13 +58,18 @@ class ArduinoController:
     def start(self):
         logging.info("Starting server...")
         if self.connect_arduino():
-            logging.info("Arduino started")
-            if self.mode == 2:
-                # type: ignore # Enable TTL control
-                self.arduino.write_bit(self.ttlAddr, 1)  # type: ignore
-            else:
-                # type: ignore # Disable TTL control
-                self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+            try:
+                if self.mode == 2:
+                    # type: ignore # Enable TTL control
+                    self.arduino.write_bit(self.ttlAddr, 1)  # type: ignore
+                else:
+                    # type: ignore # Disable TTL control
+                    self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+                logging.info("Arduino started")
+            except:
+                logging.error("Failed to connect to Arduino. Server not started.")
+                self.arduino = None
+                self.serial_connected = False
         else:
             logging.error("Failed to connect to Arduino. Server not started.")
             self.arduino = None
@@ -76,7 +81,7 @@ class ArduinoController:
             self.arduino.serial.baudrate = self.baudrate    # type: ignore
             self.arduino.serial.timeout = 3   # type: ignore
             # self.arduino.close_port_after_each_call = True
-            time.sleep(2)  # Wait for the connection to be established
+            time.sleep(1)  # Wait for the connection to be established
             self.readings = self.arduino.read_registers(
                 0, 4, 4)    # type: ignore
             logging.info(f"Connected to Arduino on port {self.port}")
@@ -129,7 +134,7 @@ class ArduinoController:
             self.arduino.write_bit(self.resetAddr, 1)  # type: ignore
             self.serial_connected = True
         except:
-            logging.error("Failed to reset system")
+            #logging.error("Failed to reset system")
             self.serial_connected = False
         finally:
             if hasattr(self.arduino, 'serial'):

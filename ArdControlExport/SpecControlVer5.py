@@ -1,3 +1,6 @@
+from pathlib import Path
+import os
+os.environ['MPLCONFIGDIR'] = str(Path.home())+"/.matplotlib/"
 from arduinoController import ArduinoController
 from motorController import MotorController
 from matplotlib.figure import Figure
@@ -1105,9 +1108,8 @@ class Ui_MainWindow(object):
 
     def disconnect_ard(self):
         try:
-            self.arduino_worker.send_command("RESET")
+            self.arduino_worker.command_signal.emit("RESET")
             self.arduino_worker.stop_timer()
-            self.arduino_worker.stop()
         except Exception:
             pass
         if self.watchdog != None:
@@ -1178,16 +1180,18 @@ class Ui_MainWindow(object):
                 self.ardWarningLabel.setStyleSheet("color: red")
             self.UIUpdateArdConnection()
 
+            time.sleep(1)
+
             # If in manual mode, make sure buttons reflect actual valve states
             if self.selectedMode == 0:
-                self.arduino_worker.send_command(
+                self.arduino_worker.command_signal.emit(
                     "TTLDISABLE")  # ensure tTL mode disabled
                 self.update_valve_states()
                 self.update_valve_button_states()
 
             # If in automatic mode, begin sequence processing
             if self.selectedMode == 1:
-                self.arduino_worker.send_command(
+                self.arduino_worker.command_signal.emit(
                     "TTLDISABLE")  # ensure tTL mode disabled
                 # begin sequence loading
                 self.find_file()
@@ -1253,6 +1257,8 @@ class Ui_MainWindow(object):
                         self.ardWarningLabel.setStyleSheet("color: green")
                         self.currentStepTypeEdit.setText("")
                         self.stepsRemainingLabel.setText("Steps: 0")
+                        self.stepsTimeRemainingLabel.setText("Time: 0.00")
+                        self.currentStepTimeEdit.setText("0.00")
 
                         # Stop the timer to prevent this function from recurring
                         self.stepTimer.stop()
@@ -1287,7 +1293,7 @@ class Ui_MainWindow(object):
                                 self.current_step.motor_position)
 
                         # Log the step type and time
-                        logging.info(f"Step {self.current_step_type} for {
+                        logging.info(f"Step {self.step_types[self.current_step_type]} for {
                             self.current_step_time} ms")
             else:
                 # If motor is not ready, stop the timer and reset all labels
@@ -1323,8 +1329,8 @@ class Ui_MainWindow(object):
 
     def calculate_sequence_time(self):
         """Calculate the total time of the sequence."""
-        self.sequence_running_time = -10
-        self.step_running_time = -10
+        self.sequence_running_time = -10/1000
+        self.step_running_time = -10/1000
         self.total_sequence_time = 0
         self.current_step_time = 0
         for step in self.steps:
@@ -1762,7 +1768,7 @@ class Ui_MainWindow(object):
 
     @QtCore.pyqtSlot()
     def on_beginSaveButton_clicked(self):
-        logging.debug("Begin save button clicked")
+        # logging.debug("Begin save button clicked")
         if self.ardConnected:
             if self.saving:
                 self.saving = False
@@ -2263,8 +2269,8 @@ class Ui_MainWindow(object):
             self.selectSavePathButton.setEnabled(True)
         if self.motor_connected:
             self.motorConnectButton.setText("Disconnect")
-            #logging.info("Motor connected")
-            #logging.info(f"Calibrated? {self.motor_worker.calibrated}")
+            # logging.info("Motor connected")
+            # logging.info(f"Calibrated? {self.motor_worker.calibrated}")
             if self.motor_worker.calibrated == 1:
                 self.motorCalibrateButton.setEnabled(False)
                 self.motorWarningLabel.setText("Calibrated")
@@ -2374,8 +2380,8 @@ class MotorMacroEditor(QtWidgets.QDialog):  # Motor Macro Editor
         self.parent = parent
 
         self.setWindowTitle("Motor Macro Editor")
-        self.setGeometry(100, 100, 400, 170)
-        self.setFixedSize(400, 170)
+        self.setGeometry(100, 100, 300, 230)
+        self.setFixedSize(300, 230)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
@@ -2772,6 +2778,7 @@ class ArduinoWorker(QtCore.QThread):
         self.parent = parent
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll_readings)
+        self.mutex = QtCore.QMutex()
 
     def run(self):
         """Run the Arduino controller in a background thread."""
@@ -2784,13 +2791,14 @@ class ArduinoWorker(QtCore.QThread):
         self.timer.stop()
 
     def stop(self):
-        """Stop the worker and the Arduino controller."""
-        self.running = False
-        # if last step was pressurised then depressurise?
-        self.controller.send_reset()
-        self.controller.serial_connected = False
-        self.quit()
-        self.wait(1)
+        with QtCore.QMutexLocker(self.mutex):
+            """Stop the worker and the Arduino controller."""
+            self.running = False
+            # if last step was pressurised then depressurise?
+            self.controller.send_reset()
+            self.controller.serial_connected = False
+            self.quit()
+            self.wait(100)
 
     def isConnected(self):
         # logging.info(f"Connection is {self.controller.serial_connected}")
@@ -2798,38 +2806,43 @@ class ArduinoWorker(QtCore.QThread):
 
     @QtCore.pyqtSlot()
     def get_valve_states(self):
-        self.parent.valveStates = self.controller.get_valve_states()
-        self.valve_states_updated.emit()
+        with QtCore.QMutexLocker(self.mutex):
+            self.parent.valveStates = self.controller.get_valve_states()
+            self.valve_states_updated.emit()
 
     def poll_readings(self):
         if self.controller.serial_connected:
-            if self.controller.get_readings():
-                data = self.controller.readings  # Get new readings from Arduino
-                # Emit signal with data to update the graph
-                self.data_signal.emit(data)
-            # mode = self.controller.get_mode()
-            # ttl_state = self.controller.get_ttl_state()
-            # logging.info(f"mode: {mode} ttl: {ttl_state}")
+            with QtCore.QMutexLocker(self.mutex):
+                if self.controller.get_readings():
+                    data = self.controller.readings  # Get new readings from Arduino
+                    # Emit signal with data to update the graph
+                    self.data_signal.emit(data)
+                # mode = self.controller.get_mode()
+                # ttl_state = self.controller.get_ttl_state()
+                # logging.info(f"mode: {mode} ttl: {ttl_state}")
 
     def depressurise(self):
-        self.controller.send_depressurise()
+        with QtCore.QMutexLocker(self.mutex):
+            self.controller.send_depressurise()
 
     def set_valve_states(self, states):
-        self.controller.set_valves(states)
+        with QtCore.QMutexLocker(self.mutex):
+            self.controller.set_valves(states)
 
     def send_command(self, command):
-        if command == "RESET":
-            self.controller.send_reset()
-            logging.info("Resetting Arduino")
-        elif command == "QUICK_VENT":
-            self.controller.send_depressurise()
-            logging.info("Depressurising Arduino")
-        elif command == "RESTART":
-            self.controller.start()
-        elif command == "TTLDISABLE":
-            self.controller.disableTTL()
-        else:
-            logging.info("Invalid command for arduino")
+        with QtCore.QMutexLocker(self.mutex):
+            if command == "RESET":
+                self.controller.send_reset()
+                logging.info("Resetting Arduino")
+            elif command == "QUICK_VENT":
+                self.controller.send_depressurise()
+                logging.info("Depressurising Arduino")
+            elif command == "RESTART":
+                self.controller.start()
+            elif command == "TTLDISABLE":
+                self.controller.disableTTL()
+            else:
+                logging.info("Invalid command for arduino")
 
 
 class MotorWorker(QtCore.QThread):
@@ -2875,8 +2888,8 @@ class MotorWorker(QtCore.QThread):
                         if self.calibrated:
                             if self.top_position == "INIT":
                                 self.top_position = self.motor.get_top_position()
-                                logging.info(f"Top position: {
-                                             self.top_position}")
+                                # logging.info(f"Top position: {
+                                #             self.top_position}")
                             position = self.motor.get_current_position()
                             position = (int(self.top_position) - int(position))
                             position = self.steps_to_mm(position)

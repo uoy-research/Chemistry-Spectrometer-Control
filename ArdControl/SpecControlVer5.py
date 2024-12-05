@@ -1,3 +1,6 @@
+from pathlib import Path
+import os
+os.environ['MPLCONFIGDIR'] = str(Path.home())+"/.matplotlib/"
 from arduinoController import ArduinoController
 from motorController import MotorController
 from matplotlib.figure import Figure
@@ -24,7 +27,7 @@ class Ui_MainWindow(object):
         # Initialise variables
 
         # how frequently the valve states are checked (ms)
-        self.valveCheckInterval = 50
+        self.valveCheckInterval = 100
 
         # List of valve settings for each step type
         self.valve_settings = {
@@ -906,7 +909,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets
         self.figure = Figure()
-        self.sc = RealTimePlot(parent=self)
+        self.sc = RealTimePlot(self)
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.graphWidget.setGeometry(QtCore.QRect(121, 325, 621, 294))
@@ -991,6 +994,7 @@ class Ui_MainWindow(object):
         # Connect menu actions to their slots
         self.editMotorMacroAction.triggered.connect(self.edit_motor_macro)
         self.editValveMacroAction.triggered.connect(self.edit_valve_macro)
+        self.sc.vent_complete_signal.connect(self.vent_complete)
 
         self.retranslateUi(MainWindow)
         self.update_controls()
@@ -1721,6 +1725,21 @@ class Ui_MainWindow(object):
             self.update_valve_button_states()
 
     @QtCore.pyqtSlot()
+    def vent_complete(self):
+        logging.debug("Vent complete")
+        self.vent_flag = False
+        logging.info(f"{self.previous_valve_states}")
+        try:
+            self.arduino_worker.set_valve_signal.emit([0, 0, 0, 0, 0, 0, 0, 0])
+        except Exception as e:
+            logging.error(f"Error setting valve signal: {e}")
+        #self.quickVentButton.setChecked(False)
+        #self.slowVentButton.setChecked(False)
+        #self.update_valve_states()
+        #self.update_valve_button_states()
+        #self.toggle_valve_controls(True)
+
+    @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.debug("Quick vent button clicked")
         self.update_valve_states()
@@ -1735,7 +1754,7 @@ class Ui_MainWindow(object):
                 self.previous_valve_states = self.valveStates.copy()
                 self.quickVentButton.setChecked(True)
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 1, 2, 1, 2, 2, 2])
+                    [2, 2, 1, 0, 1, 2, 2, 2])
                 self.toggle_valve_controls(False)
                 self.quickVentButton.setEnabled(True)
                 self.vent_flag = True
@@ -2661,9 +2680,13 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
 
 
 class RealTimePlot(FigureCanvasQTAgg):
+    vent_complete_signal = QtCore.pyqtSignal()
+
     def __init__(self, parent):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
+        self.parent=parent
+        self.vent_complete_signal.connect(self.parent.vent_complete)
 
         self.max_points = 500
 
@@ -2724,12 +2747,9 @@ class RealTimePlot(FigureCanvasQTAgg):
             if self.parent.vent_flag:
                 logging.info(f"Pressure 3: {pressure_values[2]}")
                 if pressure_values[2] < 0.1:
-                    self.parent.arduino_worker.set_valve_signal.emit(
-                        self.parent.previous_valve_states)
-                    self.parent.vent_flag = False
-                    self.parent.quickVentButton.setChecked(False)
-                    self.parent.slowVentButton.setChecked(False)
-                    self.parent.toggle_valve_controls(True)
+                    #logging.info("Venting complete")
+                    self.vent_complete_signal.emit()
+
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
