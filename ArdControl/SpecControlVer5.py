@@ -1142,9 +1142,6 @@ class Ui_MainWindow(object):
 
             self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
 
-            # Start the arduino time that read pressure readings every 500ms
-            self.arduino_worker.start_timer()
-
             # Create an event loop
             loop = QtCore.QEventLoop()
 
@@ -1172,6 +1169,8 @@ class Ui_MainWindow(object):
                 self.ardConnected = True
                 # Start the watchdog timer that updates arduino connection status
                 self.setup_arduino_watchdog()
+                # Start the arduino time that read pressure readings every 500ms
+                self.arduino_worker.start_timer()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
