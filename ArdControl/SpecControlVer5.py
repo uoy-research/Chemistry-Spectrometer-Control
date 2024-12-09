@@ -1,22 +1,21 @@
+import matplotlib.pyplot as plt
+import json
+import csv
+import random
+import threading
+import time
+import matplotlib
+import logging
+import sys
+from PyQt6 import QtCore, QtGui, QtWidgets
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from motorController import MotorController
+from arduinoController import ArduinoController
 from pathlib import Path
 import os
 os.environ['MPLCONFIGDIR'] = str(Path.home())+"/.matplotlib/"
-from arduinoController import ArduinoController
-from motorController import MotorController
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
-from PyQt6 import QtCore, QtGui, QtWidgets
-import sys
-import os
-import logging
-import matplotlib
-import time
-import threading
-import random
-import csv
-import json
-import matplotlib.pyplot as plt
 matplotlib.use('QtAgg')
 
 
@@ -994,7 +993,6 @@ class Ui_MainWindow(object):
         # Connect menu actions to their slots
         self.editMotorMacroAction.triggered.connect(self.edit_motor_macro)
         self.editValveMacroAction.triggered.connect(self.edit_valve_macro)
-        self.sc.vent_complete_signal.connect(self.vent_complete)
 
         self.retranslateUi(MainWindow)
         self.update_controls()
@@ -1725,26 +1723,11 @@ class Ui_MainWindow(object):
             self.update_valve_button_states()
 
     @QtCore.pyqtSlot()
-    def vent_complete(self):
-        logging.debug("Vent complete")
-        self.vent_flag = False
-        logging.info(f"{self.previous_valve_states}")
-        try:
-            self.arduino_worker.set_valve_signal.emit([0, 0, 0, 0, 0, 0, 0, 0])
-        except Exception as e:
-            logging.error(f"Error setting valve signal: {e}")
-        #self.quickVentButton.setChecked(False)
-        #self.slowVentButton.setChecked(False)
-        #self.update_valve_states()
-        #self.update_valve_button_states()
-        #self.toggle_valve_controls(True)
-
-    @QtCore.pyqtSlot()
     def on_quickVentButton_clicked(self):
         logging.debug("Quick vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.vent_flag:
+            if self.vent_flag or self.sc.p2_data[-1] < 0.1:
                 self.quickVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
                     self.previous_valve_states)
@@ -1765,7 +1748,7 @@ class Ui_MainWindow(object):
         logging.debug("Slow vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.vent_flag:
+            if self.vent_flag or self.sc.p2_data[-1] < 0.1:
                 self.slowVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
                     self.previous_valve_states)
@@ -2679,15 +2662,14 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         super().closeEvent(event)
 
 
-class RealTimePlot(FigureCanvasQTAgg):
-    vent_complete_signal = QtCore.pyqtSignal()
+class RealTimePlot(FigureCanvasQTAgg, QtCore.QObject):
 
     def __init__(self, parent):
         self.fig, self.ax = plt.subplots()
-        super().__init__(self.fig)
-        self.parent=parent
-        self.vent_complete_signal.connect(self.parent.vent_complete)
+        FigureCanvasQTAgg.__init__(self, self.fig)
+        QtCore.QObject.__init__(self)
 
+        self.parent = parent
         self.max_points = 500
 
         # Initialize data
@@ -2747,9 +2729,7 @@ class RealTimePlot(FigureCanvasQTAgg):
             if self.parent.vent_flag:
                 logging.info(f"Pressure 3: {pressure_values[2]}")
                 if pressure_values[2] < 0.1:
-                    #logging.info("Venting complete")
-                    self.vent_complete_signal.emit()
-
+                    logging.info("Venting complete")
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
