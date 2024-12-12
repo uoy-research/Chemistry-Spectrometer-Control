@@ -2977,6 +2977,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     print("Controller stopped")
         except AttributeError:
             pass
+        try:
+            if self.motor_worker:
+                self.motor_worker.stop()
+                if self.verbosity:
+                    print("Motor stopped")
+        except AttributeError:
+            pass
         if self.verbosity:
             print("Application is closing...")
 
