@@ -1567,7 +1567,7 @@ class Ui_MainWindow(object):
                 self.arduino_worker.set_valve_signal.emit(
                     [1, 2, 2, 2, 2, 2, 2, 2])
                 logging.info("Turning on valve 1")
-                self.Valve1Button.setChecked(True)
+                self.Valve1Button.setChecked(True)      
             else:
                 self.arduino_worker.set_valve_signal.emit(
                     [0, 2, 2, 2, 2, 2, 2, 2])

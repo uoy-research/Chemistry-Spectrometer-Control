@@ -21,35 +21,61 @@ import os
 
 
 class ArduinoController:
-    def __init__(self, port, verbose, mode):
-        self.port = port    # Port number to connect to arduino
-        self.baudrate = 9600    # Baudrate for serial connection
-        self.verbose = verbose  # Verbose mode
-        # Mode of operation (0 = manual, 1 = sequence, 2 = TTL)
+    """
+    Controls communication with Arduino for valve and pressure management.
+    
+    Handles serial communication, valve states, and pressure readings through
+    Modbus protocol.
+    """
+    
+    # Class constants
+    BAUD_RATE = 9600
+    DEFAULT_TIMEOUT = 3
+    
+    # Modbus addresses
+    VALVE_ADDRESSES = range(8)  # 0-7
+    PRESSURE_ADDRESSES = range(4)  # 0-3
+    TTL_ADDRESS = 16
+    RESET_ADDRESS = 17
+    DEPRESSURIZE_ADDRESS = 18
+    
+    def __init__(self, port: int, verbose: bool, mode: int):
+        """
+        Initialize Arduino controller.
+        
+        Args:
+            port (int): COM port number
+            verbose (bool): Enable verbose logging
+            mode (int): Operation mode (0=manual, 1=sequence, 2=TTL)
+        """
+        self.port = port
+        self.verbose = verbose
         self.mode = mode
-        self.arduino = None  # Container for arduino object
-        # Container for valve states
-        self.valve_states = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.readings = [0, 0, 0, 0]  # Container for pressure readings
-        self.serial_connected = False   # Flag to indicate serial connection
-        self.new_reading = False  # Flag to indicate new pressure reading
+        
+        # Status flags
+        self.serial_connected = False
+        self.new_reading = False
+        
+        # State containers
+        self.arduino = None
+        self.valve_states = [0] * 8
+        self.readings = [0] * 4
+        
+        self._configure_logging()
+        self._validate_mode()
 
-        self.valveAddr = [0, 1, 2, 3, 4, 5, 6, 7]
-        self.pressureAddr = [0, 1, 2, 3]
-        self.ttlAddr = 16
-        self.resetAddr = 17
-        self.depressuriseAddr = 18
-
-        if verbose:
+    def _configure_logging(self):
+        if self.verbose:
             logging.basicConfig(level=logging.DEBUG)
         else:
             logging.basicConfig(level=logging.INFO)
 
-        if mode == 0:
+    def _validate_mode(self):
+        if self.mode == 0:
             logging.info("Manual mode enabled")
-        elif mode == 1:
+        elif self.mode == 1:
             logging.info("Magritek mode enabled")
-        elif mode == 2:
+        elif self.mode == 2:
             logging.info("TTL mode enabled")
         else:
             logging.error("Invalid mode, defaulting to manual mode")
@@ -61,10 +87,10 @@ class ArduinoController:
             try:
                 if self.mode == 2:
                     # type: ignore # Enable TTL control
-                    self.arduino.write_bit(self.ttlAddr, 1)  # type: ignore
+                    self.arduino.write_bit(self.TTL_ADDRESS, 1)  # type: ignore
                 else:
                     # type: ignore # Disable TTL control
-                    self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+                    self.arduino.write_bit(self.TTL_ADDRESS, 0)  # type: ignore
                 logging.info("Arduino started")
             except:
                 logging.error("Failed to connect to Arduino. Server not started.")
@@ -78,8 +104,8 @@ class ArduinoController:
     def connect_arduino(self):
         try:
             self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
-            self.arduino.serial.baudrate = self.baudrate    # type: ignore
-            self.arduino.serial.timeout = 3   # type: ignore
+            self.arduino.serial.baudrate = self.BAUD_RATE    # type: ignore
+            self.arduino.serial.timeout = self.DEFAULT_TIMEOUT   # type: ignore
             # self.arduino.close_port_after_each_call = True
             time.sleep(1)  # Wait for the connection to be established
             self.readings = self.arduino.read_registers(
@@ -131,7 +157,7 @@ class ArduinoController:
 
     def send_reset(self):
         try:
-            self.arduino.write_bit(self.resetAddr, 1)  # type: ignore
+            self.arduino.write_bit(self.RESET_ADDRESS, 1)  # type: ignore
             self.serial_connected = True
         except:
             #logging.error("Failed to reset system")
@@ -142,7 +168,7 @@ class ArduinoController:
 
     def send_depressurise(self):
         try:
-            self.arduino.write_bit(self.depressuriseAddr, 1)  # type: ignore
+            self.arduino.write_bit(self.DEPRESSURIZE_ADDRESS, 1)  # type: ignore
             self.serial_connected = True
         except:
             logging.error("Failed to depressurise system")
@@ -154,9 +180,9 @@ class ArduinoController:
     def get_ttl_state(self):
         return self.arduino.read_bit(16, 1)  # type: ignore
 
-    def disableTTL(self):
+    def disable_ttl(self):
         try:
-            self.arduino.write_bit(self.ttlAddr, 0)  # type: ignore
+            self.arduino.write_bit(self.TTL_ADDRESS, 0)  # type: ignore
             self.serial_connected = True
         except:
             logging.error("Failed to disable TTL")

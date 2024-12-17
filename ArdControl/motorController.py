@@ -1,3 +1,8 @@
+"""
+File: motorController.py
+Description: Controls motor movements and position management through Modbus protocol.
+"""
+
 import threading
 import serial
 import logging
@@ -7,198 +12,258 @@ import os
 import minimalmodbus
 import ctypes
 
-# 25,600 microsteps per millimeter
-
-
 class MotorController:
-    def __init__(self, port):
+    """
+    Controls motor movements and manages position through Modbus communication.
+    
+    Attributes:
+        port (int): COM port number for serial communication
+        serial_connected (bool): Connection status flag
+        motor_position (int): Current motor position
+        target_position (int): Target position for movement
+    """
+    
+    # Class constants
+    BAUD_RATE = 9600
+    DEFAULT_TIMEOUT = 3
+    STEPS_PER_MM = 25600  # microsteps per millimeter
+    
+    # Modbus commands
+    COMMANDS = {
+        "HEARTBEAT": 'y',    # Heartbeat response
+        "START": 'S',        # Start the Arduino
+        "STOP": 's',         # Stop the Arduino
+        "DOWN": 'd',         # Move down
+        "UP": 'u',           # Move up
+        "GOTO_POS": 'p',     # Go to position
+        "GET_POS": 'g',      # Get current position
+        "GET_STATUS": 't',   # Get status
+        "CALIBRATE": 'c',    # Calibrate
+    }
+
+    def __init__(self, port: int):
+        """
+        Initialize motor controller.
+        
+        Args:
+            port (int): COM port number for serial connection
+        """
         self.port = port
-        self.baudrate = 9600
-        # self.arduino = None
-        self.shutdown_flag = False
         self.serial_connected = False
-        self.heartbeat_thread = None
-        self.reading_thread = None
         self.motor_position = 0
         self.target_position = 0
-        self.commands_dict = {
-            "HEARTBEAT": 'y',  # Heartbeat response
-            "START": 'S',    # Start the Arduino
-            "STOP": 's',     # Stop the Arduino
-            "DOWN": 'd',     # Move down
-            "UP": 'u',       # Move up
-            "GOTOPOS": 'p',  # Go to position
-            "GETPOS": 'g',   # Get current position
-            "GETSTATUS": 't',  # Get status
-            "CALIBRATE": 'c',  # Calibrate
-        }
+        self.instrument = None
+        
+        # Thread management
+        self.shutdown_flag = False
+        self.heartbeat_thread = None
+        self.reading_thread = None
 
     def start(self):
+        """Start the motor controller and establish connection."""
         logging.info("Starting motor controller...")
-        if self.connect_arduino():
+        if self._connect_arduino():
             logging.info("Motor controller started")
         else:
             logging.error("Failed to start motor controller")
             self.serial_connected = False
             self.instrument = None
 
-    def connect_arduino(self):
+    def _connect_arduino(self):
+        """
+        Establish Modbus connection with Arduino.
+        
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
         try:
             self.instrument = minimalmodbus.Instrument(f"COM{self.port}", 11)
-            self.instrument.serial.baudrate = self.baudrate    # type: ignore
-            self.instrument.serial.timeout = 3   # type: ignore
-            # self.instrument.close_port_after_each_call = True
-            time.sleep(2)  # Wait for the connection to be established
-            self.instrument.write_bit(3, 1)  # writing 1 to toggle init flag
+            self.instrument.serial.baudrate = self.BAUD_RATE    # type: ignore
+            self.instrument.serial.timeout = self.DEFAULT_TIMEOUT   # type: ignore
+            time.sleep(2)  # Wait for connection establishment
+            
+            # Initialize Arduino
+            self.instrument.write_bit(3, 1)  # Toggle init flag
             self.serial_connected = True
             logging.info(f"Connected to Arduino on port {self.port}")
-            result = self.instrument.read_bit(3, 1)  # reading init flag
-            if result:
+            
+            # Verify initialization
+            if self.instrument.read_bit(3, 1):  # Read init flag
                 logging.info("Arduino initialized")
+                return True
             else:
                 logging.error("Arduino not initialized")
-            return True
+                return False
+                
         except Exception as e:
-            logging.error(f"Failed to connect to Arduino on port {
-                          self.port}: {e}")
+            logging.error(f"Failed to connect to Arduino on port {self.port}: {e}")
             self.serial_connected = False
             return False
 
     def get_current_position(self):
+        """
+        Read current motor position from registers.
+        
+        Returns:
+            int: Current motor position
+        """
         try:
-            readings = self.instrument.read_registers(  # type: ignore
-                5, 2, 3)
-            self.motor_position = self.assemble(readings[0], readings[1])
+            readings = self.instrument.read_registers(5, 2, 3)  # type: ignore
+            self.motor_position = self._assemble(readings[0], readings[1])
             self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't read motor position: %s", e)
+            logging.error(f"Couldn't read motor position: {e}")
             self.serial_connected = False
-            pass
         return self.motor_position
 
     def calibrate(self):
+        """Initiate motor calibration sequence."""
         try:
-            self.instrument.write_register(2, ord('c'))  # type: ignore
+            self.instrument.write_register(2, ord('c'))  # Write calibrate command
             time.sleep(1)
-            # writing 'c' to command register
-            try:
-                # writing 1 to toggle command flag
-                self.instrument.write_bit(1, 1)  # type: ignore
-                self.serial_connected = True
-                logging.info("Calibrating motor, please wait")
-            except Exception as e:
-                logging.error("Couldn't write to command register: %s", e)
-                self.serial_connected = False
+            self.instrument.write_bit(1, 1)  # Toggle command flag
+            self.serial_connected = True
+            logging.info("Calibrating motor, please wait")
         except Exception as e:
-            logging.error("Couldn't calibrate motor: %s", e)
+            logging.error(f"Couldn't calibrate motor: {e}")
             self.serial_connected = False
 
     def check_calibrated(self):
+        """
+        Check if motor is calibrated.
+        
+        Returns:
+            bool: True if calibrated, False otherwise
+        """
         try:
-            # reading calibration status
             calibrated = self.instrument.read_bit(2, 1)  # type: ignore
-            # logging.info(f"Calibrated: {calibrated}")
             self.serial_connected = True
+            return calibrated
         except Exception as e:
-            logging.error("Couldn't read calibration status: %s", e)
+            logging.error(f"Couldn't read calibration status: {e}")
             self.serial_connected = False
-            calibrated = False
-        return calibrated
+            return False
 
-    def move_to_position(self, position):
+    def move_to_position(self, position: int):
+        """
+        Move motor to specified position.
+        
+        Args:
+            position (int): Target position in steps
+        """
         try:
             if self.check_calibrated():
-                high, low = self.disassemble(position)  # type: ignore
-                # writing high word
-                self.instrument.write_register(3, high)  # type: ignore
-                # writing low word
-                self.instrument.write_register(4, low)  # type: ignore
-                # writing 'x' to command register
-                self.instrument.write_register(2, ord('x'))  # type: ignore
-                # writing 1 to toggle command flag
-                self.instrument.write_bit(1, 1)  # type: ignore
+                high, low = self._disassemble(position)
+                self.instrument.write_register(3, high)  # Write high word
+                self.instrument.write_register(4, low)   # Write low word
+                self.instrument.write_register(2, ord('x'))  # Write move command
+                self.instrument.write_bit(1, 1)  # Toggle command flag
                 self.serial_connected = True
             else:
                 logging.error("Motor not calibrated")
-                self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't move to position: %s", e)
+            logging.error(f"Couldn't move to position: {e}")
             self.serial_connected = False
-            pass
 
     def stop_motor(self):
+        """Stop motor movement immediately."""
         try:
-            self.instrument.write_register(2, ord('s'))  # type: ignore
-            self.instrument.write_bit(1, 1)  # type: ignore
+            self.instrument.write_register(2, ord('s'))
+            self.instrument.write_bit(1, 1)
             self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't stop motor: %s", e)
+            logging.error(f"Couldn't stop motor: {e}")
             self.serial_connected = False
-            pass
 
     def shutdown(self):
+        """Safely shutdown motor controller."""
         try:
             if hasattr(self, 'instrument') and self.instrument:
-                self.instrument.write_register(2, ord('s'))  # type: ignore
-                self.instrument.write_bit(1, 1)  # type: ignore
+                self.instrument.write_register(2, ord('s'))
+                self.instrument.write_bit(1, 1)
                 self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't stop motor: %s", e)
+            logging.error(f"Couldn't stop motor: {e}")
             self.serial_connected = False
-            pass
 
-    def disassemble(self, combined):
+    @staticmethod
+    def _disassemble(combined: int) -> tuple[int, int]:
+        """
+        Split 32-bit position into high and low 16-bit words.
+        
+        Args:
+            combined (int): 32-bit position value
+            
+        Returns:
+            tuple[int, int]: High and low 16-bit words
+        """
         combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
         high = (combined >> 16) & 0xFFFF
         low = combined & 0xFFFF
         return high, low
 
-    def assemble(self, high, low):
-        high = ctypes.c_int16(high).value   # Convert high to signed int16
+    @staticmethod
+    def _assemble(high: int, low: int) -> int:
+        """
+        Combine high and low 16-bit words into 32-bit position.
+        
+        Args:
+            high (int): High 16-bit word
+            low (int): Low 16-bit word
+            
+        Returns:
+            int: Combined 32-bit position value
+        """
+        high = ctypes.c_int16(high).value  # Convert high to signed int16
         combined = (high << 16) | (low & 0xFFFF)
         return combined
 
     def ascent(self):
+        """Move motor upward."""
         try:
-            self.instrument.write_register(2, ord('u'))  # type: ignore
-            self.instrument.write_bit(1, 1)  # type: ignore
+            self.instrument.write_register(2, ord('u'))
+            self.instrument.write_bit(1, 1)
             self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't move up: %s", e)
+            logging.error(f"Couldn't move up: {e}")
             self.serial_connected = False
-            pass
 
     def to_top(self):
+        """Move motor to top position."""
         try:
-            self.instrument.write_register(2, ord('t'))  # type: ignore
-            self.instrument.write_bit(1, 1)  # type: ignore
+            self.instrument.write_register(2, ord('t'))
+            self.instrument.write_bit(1, 1)
             self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't move to top: %s", e)
+            logging.error(f"Couldn't move to top: {e}")
             self.serial_connected = False
-            pass
 
     def get_top_position(self):
+        """
+        Get the calibrated top position.
+        
+        Returns:
+            int: Top position value
+        """
         try:
-            readings = self.instrument.read_registers(  # type: ignore
-                7, 2, 3)
-            top_position = self.assemble(readings[0], readings[1])
+            readings = self.instrument.read_registers(7, 2, 3)  # type: ignore
+            top_position = self._assemble(readings[0], readings[1])
             self.serial_connected = True
+            return top_position
         except Exception as e:
-            logging.error("Couldn't read top position: %s", e)
+            logging.error(f"Couldn't read top position: {e}")
             self.serial_connected = False
-            pass
-        return top_position
+            return 0
 
     def reset(self):
+        """Reset motor controller and close connection."""
         try:
-            self.instrument.write_register(2, ord('e'))  # type: ignore
-            self.instrument.write_bit(1, 1)  # type: ignore
+            self.instrument.write_register(2, ord('e'))
+            self.instrument.write_bit(1, 1)
             self.serial_connected = True
         except Exception as e:
-            logging.error("Couldn't reset motor: %s", e)
+            logging.error(f"Couldn't reset motor: {e}")
             self.serial_connected = False
-            pass
         finally:
             if hasattr(self, 'instrument') and self.instrument:
                 self.instrument.serial.close()  # type: ignore
