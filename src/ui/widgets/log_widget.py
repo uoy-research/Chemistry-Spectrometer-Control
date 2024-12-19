@@ -220,4 +220,7 @@ class LogWidget(QWidget):
         self.max_lines = max_lines
         if self.line_count > max_lines:
             self.trim_log()
-2
+
+    def toPlainText(self):
+        """Get the plain text content of the log widget."""
+        return self.log_display.toPlainText()

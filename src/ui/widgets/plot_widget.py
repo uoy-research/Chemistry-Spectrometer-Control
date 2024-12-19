@@ -10,6 +10,7 @@ import numpy as np
 from collections import deque
 from typing import List, Deque
 import logging
+import time  # Add this import at the top
 
 
 class PlotWidget(QWidget):
@@ -34,7 +35,7 @@ class PlotWidget(QWidget):
             deque(maxlen=max_points) for _ in range(3)
         ]
 
-        self.start_time = pg.time()
+        self.start_time = time.time()
         self.setup_ui()
         self.logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class PlotWidget(QWidget):
         """
         try:
             # Add new data points
-            current_time = pg.time() - self.start_time
+            current_time = time.time() - self.start_time
             self.timestamps.append(current_time)
 
             for i, reading in enumerate(readings):
@@ -135,7 +136,7 @@ class PlotWidget(QWidget):
                 data.clear()
 
             # Reset start time
-            self.start_time = pg.time()
+            self.start_time = time.time()
 
             # Update plot
             for curve in self.curves:

@@ -8,7 +8,7 @@ import time
 import logging
 from typing import Optional
 
-from src.controllers.motor_controller import MotorController
+from controllers.motor_controller import MotorController
 
 
 class MotorWorker(QThread):
@@ -116,3 +116,8 @@ class MotorWorker(QThread):
     def home(self):
         """Move motor to home position."""
         return self.move_to(0)
+
+    @property
+    def running(self) -> bool:
+        """Get the running state of the worker."""
+        return self._running

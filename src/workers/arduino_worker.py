@@ -8,7 +8,7 @@ import time
 import logging
 from typing import List, Optional
 
-from src.controllers.arduino_controller import ArduinoController
+from controllers.arduino_controller import ArduinoController
 
 
 class ArduinoWorker(QThread):
@@ -101,3 +101,8 @@ class ArduinoWorker(QThread):
             success = self.controller.send_depressurise()
             if not success:
                 self.error_occurred.emit("Failed to depressurize")
+
+    @property
+    def running(self) -> bool:
+        """Get the running state of the worker."""
+        return self._running

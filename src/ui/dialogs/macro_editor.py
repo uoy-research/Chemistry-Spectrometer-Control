@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt
 import logging
 from typing import List, Dict, Optional
 
-from src.models.valve_macro import MacroManager, ValveMacro
+from models.valve_macro import MacroManager, ValveMacro
 
 
 class MacroEditor(QDialog):
