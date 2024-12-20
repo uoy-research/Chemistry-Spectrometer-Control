@@ -16,7 +16,7 @@ import time  # Add this import at the top
 class PlotWidget(QWidget):
     """
     Widget for real-time pressure data plotting.
-    
+
     Attributes:
         max_points (int): Maximum number of points to display
         update_interval (int): Plot update interval in ms
@@ -42,9 +42,11 @@ class PlotWidget(QWidget):
     def setup_ui(self):
         """Setup user interface."""
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         # Create plot widget
         self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setFixedSize(620, 259)
         self.plot_widget.setBackground('w')  # White background
         self.plot_widget.setTitle("Pressure Readings")
         self.plot_widget.setLabel('left', "Pressure", units='bar')
@@ -100,7 +102,7 @@ class PlotWidget(QWidget):
     def update_plot(self, readings: List[float]):
         """
         Update plot with new readings.
-        
+
         Args:
             readings: List of pressure readings from sensors
         """

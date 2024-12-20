@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
     QPushButton, QComboBox, QLabel, QFileDialog
 )
-from PyQt6.QtCore import Qt, QDateTime
-from PyQt6.QtGui import QTextCursor, QColor, QTextCharFormat
+from PyQt6.QtCore import Qt, QDateTime, QRect
+from PyQt6.QtGui import QTextCursor, QColor, QTextCharFormat, QFont
 import logging
 from typing import Dict, Optional
 import os
@@ -22,7 +22,8 @@ class LogHandler(logging.Handler):
         super().__init__()
         self.widget = widget
         self.setFormatter(
-            logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            # logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            logging.Formatter('%(levelname)s - %(message)s')
         )
 
     def emit(self, record):
@@ -67,10 +68,11 @@ class LogWidget(QWidget):
         # Create log display
         self.log_display = QTextEdit()
         self.log_display.setReadOnly(True)
-        self.log_display.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.log_display.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
 
         # Create control panel
         control_panel = QHBoxLayout()
+        control_panel.setGeometry(QRect(200, 10, 321, 291))
 
         # Log level filter
         self.level_combo = QComboBox()
@@ -94,12 +96,23 @@ class LogWidget(QWidget):
         self.export_btn.clicked.connect(self.export_log)
 
         # Add widgets to control panel
-        control_panel.addWidget(QLabel("Log Level:"))
+        control_panel.addWidget(QLabel("Level:"))
         control_panel.addWidget(self.level_combo)
         control_panel.addStretch()
         control_panel.addWidget(self.scroll_btn)
         control_panel.addWidget(self.clear_btn)
         control_panel.addWidget(self.export_btn)
+
+        # Set font size to 12
+        log_font = QFont()
+        log_font.setPointSize(12)
+        font = QFont()
+        font.setPointSize(8)
+        self.log_display.setFont(log_font)
+        self.level_combo.setFont(font)
+        self.scroll_btn.setFont(font)
+        self.clear_btn.setFont(font)
+        self.export_btn.setFont(font)
 
         # Add widgets to main layout
         layout.addWidget(self.log_display)

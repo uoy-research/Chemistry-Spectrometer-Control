@@ -1,34 +1,10 @@
-2024-12-19 15:30:39 - SSBubble - INFO - === Starting SSBubble application ===
-2024-12-19 15:30:39 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\ssbubble.exe', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2024-12-19 15:30:39 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2024-12-19 15:30:39 - SSBubble - DEBUG - Creating QApplication
-2024-12-19 15:30:39 - SSBubble - DEBUG - Setting up exception handling
-2024-12-19 15:30:39 - SSBubble - DEBUG - Loading configuration
-2024-12-19 15:30:39 - SSBubble - DEBUG - Creating main window
-2024-12-19 15:30:39 - ui.main_window - INFO - Application started
-2024-12-19 15:30:42 - ui.main_window - INFO - Arduino port updated to COM2
-2024-12-19 15:30:43 - ui.main_window - INFO - Arduino port updated to COM3
-2024-12-19 15:30:44 - ui.main_window - INFO - Arduino port updated to COM4
-2024-12-19 15:30:44 - ui.main_window - INFO - Arduino port updated to COM5
-2024-12-19 15:30:44 - ui.main_window - INFO - Arduino port updated to COM6
-2024-12-19 15:30:44 - ui.main_window - INFO - Arduino port updated to COM7
-2024-12-19 15:30:45 - ui.main_window - INFO - Arduino port updated to COM8
-2024-12-19 15:30:45 - ui.main_window - INFO - Arduino port updated to COM9
-2024-12-19 15:30:46 - ui.main_window - INFO - Arduino port updated to COM10
-2024-12-19 15:30:47 - ui.main_window - INFO - Arduino port updated to COM11
-2024-12-19 15:30:47 - ui.main_window - INFO - Arduino port updated to COM12
-2024-12-19 15:30:47 - ui.main_window - INFO - Arduino port updated to COM13
-2024-12-19 15:30:48 - ui.main_window - INFO - Arduino port updated to COM14
-2024-12-19 15:30:49 - ui.main_window - INFO - Arduino port updated to COM15
-2024-12-19 15:30:50 - ui.main_window - INFO - Arduino port updated to COM14
-2024-12-19 15:30:50 - ui.main_window - INFO - Arduino port updated to COM13
-2024-12-19 15:30:51 - ui.main_window - INFO - Arduino port updated to COM12
-2024-12-19 15:30:51 - ui.main_window - INFO - Arduino port updated to COM11
-2024-12-19 15:30:51 - ui.main_window - INFO - Arduino port updated to COM10
-2024-12-19 15:30:51 - ui.main_window - INFO - Arduino port updated to COM9
-2024-12-19 15:30:51 - ui.main_window - INFO - Arduino port updated to COM8
-2024-12-19 15:30:52 - ui.main_window - INFO - Arduino port updated to COM7
-2024-12-19 15:30:52 - ui.main_window - INFO - Arduino port updated to COM6
-2024-12-19 15:30:52 - ui.main_window - INFO - Arduino port updated to COM5
-2024-12-19 15:31:25 - ui.main_window - INFO - Shutdown complete
-2024-12-19 15:31:25 - SSBubble - INFO - Application shutting down
+2024-12-20 06:22:45 - SSBubble - INFO - === Starting SSBubble application ===
+2024-12-20 06:22:45 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\ssbubble.exe', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2024-12-20 06:22:45 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2024-12-20 06:22:45 - SSBubble - DEBUG - Creating QApplication
+2024-12-20 06:22:45 - SSBubble - DEBUG - Setting up exception handling
+2024-12-20 06:22:45 - SSBubble - DEBUG - Loading configuration
+2024-12-20 06:22:45 - SSBubble - DEBUG - Creating main window
+2024-12-20 06:22:45 - ui.main_window - INFO - Application started
+2024-12-20 06:23:30 - ui.main_window - INFO - Shutdown complete
+2024-12-20 06:23:30 - SSBubble - INFO - Application shutting down
