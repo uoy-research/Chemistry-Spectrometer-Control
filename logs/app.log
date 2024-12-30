@@ -1,21 +1,10 @@
-2024-12-30 17:46:33 - SSBubble - INFO - === Starting SSBubble application ===
-2024-12-30 17:46:33 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2024-12-30 17:46:33 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2024-12-30 17:46:33 - SSBubble - DEBUG - Creating QApplication
-2024-12-30 17:46:33 - SSBubble - DEBUG - Setting up exception handling
-2024-12-30 17:46:33 - SSBubble - DEBUG - Loading configuration
-2024-12-30 17:46:33 - SSBubble - DEBUG - Creating main window
-2024-12-30 17:46:33 - ui.main_window - INFO - Application started
-2024-12-30 17:46:36 - ui.main_window - INFO - Connected to Arduino in mode 1
-2024-12-30 17:46:41 - ui.main_window - INFO - Disconnected from Arduino
-2024-12-30 17:46:42 - ui.main_window - INFO - Connected to Arduino in mode 2
-2024-12-30 17:46:45 - ui.main_window - INFO - Disconnected from Arduino
-2024-12-30 17:46:45 - ui.main_window - INFO - Connected to motor on COM9
-2024-12-30 17:46:45 - root - ERROR - Uncaught exception
-Traceback (most recent call last):
-  File "C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble\src\ui\main_window.py", line 757, in handle_position_update
-    self.position_spin.setValue(position)
-    ^^^^^^^^^^^^^^^^^^
-AttributeError: 'MainWindow' object has no attribute 'position_spin'
-2024-12-30 17:46:51 - ui.main_window - INFO - Shutdown complete
-2024-12-30 17:46:51 - SSBubble - INFO - Application shutting down
+2024-12-30 17:56:47 - SSBubble - INFO - === Starting SSBubble application ===
+2024-12-30 17:56:47 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2024-12-30 17:56:47 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2024-12-30 17:56:47 - SSBubble - DEBUG - Creating QApplication
+2024-12-30 17:56:47 - SSBubble - DEBUG - Setting up exception handling
+2024-12-30 17:56:47 - SSBubble - DEBUG - Loading configuration
+2024-12-30 17:56:47 - SSBubble - DEBUG - Creating main window
+2024-12-30 17:56:47 - ui.main_window - INFO - Application started
+2024-12-30 17:56:55 - ui.main_window - INFO - Shutdown complete
+2024-12-30 17:56:55 - SSBubble - INFO - Application shutting down
