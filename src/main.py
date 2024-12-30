@@ -57,9 +57,12 @@ def main():
         logger.debug("Loading configuration")
         config = Config()
 
+        # Check for --test flag
+        test_mode = "--test" in sys.argv
+        
         # Create and show main window
         logger.debug("Creating main window")
-        window = MainWindow()
+        window = MainWindow(test_mode=test_mode)
         logger.debug("Showing main window")
         window.show()
 

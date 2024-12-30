@@ -27,13 +27,23 @@ class MotorWorker(QThread):
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
 
-    def __init__(self, port: int, update_interval: float = 0.1):
-        """Initialize worker."""
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
+        """Initialize worker.
+        
+        Args:
+            port: COM port number
+            update_interval: Position update interval in seconds
+            mock: Use mock controller for testing
+        """
         super().__init__()
 
         self.port = port
         self.update_interval = update_interval
-        self.controller = MotorController(port=port)
+        if mock:
+            from controllers.base_controller import MockMotorController
+            self.controller = MockMotorController(port=port)
+        else:
+            self.controller = MotorController(port=port)
 
         self._running = False
         self._paused = False

@@ -55,8 +55,8 @@ class PlotWidget(QWidget):
 
         # Create plot curves
         self.curves = []
-        colors = ['b', 'r', 'g']  # Blue, Red, Green for different sensors
-        names = ['Sensor 1', 'Sensor 2', 'Sensor 3']
+        colors = ['b', 'r', 'g', 'y']  # Blue, Red, Green, Yellow for different sensors
+        names = ['Sensor 1', 'Sensor 2', 'Sensor 3', 'Sensor 4']
 
         for color, name in zip(colors, names):
             curve = self.plot_widget.plot(
@@ -67,6 +67,11 @@ class PlotWidget(QWidget):
 
         # Add legend
         self.plot_widget.addLegend()
+
+        # Initialize data storage for 4 sensors
+        self.pressure_data = [
+            deque(maxlen=self.max_points) for _ in range(4)
+        ]
 
         # Create control panel
         control_panel = QHBoxLayout()
@@ -111,12 +116,13 @@ class PlotWidget(QWidget):
             current_time = time.time() - self.start_time
             self.timestamps.append(current_time)
 
-            for i, reading in enumerate(readings):
-                self.pressure_data[i].append(reading)
+            # Ensure we only use as many readings as we have curves
+            for i in range(min(len(readings), len(self.curves))):
+                self.pressure_data[i].append(readings[i])
 
             # Update plot curves
             for i, curve in enumerate(self.curves):
-                if self.sensor_toggles[i].isChecked():
+                if i < len(self.pressure_data) and self.sensor_toggles[i].isChecked():
                     curve.setData(
                         x=list(self.timestamps),
                         y=list(self.pressure_data[i])
@@ -169,7 +175,8 @@ class PlotWidget(QWidget):
                 'Time': list(self.timestamps),
                 'Sensor1': list(self.pressure_data[0]),
                 'Sensor2': list(self.pressure_data[1]),
-                'Sensor3': list(self.pressure_data[2])
+                'Sensor3': list(self.pressure_data[2]),
+                'Sensor4': list(self.pressure_data[3])
             }
             df = pd.DataFrame(data)
 
