@@ -4,13 +4,15 @@ Description: Real-time pressure plotting widget
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QCheckBox
-from PyQt6.QtCore import Qt
-import pyqtgraph as pg
+from PyQt6.QtCore import QTimer
 import numpy as np
-from collections import deque
-from typing import List, Deque
+import time
 import logging
-import time  # Add this import at the top
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+import matplotlib
+matplotlib.use('QtAgg')
 
 
 class PlotWidget(QWidget):
@@ -26,114 +28,81 @@ class PlotWidget(QWidget):
         """Initialize plot widget."""
         super().__init__()
 
-        self.max_points = max_points
-        self.update_interval = update_interval
-
-        # Initialize data storage
-        self.timestamps: Deque[float] = deque(maxlen=max_points)
-        self.pressure_data: List[Deque[float]] = [
-            deque(maxlen=max_points) for _ in range(3)
-        ]
-
-        self.start_time = time.time()
-        self.setup_ui()
-        self.logger = logging.getLogger(__name__)
-
-    def setup_ui(self):
-        """Setup user interface."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Create plot widget
-        self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setFixedSize(620, 259)
-        self.plot_widget.setBackground('w')  # White background
-        self.plot_widget.setTitle("Pressure Readings")
-        self.plot_widget.setLabel('left', "Pressure", units='bar')
-        self.plot_widget.setLabel('bottom', "Time", units='s')
-        self.plot_widget.showGrid(x=True, y=True)
-
-        # Create plot curves
-        self.curves = []
-        colors = ['b', 'r', 'g', 'y']  # Blue, Red, Green, Yellow for different sensors
-        names = ['Sensor 1', 'Sensor 2', 'Sensor 3', 'Sensor 4']
-
-        for color, name in zip(colors, names):
-            curve = self.plot_widget.plot(
-                pen=pg.mkPen(color=color, width=2),
-                name=name
-            )
-            self.curves.append(curve)
-
+        # Create matplotlib figure
+        self.figure = Figure(figsize=(6, 3))
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        
+        # Set fixed axis limits
+        self.ax.set_xlim(-30, 0)  # Show last 30 seconds
+        self.ax.set_ylim(-0.1, 11)  # Set y-axis from -0.1 to 11
+        self.ax.set_autoscalex_on(False)  # Disable auto-scaling for x-axis
+        self.ax.set_autoscaley_on(False)  # Disable auto-scaling for y-axis
+        
+        # Initialize other plot settings
+        self.ax.grid(True)
+        self.ax.set_ylabel('Pressure')
+        self.ax.set_xlabel('Time (s)')
+        
+        # Create toolbar
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        # Setup layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        self.setLayout(layout)
+        
+        # Initialize data
+        self.times = np.array([])
+        self.pressures = [np.array([]) for _ in range(4)]
+        self.lines = [self.ax.plot([], [], label=f'Sensor {i+1}')[0] 
+                     for i in range(4)]
+        
         # Add legend
-        self.plot_widget.addLegend()
+        self.ax.legend()
+        
+        # Set up update timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_plot)
+        self.timer.start(update_interval)
+        
+        self.max_points = max_points
+        self.start_time = time.time()
 
-        # Initialize data storage for 4 sensors
-        self.pressure_data = [
-            deque(maxlen=self.max_points) for _ in range(4)
-        ]
-
-        # Create control panel
-        control_panel = QHBoxLayout()
-
-        # Sensor visibility toggles
-        self.sensor_toggles = []
-        for i, name in enumerate(names):
-            toggle = QCheckBox(name)
-            toggle.setChecked(True)
-            toggle.stateChanged.connect(self.update_visibility)
-            self.sensor_toggles.append(toggle)
-            control_panel.addWidget(toggle)
-
-        # Add clear and export buttons
-        self.clear_btn = QPushButton("Clear")
-        self.clear_btn.clicked.connect(self.clear_data)
-        self.export_btn = QPushButton("Export")
-        self.export_btn.clicked.connect(self.export_data)
-
-        control_panel.addStretch()
-        control_panel.addWidget(self.clear_btn)
-        control_panel.addWidget(self.export_btn)
-
-        # Add auto-range toggle
-        self.autorange_cb = QCheckBox("Auto Range")
-        self.autorange_cb.setChecked(True)
-        control_panel.addWidget(self.autorange_cb)
-
-        # Add widgets to layout
-        layout.addWidget(self.plot_widget)
-        layout.addLayout(control_panel)
-
-    def update_plot(self, readings: List[float]):
-        """
-        Update plot with new readings.
-
+    def update_plot(self, readings=None):
+        """Update plot with new readings.
+        
         Args:
             readings: List of pressure readings from sensors
         """
-        try:
-            # Add new data points
+        if readings is not None:
             current_time = time.time() - self.start_time
-            self.timestamps.append(current_time)
-
-            # Ensure we only use as many readings as we have curves
-            for i in range(min(len(readings), len(self.curves))):
-                self.pressure_data[i].append(readings[i])
-
-            # Update plot curves
-            for i, curve in enumerate(self.curves):
-                if i < len(self.pressure_data) and self.sensor_toggles[i].isChecked():
-                    curve.setData(
-                        x=list(self.timestamps),
-                        y=list(self.pressure_data[i])
-                    )
-
-            # Update range if auto-range is enabled
-            if self.autorange_cb.isChecked():
-                self.plot_widget.enableAutoRange()
-
-        except Exception as e:
-            self.logger.error(f"Error updating plot: {e}")
+            
+            # Add new data point
+            self.times = np.append(self.times, current_time)
+            for i, reading in enumerate(readings):
+                self.pressures[i] = np.append(self.pressures[i], reading)
+            
+            # Remove old data points
+            if len(self.times) > self.max_points:
+                self.times = self.times[-self.max_points:]
+                for i in range(4):
+                    self.pressures[i] = self.pressures[i][-self.max_points:]
+        
+        if not self.times.size:
+            return
+            
+        current_time = time.time() - self.start_time
+        
+        # Update x-axis to maintain 30-second window
+        self.ax.set_xlim(current_time - 30, current_time)
+        
+        # Update line data
+        for i, line in enumerate(self.lines):
+            line.set_data(self.times, self.pressures[i])
+        
+        self.canvas.draw()
 
     def clear_data(self):
         """Clear all plot data."""

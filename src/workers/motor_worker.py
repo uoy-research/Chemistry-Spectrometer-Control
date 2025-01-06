@@ -131,3 +131,16 @@ class MotorWorker(QThread):
     def running(self) -> bool:
         """Get the running state of the worker."""
         return self._running
+
+    def emergency_stop(self):
+        """Execute emergency stop."""
+        try:
+            if self.running:
+                # Stop any current movement
+                self.controller.stop_motor()
+                # Signal that we've stopped
+                self.status_changed.emit("Motor emergency stopped")
+                self.logger.info("Emergency stop executed")
+        except Exception as e:
+            self.error_occurred.emit(f"Emergency stop failed: {str(e)}")
+            self.logger.error(f"Emergency stop failed: {e}")

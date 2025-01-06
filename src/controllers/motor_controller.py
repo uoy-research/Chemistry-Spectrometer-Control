@@ -90,3 +90,19 @@ class MotorController:
         except Exception as e:
             self.logger.error(f"Error setting position: {e}")
             return False
+
+    def stop_motor(self) -> bool:
+        """Stop motor movement.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if self.running:
+                # Send stop command to motor
+                self.send_command('STOP')
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to stop motor: {e}")
+            return False

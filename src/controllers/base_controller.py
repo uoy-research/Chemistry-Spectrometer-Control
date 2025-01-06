@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 import random
 import time
+import logging
 
 class BaseController(ABC):
     @abstractmethod
@@ -75,22 +76,33 @@ class MockMotorController(BaseController):
 
     def __init__(self, port: int, address: int = 1, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
-        self.running = False
+        self._running = False
         self.current_position = 500
         self.target_position = 500
         self._last_update = time.time()
         self.speed = 100  # positions per second
+        self.logger = logging.getLogger(__name__)
 
     def start(self) -> bool:
-        self.running = True
+        self._running = True
         return True
 
     def stop(self) -> None:
-        self.running = False
+        self._running = False
+
+    @property
+    def running(self) -> bool:
+        """Get running state."""
+        return self._running
+
+    @running.setter
+    def running(self, value: bool):
+        """Set running state."""
+        self._running = value
 
     def get_position(self) -> Optional[int]:
         """Simulate motor movement."""
-        if not self.running:
+        if not self._running:
             return None
 
         current_time = time.time()
@@ -110,7 +122,7 @@ class MockMotorController(BaseController):
 
     def set_position(self, position: int, wait: bool = False) -> bool:
         """Set target position."""
-        if not self.running:
+        if not self._running:
             return False
 
         if not self.POSITION_MIN <= position <= self.POSITION_MAX:
@@ -122,4 +134,9 @@ class MockMotorController(BaseController):
             while self.get_position() != position:
                 time.sleep(0.1)
         
+        return True 
+
+    def stop_motor(self) -> bool:
+        """Stop motor movement."""
+        self._running = False
         return True 

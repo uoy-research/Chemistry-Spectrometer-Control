@@ -15,6 +15,7 @@ from PyQt6.QtGui import QFont
 import logging
 from typing import List, Optional
 from pathlib import Path
+import time
 
 from utils.config import Config
 from workers.arduino_worker import ArduinoWorker
@@ -426,13 +427,21 @@ class MainWindow(QMainWindow):
 
     def reset_valves(self):
         """Reset all valves to their default state."""
+        # Reset valve buttons
         for button in self.valve_buttons:
             button.setChecked(False)
 
+        # Reset sequence info displays
         self.currentStepTypeEdit.clear()
         self.currentStepTimeEdit.clear()
-        self.stepsRemainingLabel.setText("Steps Remaining")
-        self.stepsTimeRemainingLabel.setText("Steps Time Remaining")
+        self.stepsRemainingEdit.clear()
+        self.totalTimeEdit.clear()
+
+        # Reset valve states
+        if self.arduino_worker.running:
+            self.arduino_worker.set_valves([0] * 8)  # Close all valves
+            
+        self.logger.info("Valves reset to default state")
 
     def set_valve_mode(self, is_auto: bool):
         """Switch between manual and automated valve control.
@@ -765,8 +774,16 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(int)
     def handle_position_update(self, position: int):
-        """Handle motor position updates."""
-        self.position_spin.setValue(position)
+        """Handle motor position update.
+        
+        Args:
+            position: Current motor position (integer)
+        """
+        try:
+            # Format position to 2 decimal places and update display
+            self.position_spin.setText(str(position))
+        except Exception as e:
+            self.logger.error(f"Error updating position display: {e}")
 
     @pyqtSlot(str)
     def handle_status_message(self, message: str):
@@ -987,35 +1004,46 @@ class MainWindow(QMainWindow):
     def on_Valve1Button_clicked(self, checked: bool):
         """Handle Valve 1 (Switch valve) button click."""
         if self.arduino_worker.running:
-            self.arduino_worker.set_valve(1, checked)
+            # Create valve states list with all valves off except the target valve
+            valve_states = [0] * 8  # 8 valve states
+            valve_states[0] = 1 if checked else 0  # Valve 1 is index 0
+            self.arduino_worker.set_valves(valve_states)
             self.logger.info(f"Valve 1 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
     def on_Valve2Button_clicked(self, checked: bool):
         """Handle Valve 2 (Inlet valve) button click."""
         if self.arduino_worker.running:
-            self.arduino_worker.set_valve(2, checked)
+            valve_states = [0] * 8
+            valve_states[1] = 1 if checked else 0  # Valve 2 is index 1
+            self.arduino_worker.set_valves(valve_states)
             self.logger.info(f"Valve 2 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
     def on_Valve3Button_clicked(self, checked: bool):
         """Handle Valve 3 (Outlet valve) button click."""
         if self.arduino_worker.running:
-            self.arduino_worker.set_valve(3, checked)
+            valve_states = [0] * 8
+            valve_states[2] = 1 if checked else 0  # Valve 3 is index 2
+            self.arduino_worker.set_valves(valve_states)
             self.logger.info(f"Valve 3 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
     def on_Valve4Button_clicked(self, checked: bool):
         """Handle Valve 4 (Vent valve) button click."""
         if self.arduino_worker.running:
-            self.arduino_worker.set_valve(4, checked)
+            valve_states = [0] * 8
+            valve_states[3] = 1 if checked else 0  # Valve 4 is index 3
+            self.arduino_worker.set_valves(valve_states)
             self.logger.info(f"Valve 4 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
     def on_Valve5Button_clicked(self, checked: bool):
         """Handle Valve 5 (Short valve) button click."""
         if self.arduino_worker.running:
-            self.arduino_worker.set_valve(5, checked)
+            valve_states = [0] * 8
+            valve_states[4] = 1 if checked else 0  # Valve 5 is index 4
+            self.arduino_worker.set_valves(valve_states)
             self.logger.info(f"Valve 5 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
@@ -1025,16 +1053,15 @@ class MainWindow(QMainWindow):
             return
 
         if checked:
-            # Open vent and short valves, close inlet
-            self.arduino_worker.set_valve(2, False)  # Close inlet
-            self.arduino_worker.set_valve(4, True)   # Open vent
-            self.arduino_worker.set_valve(5, True)   # Open short
+            valve_states = [0] * 8
+            valve_states[1] = 0  # Close inlet (Valve 2)
+            valve_states[3] = 1  # Open vent (Valve 4)
+            valve_states[4] = 1  # Open short (Valve 5)
+            self.arduino_worker.set_valves(valve_states)
             self.disable_valve_controls(True)
             self.logger.info("Quick vent started")
         else:
-            # Close all valves
-            for valve in range(1, 6):
-                self.arduino_worker.set_valve(valve, False)
+            self.arduino_worker.set_valves([0] * 8)  # Close all valves
             self.disable_valve_controls(False)
             self.logger.info("Quick vent stopped")
 
@@ -1185,7 +1212,7 @@ class MainWindow(QMainWindow):
         """Handle move to target button click."""
         if self.motor_worker.running:
             try:
-                target = int(self.target_motor_pos_edit.text())
+                target = self.target_motor_pos_edit.value()
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}")
             except ValueError:
@@ -1229,30 +1256,42 @@ class MainWindow(QMainWindow):
     def on_beginSaveButton_clicked(self, checked: bool):
         """Handle begin save button click."""
         if checked:
-            save_path = self.savePathEdit.text()
-            if not save_path:
-                self.handle_error("Please select a save path first")
-                self.beginSaveButton.setChecked(False)
-                return
-
+            # Create data directory if it doesn't exist
+            data_dir = Path("C:/ssbubble/data")
+            data_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate default save path with timestamp
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            default_path = data_dir / f"pressure_data_{timestamp}.csv"
+            
+            # If no path is set, use the default
+            if not self.savePathEdit.text():
+                self.savePathEdit.setText(str(default_path))
+            
             try:
                 # Use plot widget's export_data method
                 self.plot_widget.export_data()
-                self.logger.info(f"Started recording data to {save_path}")
+                self.beginSaveButton.setText("Stop Saving")
+                self.logger.info(f"Started recording data to {self.savePathEdit.text()}")
             except Exception as e:
                 self.handle_error(f"Failed to start recording: {e}")
                 self.beginSaveButton.setChecked(False)
         else:
             self.plot_widget.stop_recording()
+            self.beginSaveButton.setText("Begin Saving")
             self.logger.info("Stopped recording data")
 
     @pyqtSlot()
     def on_selectSavePathButton_clicked(self):
         """Handle select save path button click."""
+        # Create data directory if it doesn't exist
+        data_dir = Path("C:/ssbubble/data")
+        data_dir.mkdir(parents=True, exist_ok=True)
+
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Select Save Location",
-            "",
+            str(data_dir),  # Start in C:\ssbubble\data directory
             "CSV Files (*.csv);;All Files (*)"
         )
 
