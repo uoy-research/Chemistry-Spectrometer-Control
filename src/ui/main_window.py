@@ -16,6 +16,7 @@ import logging
 from typing import List, Optional
 from pathlib import Path
 import time
+import json
 
 from utils.config import Config
 from workers.arduino_worker import ArduinoWorker
@@ -23,7 +24,8 @@ from workers.motor_worker import MotorWorker
 from models.valve_macro import MacroManager
 from .widgets.plot_widget import PlotWidget
 from .widgets.log_widget import LogWidget
-from .dialogs.macro_editor import MacroEditor
+from .dialogs.valve_macro_editor import ValveMacroEditor
+from .dialogs.motor_macro_editor import MotorMacroEditor
 
 
 class MainWindow(QMainWindow):
@@ -440,7 +442,7 @@ class MainWindow(QMainWindow):
         # Reset valve states
         if self.arduino_worker.running:
             self.arduino_worker.set_valves([0] * 8)  # Close all valves
-            
+
         self.logger.info("Valves reset to default state")
 
     def set_valve_mode(self, is_auto: bool):
@@ -683,8 +685,10 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
 
         tools_menu = menubar.addMenu("Tools")
-        macro_action = tools_menu.addAction("Macro Editor")
-        macro_action.triggered.connect(self.edit_macros)
+        valve_macro_action = tools_menu.addAction("Valve Macros")
+        valve_macro_action.triggered.connect(self.edit_macros)
+        motor_macro_action = tools_menu.addAction("Motor Macros") 
+        motor_macro_action.triggered.connect(self.edit_macros)
 
     def setup_status_bar(self):
         """Setup status bar."""
@@ -775,7 +779,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot(int)
     def handle_position_update(self, position: int):
         """Handle motor position update.
-        
+
         Args:
             position: Current motor position (integer)
         """
@@ -804,7 +808,12 @@ class MainWindow(QMainWindow):
 
     def edit_macros(self):
         """Open macro editor dialog."""
-        editor = MacroEditor(self.macro_manager, self)
+        # Get the sender (which menu item triggered this)
+        sender = self.sender()
+        if sender.text() == "Valve Macros":
+            editor = ValveMacroEditor(self)
+        else:  # Motor Macros
+            editor = MotorMacroEditor(self)
         editor.exec()
 
     def emergency_stop(self):
@@ -1245,12 +1254,15 @@ class MainWindow(QMainWindow):
         """
         if self.motor_worker.running:
             try:
-                position = self.macro_manager.get_motor_position(macro_num)
-                self.motor_worker.move_to(position)
-                self.logger.info(f"Executing motor macro {macro_num}")
+                macro = self.load_motor_macro(macro_num)
+                if macro:
+                    position = macro["Position"]
+                    self.motor_worker.move_to(position)
+                    self.logger.info(f"Executing motor macro {macro_num}: {macro['Label']}")
+                else:
+                    self.handle_error(f"Motor macro {macro_num} not found")
             except Exception as e:
-                self.handle_error(
-                    f"Failed to execute motor macro {macro_num}: {e}")
+                self.handle_error(f"Failed to execute motor macro {macro_num}: {e}")
 
     @pyqtSlot(bool)
     def on_beginSaveButton_clicked(self, checked: bool):
@@ -1259,20 +1271,21 @@ class MainWindow(QMainWindow):
             # Create data directory if it doesn't exist
             data_dir = Path("C:/ssbubble/data")
             data_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Generate default save path with timestamp
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             default_path = data_dir / f"pressure_data_{timestamp}.csv"
-            
+
             # If no path is set, use the default
             if not self.savePathEdit.text():
                 self.savePathEdit.setText(str(default_path))
-            
+
             try:
                 # Use plot widget's export_data method
                 self.plot_widget.export_data()
                 self.beginSaveButton.setText("Stop Saving")
-                self.logger.info(f"Started recording data to {self.savePathEdit.text()}")
+                self.logger.info(f"Started recording data to {
+                                 self.savePathEdit.text()}")
             except Exception as e:
                 self.handle_error(f"Failed to start recording: {e}")
                 self.beginSaveButton.setChecked(False)
@@ -1323,21 +1336,31 @@ class MainWindow(QMainWindow):
         """
         if self.arduino_worker.running:
             try:
-                macro = self.macro_manager.get_macro(str(macro_num))
-                # Convert macro valve states to list of 8 integers (0/1)
-                valve_states = [0 if x == 0 else 1 for x in macro.valve_states]
-                self.arduino_worker.set_valves(valve_states)
+                macro = self.load_valve_macro(macro_num)
+                if macro:
+                    # Convert valve states to binary (0/1)
+                    valve_states = []
+                    for state in macro["Valves"]:
+                        if state == "Open":
+                            valve_states.append(1)
+                        else:  # "Closed" or "Ignore"
+                            valve_states.append(0)
+                        
+                    # Set valve states
+                    self.arduino_worker.set_valves(valve_states)
 
-                # If macro has a timer, schedule valve reset
-                if macro.timer > 0:
-                    QTimer.singleShot(
-                        int(macro.timer * 1000),
-                        lambda: self.arduino_worker.set_valves([0] * 8)
-                    )
-                self.logger.info(f"Executing valve macro {macro_num}")
+                    # If macro has a timer, schedule valve reset
+                    timer = macro.get("Timer", 0)
+                    if timer > 0:
+                        QTimer.singleShot(
+                            int(timer * 1000),
+                            lambda: self.arduino_worker.set_valves([0] * 8)
+                        )
+                    self.logger.info(f"Executing valve macro {macro_num}: {macro['Label']}")
+                else:
+                    self.handle_error(f"Valve macro {macro_num} not found")
             except Exception as e:
-                self.handle_error(
-                    f"Failed to execute valve macro {macro_num}: {e}")
+                self.handle_error(f"Failed to execute valve macro {macro_num}: {e}")
 
     @pyqtSlot()
     def on_loadSequence_clicked(self):
@@ -1385,3 +1408,45 @@ class MainWindow(QMainWindow):
         self.currentStepTimeEdit.setText(f"{step_time:.1f}s")
         self.stepsRemainingEdit.setText(str(steps_left))
         self.totalTimeEdit.setText(f"{total_time:.1f}s")
+
+    def load_valve_macro(self, macro_num: int) -> dict:
+        """Load valve macro data from JSON file.
+        
+        Args:
+            macro_num: Macro number (1-4)
+            
+        Returns:
+            dict: Macro data or None if not found
+        """
+        try:
+            json_path = Path("C:/ssbubble/valve_macro_data.json")
+            if json_path.exists():
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                    for macro in data:
+                        if macro["Macro No."] == f"Macro {macro_num}":
+                            return macro
+        except Exception as e:
+            self.logger.error(f"Error loading valve macro {macro_num}: {e}")
+        return None
+
+    def load_motor_macro(self, macro_num: int) -> dict:
+        """Load motor macro data from JSON file.
+        
+        Args:
+            macro_num: Macro number (1-6)
+            
+        Returns:
+            dict: Macro data or None if not found
+        """
+        try:
+            json_path = Path("C:/ssbubble/motor_macro_data.json")
+            if json_path.exists():
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                    for macro in data:
+                        if macro["Macro No."] == f"Macro {macro_num}":
+                            return macro
+        except Exception as e:
+            self.logger.error(f"Error loading motor macro {macro_num}: {e}")
+        return None
