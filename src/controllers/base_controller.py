@@ -67,76 +67,28 @@ class MockArduinoController(BaseController):
         self.valve_states = states.copy()
         return True
 
-class MockMotorController(BaseController):
-    """Mock motor controller for testing."""
-    SPEED_MAX = 1000
-    SPEED_MIN = 0
-    POSITION_MAX = 1000
-    POSITION_MIN = 0
-
-    def __init__(self, port: int, address: int = 1, verbose: bool = False, mode: int = 1):
-        self.port = f"COM{port}"
-        self._running = False
-        self.current_position = 500
-        self.target_position = 500
-        self._last_update = time.time()
-        self.speed = 100  # positions per second
-        self.logger = logging.getLogger(__name__)
+class MockMotorController:
+    def __init__(self):
+        self.position = 0
+        self.running = False
+        self.POSITION_MAX = 1000
+        self.POSITION_MIN = 0
 
     def start(self) -> bool:
-        self._running = True
+        self.running = True
         return True
 
-    def stop(self) -> None:
-        self._running = False
+    def stop(self):
+        self.running = False
 
-    @property
-    def running(self) -> bool:
-        """Get running state."""
-        return self._running
-
-    @running.setter
-    def running(self, value: bool):
-        """Set running state."""
-        self._running = value
-
-    def get_position(self) -> Optional[int]:
-        """Simulate motor movement."""
-        if not self._running:
-            return None
-
-        current_time = time.time()
-        dt = current_time - self._last_update
-        
-        if self.current_position != self.target_position:
-            # Calculate movement direction and distance
-            direction = 1 if self.target_position > self.current_position else -1
-            distance = min(abs(self.target_position - self.current_position), 
-                         self.speed * dt)
-            
-            # Update position
-            self.current_position += direction * distance
-            
-        self._last_update = current_time
-        return round(self.current_position)
+    def get_position(self) -> int:
+        return self.position
 
     def set_position(self, position: int, wait: bool = False) -> bool:
-        """Set target position."""
-        if not self._running:
-            return False
-
-        if not self.POSITION_MIN <= position <= self.POSITION_MAX:
-            return False
-
-        self.target_position = position
-        
-        if wait:
-            while self.get_position() != position:
-                time.sleep(0.1)
-        
-        return True 
+        if self.POSITION_MIN <= position <= self.POSITION_MAX:
+            self.position = int(position)
+            return True
+        return False
 
     def stop_motor(self) -> bool:
-        """Stop motor movement."""
-        self._running = False
         return True 

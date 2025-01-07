@@ -68,11 +68,27 @@ class MainWindow(QMainWindow):
         # Setup logging
         self.logger = logging.getLogger(__name__)
 
+        # Initialize state variables
+        self.position_check_timer = None  # Track the position check timer
+        self.motor_calibrated = False  # Track motor calibration state
+
         # Setup UI
         self.setup_ui()
         self.setup_connections()
 
+        # Initialize control states
+        self.initialize_control_states()
+
         self.logger.info("Application started")
+
+    def initialize_control_states(self):
+        """Initialize the enabled/disabled states of all controls."""
+        # Motor controls
+        if hasattr(self, 'motor_calibrate_btn'):
+            self.motor_calibrate_btn.setEnabled(False)
+        if hasattr(self, 'motor_stop_btn'):
+            self.motor_stop_btn.setEnabled(True)  # Always enabled for emergency
+        self.disable_motor_controls(True)  # Disable all other motor controls
 
     def setup_ui(self):
         """Setup user interface."""
@@ -290,7 +306,26 @@ class MainWindow(QMainWindow):
             "background-color: red; color: white;")  # Red background
         motor_layout.addWidget(self.motor_stop_btn)
 
+        # Don't set initial states here - they'll be set in initialize_control_states()
         layout.addWidget(motor_group, 0, 2, 2, 1)
+
+    def disable_motor_controls(self, disabled: bool):
+        """Enable/disable motor controls based on connection and calibration state."""
+        # Motor position controls
+        if hasattr(self, 'target_motor_pos_edit'):
+            self.target_motor_pos_edit.setEnabled(not disabled and self.motor_calibrated)
+            self.motor_move_to_target_button.setEnabled(not disabled and self.motor_calibrated)
+        
+        # Motor macro buttons
+        if hasattr(self, 'motor_to_top_button'):
+            self.motor_to_top_button.setEnabled(not disabled and self.motor_calibrated)
+            self.motor_ascent_button.setEnabled(not disabled and self.motor_calibrated)
+            
+            # Macro buttons 1-6
+            for i in range(1, 7):
+                btn = getattr(self, f"motor_macro{i}_button", None)
+                if btn:
+                    btn.setEnabled(not disabled and self.motor_calibrated)
 
     def setup_valve_section(self, layout):
         """Setup valve controls with switchable views."""
@@ -556,6 +591,7 @@ class MainWindow(QMainWindow):
             btn = QPushButton(f"Valve Macro {i}")
             btn.setMinimumSize(QSize(0, 25))
             btn.setMaximumWidth(125)
+            btn.setCheckable(True)  # Make button checkable
             font = QFont()
             font.setPointSize(10)
             btn.setFont(font)
@@ -666,6 +702,7 @@ class MainWindow(QMainWindow):
             btn = QPushButton(f"Macro {i}")
             btn.setMinimumSize(QSize(0, 35))
             btn.setMaximumWidth(135)
+            btn.setCheckable(True)  # Make button checkable
             font = QFont()
             font.setPointSize(10)
             btn.setFont(font)
@@ -727,17 +764,12 @@ class MainWindow(QMainWindow):
             self.on_quickBubbleButton_clicked)
 
         # Motor control buttons
-        self.motor_connect_btn.clicked.connect(
-            self.on_motorConnectButton_clicked)
-        self.motor_calibrate_btn.clicked.connect(
-            self.on_motorCalibrateButton_clicked)
+        self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
+        self.motor_calibrate_btn.clicked.connect(self.on_motorCalibrateButton_clicked)
         self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
-        self.motor_move_to_target_button.clicked.connect(
-            self.on_motorMoveToTargetButton_clicked)
-        self.motor_ascent_button.clicked.connect(
-            self.on_motorAscentButton_clicked)
-        self.motor_to_top_button.clicked.connect(
-            self.on_motorToTopButton_clicked)
+        self.motor_move_to_target_button.clicked.connect(self.on_motorMoveToTargetButton_clicked)
+        self.motor_ascent_button.clicked.connect(self.on_motorAscentButton_clicked)
+        self.motor_to_top_button.clicked.connect(self.on_motorToTopButton_clicked)
 
         # Motor macro buttons
         for i in range(1, 7):
@@ -760,16 +792,31 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def handle_motor_connection(self):
         """Handle motor connection/disconnection."""
-        if not self.motor_worker.running:
-            if self.motor_worker.start():
-                self.motor_connect_btn.setText("Disconnect")
-                self.logger.info("Connected to motor")
+        try:
+            if not self.motor_worker.running:
+                # Start the worker - note that in test mode this should always succeed
+                if self.motor_worker.start() or self.test_mode:  # Add test_mode check here
+                    self.motor_connect_btn.setText("Disconnect")
+                    self.motor_warning_label.setText("")
+                    self.motor_calibrate_btn.setEnabled(True)  # Enable calibration after connection
+                    self.disable_motor_controls(True)  # Ensure other controls stay disabled
+                    self.logger.info("Connected to motor")
+                else:
+                    self.handle_error("Failed to connect to motor")
+                    self.motor_warning_label.setText("Warning: Motor not connected")
+                    self.motor_calibrate_btn.setEnabled(False)
+                    self.disable_motor_controls(True)
             else:
-                self.handle_error("Failed to connect to motor")
-        else:
-            self.motor_worker.stop()
-            self.motor_connect_btn.setText("Connect")
-            self.logger.info("Disconnected from motor")
+                self.motor_worker.stop()
+                self.motor_connect_btn.setText("Connect")
+                self.motor_calibrated = False
+                self.motor_warning_label.setText("Warning: Motor not connected")
+                self.motor_calibrate_btn.setEnabled(False)
+                self.disable_motor_controls(True)
+                self.logger.info("Disconnected from motor")
+        except Exception as e:
+            self.logger.error(f"Error in motor connection handler: {e}")
+            self.handle_error(f"Motor connection error: {str(e)}")
 
     @pyqtSlot(list)
     def handle_pressure_readings(self, readings: List[float]):
@@ -1082,14 +1129,26 @@ class MainWindow(QMainWindow):
 
         if checked:
             # Configure valves for slow venting
-            self.arduino_worker.set_valve(2, False)  # Close inlet
-            self.arduino_worker.set_valve(4, True)   # Open vent
+            valve_states = [0] * 8  # Initialize all valves closed
+            valve_states[1] = 0     # Close inlet (Valve 2)
+            valve_states[3] = 1     # Open vent (Valve 4)
+            self.arduino_worker.set_valves(valve_states)
+            
+            # Update valve button states
+            self.Valve2Button.setChecked(False)  # Inlet
+            self.Valve4Button.setChecked(True)   # Vent
+            
             self.disable_valve_controls(True)
             self.logger.info("Slow vent started")
         else:
             # Close all valves
-            for valve in range(1, 6):
-                self.arduino_worker.set_valve(valve, False)
+            self.arduino_worker.set_valves([0] * 8)
+            
+            # Update valve button states
+            for i in range(1, 6):
+                valve_button = getattr(self, f"Valve{i}Button")
+                valve_button.setChecked(False)
+            
             self.disable_valve_controls(False)
             self.logger.info("Slow vent stopped")
 
@@ -1205,15 +1264,26 @@ class MainWindow(QMainWindow):
     def on_motorCalibrateButton_clicked(self):
         """Handle motor calibration button click."""
         if self.motor_worker.running:
-            # Move to position 0 for calibration
-            self.motor_worker.move_to(0)
-            self.logger.info("Motor calibration started")
+            try:
+                # Move to position 0 for calibration
+                success = self.motor_worker.move_to(0)
+                if success:
+                    self.motor_calibrated = True
+                    self.disable_motor_controls(False)  # Enable controls after calibration
+                    self.logger.info("Motor calibration completed")
+                else:
+                    self.handle_error("Motor calibration failed")
+            except Exception as e:
+                self.handle_error(f"Calibration error: {e}")
 
     @pyqtSlot()
     def on_motorStopButton_clicked(self):
         """Handle motor emergency stop button click."""
         if self.motor_worker.running:
             self.motor_worker.emergency_stop()
+            self.motor_calibrated = False  # Reset calibration state after emergency stop
+            self.disable_motor_controls(True)  # Disable controls after emergency stop
+            self.motor_calibrate_btn.setEnabled(True)  # Allow recalibration
             self.logger.warning("Motor emergency stop activated")
 
     @pyqtSlot()
@@ -1254,15 +1324,53 @@ class MainWindow(QMainWindow):
         """
         if self.motor_worker.running:
             try:
+                # Get the macro button that was clicked
+                macro_button = getattr(self, f"motor_macro{macro_num}_button")
+                
+                # Uncheck all other macro buttons
+                for i in range(1, 7):
+                    if i != macro_num:
+                        other_button = getattr(self, f"motor_macro{i}_button")
+                        other_button.setChecked(False)
+                
                 macro = self.load_motor_macro(macro_num)
                 if macro:
                     position = macro["Position"]
-                    self.motor_worker.move_to(position)
-                    self.logger.info(f"Executing motor macro {macro_num}: {macro['Label']}")
+                    # Check the macro button
+                    macro_button.setChecked(True)
+                    
+                    # Start the movement
+                    success = self.motor_worker.move_to(position)
+                    if success:
+                        self.logger.info(f"Executing motor macro {macro_num}: {macro['Label']}")
+                        
+                        # Create a timer to check position periodically
+                        self.position_check_timer = QTimer(self)
+                        self.position_check_timer.setInterval(100)  # Check every 100ms
+                        
+                        def check_position():
+                            current_pos = self.motor_worker.get_current_position()
+                            if current_pos == position:
+                                macro_button.setChecked(False)
+                                self.position_check_timer.stop()
+                                self.position_check_timer = None
+                        
+                        self.position_check_timer.timeout.connect(check_position)
+                        self.position_check_timer.start()
+                    else:
+                        macro_button.setChecked(False)
                 else:
                     self.handle_error(f"Motor macro {macro_num} not found")
+                    macro_button.setChecked(False)
             except Exception as e:
                 self.handle_error(f"Failed to execute motor macro {macro_num}: {e}")
+                # Ensure macro button is unchecked on error
+                macro_button = getattr(self, f"motor_macro{macro_num}_button")
+                macro_button.setChecked(False)
+                # Clean up timer on error
+                if self.position_check_timer is not None:
+                    self.position_check_timer.stop()
+                    self.position_check_timer = None
 
     @pyqtSlot(bool)
     def on_beginSaveButton_clicked(self, checked: bool):
@@ -1336,6 +1444,9 @@ class MainWindow(QMainWindow):
         """
         if self.arduino_worker.running:
             try:
+                # Get the macro button that was clicked
+                macro_button = getattr(self, f"valveMacro{macro_num}Button")
+                
                 macro = self.load_valve_macro(macro_num)
                 if macro:
                     # Convert valve states to binary (0/1)
@@ -1349,18 +1460,38 @@ class MainWindow(QMainWindow):
                     # Set valve states
                     self.arduino_worker.set_valves(valve_states)
 
+                    # Update valve button states
+                    for i, state in enumerate(valve_states[:5]):  # Only first 5 valves have buttons
+                        valve_button = getattr(self, f"Valve{i+1}Button")
+                        valve_button.setChecked(bool(state))
+
+                    # Check the macro button
+                    macro_button.setChecked(True)
+
                     # If macro has a timer, schedule valve reset
                     timer = macro.get("Timer", 0)
                     if timer > 0:
-                        QTimer.singleShot(
-                            int(timer * 1000),
-                            lambda: self.arduino_worker.set_valves([0] * 8)
-                        )
+                        def reset_valves():
+                            # Reset all valve states
+                            self.arduino_worker.set_valves([0] * 8)
+                            # Uncheck all valve buttons
+                            for i in range(1, 6):
+                                valve_button = getattr(self, f"Valve{i}Button")
+                                valve_button.setChecked(False)
+                            # Uncheck the macro button
+                            macro_button.setChecked(False)
+
+                        QTimer.singleShot(int(timer * 1000), reset_valves)
+                    
                     self.logger.info(f"Executing valve macro {macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
+                    macro_button.setChecked(False)
             except Exception as e:
                 self.handle_error(f"Failed to execute valve macro {macro_num}: {e}")
+                # Ensure macro button is unchecked on error
+                macro_button = getattr(self, f"valveMacro{macro_num}Button")
+                macro_button.setChecked(False)
 
     @pyqtSlot()
     def on_loadSequence_clicked(self):

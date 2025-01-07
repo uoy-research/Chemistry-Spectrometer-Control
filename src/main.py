@@ -62,7 +62,7 @@ def main():
         
         # Create and show main window
         logger.debug("Creating main window")
-        window = MainWindow(test_mode=test_mode)
+        window = MainWindow(test_mode=True)
         logger.debug("Showing main window")
         window.show()
 

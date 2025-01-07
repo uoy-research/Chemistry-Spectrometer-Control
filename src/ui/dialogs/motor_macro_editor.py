@@ -100,7 +100,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
         # Update the main window's buttons with the new labels
         for i in range(6):
             macro_data = data[i]
-            button = getattr(self.parent, f'motorMacro{i+1}Button')
+            button = getattr(self.parent, f'motor_macro{i+1}_button')
             button.setText(macro_data['Label'])
 
         super().closeEvent(event)

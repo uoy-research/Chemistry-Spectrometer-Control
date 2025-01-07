@@ -41,7 +41,7 @@ class MotorWorker(QThread):
         self.update_interval = update_interval
         if mock:
             from controllers.base_controller import MockMotorController
-            self.controller = MockMotorController(port=port)
+            self.controller = MockMotorController()
         else:
             self.controller = MotorController(port=port)
 
@@ -144,3 +144,24 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Emergency stop failed: {str(e)}")
             self.logger.error(f"Emergency stop failed: {e}")
+
+    def get_current_position(self) -> Optional[int]:
+        """Get the current motor position.
+        
+        Returns:
+            int: Current position or None if not available
+        """
+        if not self.running:
+            return None
+        return self._current_position
+
+    def stop_movement(self):
+        """Stop current movement without stopping the worker thread."""
+        try:
+            if self.running:
+                self.controller.stop_motor()
+                self._target_position = None
+                self.status_changed.emit("Motor movement stopped")
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to stop motor: {str(e)}")
+            self.logger.error(f"Failed to stop motor: {e}")
