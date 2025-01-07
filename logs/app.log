@@ -1,35 +1,16 @@
-2025-01-07 02:24:47 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-07 02:24:47 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-07 02:24:47 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-07 02:24:47 - SSBubble - DEBUG - Creating QApplication
-2025-01-07 02:24:47 - SSBubble - DEBUG - Setting up exception handling
-2025-01-07 02:24:47 - SSBubble - DEBUG - Loading configuration
-2025-01-07 02:24:47 - SSBubble - DEBUG - Creating main window
-2025-01-07 02:24:47 - ui.main_window - INFO - Application started
-2025-01-07 02:24:49 - ui.main_window - INFO - Connected to motor
-2025-01-07 02:24:49 - ui.main_window - INFO - Motor calibration completed
-2025-01-07 02:24:51 - ui.main_window - INFO - Moving motor to position 3.0
-2025-01-07 02:24:54 - ui.main_window - INFO - Moving motor to position 7.0
-2025-01-07 02:24:55 - ui.main_window - INFO - Moving motor to position 11.0
-2025-01-07 02:24:56 - ui.main_window - INFO - Motor ascent started
-2025-01-07 02:24:57 - ui.main_window - INFO - Executing motor macro 2: Motor Macro 2
-2025-01-07 02:24:58 - ui.main_window - INFO - Executing motor macro 3: Motor Macro 3
-2025-01-07 02:24:58 - ui.main_window - INFO - Executing motor macro 4: Motor Macro 4
-2025-01-07 02:24:59 - ui.main_window - INFO - Executing motor macro 1: Macro test name
-2025-01-07 02:24:59 - ui.main_window - INFO - Executing motor macro 5: Motor Macro 5
-2025-01-07 02:25:01 - ui.main_window - INFO - Connected to Arduino in mode 0
-2025-01-07 02:25:03 - ui.main_window - INFO - Valve 1 opened
-2025-01-07 02:25:04 - ui.main_window - INFO - Valve 2 opened
-2025-01-07 02:25:04 - ui.main_window - INFO - Valve 4 opened
-2025-01-07 02:25:06 - ui.main_window - INFO - Executing valve macro 1: Valve test name
-2025-01-07 02:25:07 - ui.main_window - INFO - Executing valve macro 2: Valve Macro 2
-2025-01-07 02:25:11 - workers.motor_worker - INFO - Emergency stop executed
-2025-01-07 02:25:11 - ui.main_window - WARNING - Motor emergency stop activated
-2025-01-07 02:25:14 - ui.main_window - INFO - Motor calibration completed
-2025-01-07 02:25:15 - ui.main_window - INFO - Disconnected from motor
-2025-01-07 02:25:19 - ui.main_window - INFO - Disconnected from Arduino
-2025-01-07 02:25:23 - ui.main_window - INFO - Connected to Arduino in mode 0
-2025-01-07 02:25:25 - ui.main_window - INFO - Connected to motor
-2025-01-07 02:25:26 - ui.main_window - INFO - Motor calibration completed
-2025-01-07 02:25:30 - ui.main_window - INFO - Shutdown complete
-2025-01-07 02:25:30 - SSBubble - INFO - Application shutting down
+2025-01-07 03:04:24 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-07 03:04:24 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-07 03:04:24 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-07 03:04:24 - SSBubble - DEBUG - Creating QApplication
+2025-01-07 03:04:24 - SSBubble - DEBUG - Setting up exception handling
+2025-01-07 03:04:24 - SSBubble - DEBUG - Loading configuration
+2025-01-07 03:04:24 - SSBubble - DEBUG - Creating main window
+2025-01-07 03:04:24 - ui.main_window - INFO - Application started
+2025-01-07 03:04:40 - ui.main_window - INFO - Connected to Arduino in mode 2
+2025-01-07 03:04:43 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-07 03:04:44 - ui.main_window - INFO - Connected to Arduino in mode 1
+2025-01-07 03:04:45 - ui.main_window - INFO - Sequence file found
+2025-01-07 03:04:45 - ui.main_window - ERROR - Sequence file is empty
+2025-01-07 03:04:48 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-07 03:04:50 - ui.main_window - INFO - Shutdown complete
+2025-01-07 03:04:50 - SSBubble - INFO - Application shutting down
