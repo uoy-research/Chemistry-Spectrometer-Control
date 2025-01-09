@@ -655,6 +655,9 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(monitor_group, 1, 3)
 
+        # Connect the select save path button
+        self.selectSavePathButton.clicked.connect(self.on_selectSavePathButton_clicked)
+
     def setup_motor_position_section(self, layout):
         """Setup motor position controls."""
         motor_pos_group = QGroupBox()
@@ -1434,20 +1437,33 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def on_selectSavePathButton_clicked(self):
         """Handle select save path button click."""
-        # Create data directory if it doesn't exist
-        data_dir = Path("C:/ssbubble/data")
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Select Save Location",
-            str(data_dir),  # Start in C:\ssbubble\data directory
-            "CSV Files (*.csv);;All Files (*)"
-        )
-
-        if file_path:
-            self.savePathEdit.setText(file_path)
-            self.logger.info(f"Save path set to {file_path}")
+        try:
+            # Get initial directory - use current path if exists, otherwise default
+            initial_dir = str(Path(self.savePathEdit.text()).parent) if self.savePathEdit.text() else self.default_save_path
+            
+            # Create default filename with timestamp
+            default_filename = f"pressure_data_{time.strftime('%m%d-%H%M')}.csv"
+            
+            # Open file dialog
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Select Save Location",
+                os.path.join(initial_dir, default_filename),
+                "CSV Files (*.csv);;All Files (*.*)"
+            )
+            
+            if file_path:
+                # If user didn't add .csv extension, add it
+                if not file_path.lower().endswith('.csv'):
+                    file_path += '.csv'
+                
+                # Update the save path text field
+                self.savePathEdit.setText(file_path)
+                self.logger.info(f"Save path set to: {file_path}")
+                
+        except Exception as e:
+            self.logger.error(f"Error setting save path: {e}")
+            self.handle_error("Failed to set save path")
 
     @pyqtSlot(int)
     def on_pressureRadioButton_clicked(self, sensor_num: int):

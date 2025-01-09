@@ -1,16 +1,12 @@
-2025-01-07 03:04:24 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-07 03:04:24 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-07 03:04:24 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-07 03:04:24 - SSBubble - DEBUG - Creating QApplication
-2025-01-07 03:04:24 - SSBubble - DEBUG - Setting up exception handling
-2025-01-07 03:04:24 - SSBubble - DEBUG - Loading configuration
-2025-01-07 03:04:24 - SSBubble - DEBUG - Creating main window
-2025-01-07 03:04:24 - ui.main_window - INFO - Application started
-2025-01-07 03:04:40 - ui.main_window - INFO - Connected to Arduino in mode 2
-2025-01-07 03:04:43 - ui.main_window - INFO - Disconnected from Arduino
-2025-01-07 03:04:44 - ui.main_window - INFO - Connected to Arduino in mode 1
-2025-01-07 03:04:45 - ui.main_window - INFO - Sequence file found
-2025-01-07 03:04:45 - ui.main_window - ERROR - Sequence file is empty
-2025-01-07 03:04:48 - ui.main_window - INFO - Disconnected from Arduino
-2025-01-07 03:04:50 - ui.main_window - INFO - Shutdown complete
-2025-01-07 03:04:50 - SSBubble - INFO - Application shutting down
+2025-01-09 20:32:12 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-09 20:32:12 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-09 20:32:12 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-09 20:32:12 - SSBubble - DEBUG - Creating QApplication
+2025-01-09 20:32:12 - SSBubble - DEBUG - Setting up exception handling
+2025-01-09 20:32:12 - SSBubble - DEBUG - Loading configuration
+2025-01-09 20:32:12 - SSBubble - DEBUG - Creating main window
+2025-01-09 20:32:12 - ui.main_window - INFO - Application started
+2025-01-09 20:32:19 - ui.main_window - INFO - Save path set to: C:/Users/Jonat/Documents/NMR project/NMR Git/ssbubble/pressure_data_0109-2032.csv
+2025-01-09 20:32:25 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-09 20:32:33 - ui.main_window - INFO - Shutdown complete
+2025-01-09 20:32:33 - SSBubble - INFO - Application shutting down
