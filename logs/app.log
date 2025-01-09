@@ -1,12 +1,16 @@
-2025-01-09 20:32:12 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-09 20:32:12 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-09 20:32:12 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-09 20:32:12 - SSBubble - DEBUG - Creating QApplication
-2025-01-09 20:32:12 - SSBubble - DEBUG - Setting up exception handling
-2025-01-09 20:32:12 - SSBubble - DEBUG - Loading configuration
-2025-01-09 20:32:12 - SSBubble - DEBUG - Creating main window
-2025-01-09 20:32:12 - ui.main_window - INFO - Application started
-2025-01-09 20:32:19 - ui.main_window - INFO - Save path set to: C:/Users/Jonat/Documents/NMR project/NMR Git/ssbubble/pressure_data_0109-2032.csv
-2025-01-09 20:32:25 - ui.main_window - INFO - Connected to Arduino in mode 0
-2025-01-09 20:32:33 - ui.main_window - INFO - Shutdown complete
-2025-01-09 20:32:33 - SSBubble - INFO - Application shutting down
+2025-01-09 20:59:41 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-09 20:59:41 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-09 20:59:41 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-09 20:59:41 - SSBubble - DEBUG - Creating QApplication
+2025-01-09 20:59:41 - SSBubble - DEBUG - Setting up exception handling
+2025-01-09 20:59:41 - SSBubble - DEBUG - Loading configuration
+2025-01-09 20:59:41 - SSBubble - DEBUG - Creating main window
+2025-01-09 20:59:41 - ui.main_window - INFO - Application started
+2025-01-09 20:59:42 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-09 20:59:43 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-09 20:59:44 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-09 20:59:45 - ui.main_window - INFO - Begin save button clicked: checked=True
+2025-01-09 20:59:45 - ui.main_window - INFO - Started recording data to C:\ssbubble\data\pressure_data_20250109_205945.csv
+2025-01-09 20:59:50 - ui.main_window - INFO - Stopped recording data
+2025-01-09 20:59:52 - ui.main_window - INFO - Shutdown complete
+2025-01-09 20:59:52 - SSBubble - INFO - Application shutting down

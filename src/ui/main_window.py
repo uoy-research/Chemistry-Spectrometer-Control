@@ -656,7 +656,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(monitor_group, 1, 3)
 
         # Connect the select save path button
-        self.selectSavePathButton.clicked.connect(self.on_selectSavePathButton_clicked)
+        self.selectSavePathButton.clicked.connect(
+            self.on_selectSavePathButton_clicked)
+
+        # Add this connection
+        self.beginSaveButton.clicked.connect(self.on_beginSaveButton_clicked)
 
     def setup_motor_position_section(self, layout):
         """Setup motor position controls."""
@@ -1047,8 +1051,7 @@ class MainWindow(QMainWindow):
             valve_states = [0] * 8
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
             self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Pressure build {
-                             'started' if checked else 'stopped'}")
+            self.logger.info(f"Pressure build {'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
     def on_switchGasButton_clicked(self, checked: bool):
@@ -1405,33 +1408,51 @@ class MainWindow(QMainWindow):
                     self.position_check_timer = None
 
     @pyqtSlot(bool)
-    def on_beginSaveButton_clicked(self, checked: bool):
+    def on_beginSaveButton_clicked(self, checked=None):
         """Handle begin save button click."""
+        # If called programmatically, use button's checked state
+        if checked is None:
+            checked = self.beginSaveButton.isChecked()
+
         if checked:
-            # Create data directory if it doesn't exist
-            data_dir = Path("C:/ssbubble/data")
-            data_dir.mkdir(parents=True, exist_ok=True)
-
-            # Generate default save path with timestamp
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            default_path = data_dir / f"pressure_data_{timestamp}.csv"
-
-            # If no path is set, use the default
-            if not self.savePathEdit.text():
-                self.savePathEdit.setText(str(default_path))
-
             try:
-                # Use plot widget's export_data method
-                self.plot_widget.export_data()
-                self.beginSaveButton.setText("Stop Saving")
-                self.logger.info(f"Started recording data to {
-                                 self.savePathEdit.text()}")
+                # Log the checked state
+                self.logger.info(
+                    f"Begin save button clicked: checked={checked}")
+
+                # Create data directory if it doesn't exist
+                data_dir = Path("C:/ssbubble/data")
+                data_dir.mkdir(parents=True, exist_ok=True)
+
+                # Get or generate save path
+                save_path = self.savePathEdit.text()
+                if not save_path:
+                    # Generate default save path with timestamp
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    save_path = str(
+                        data_dir / f"pressure_data_{timestamp}.csv")
+
+                # Update the text field with the generated path
+                self.savePathEdit.setText(save_path)
+
+                # Ensure directory exists
+                Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
+                # Start recording
+                if self.plot_widget.start_recording(save_path):
+                    self.beginSaveButton.setText("Stop Saving")
+                    self.saving = True
+                    self.logger.info(f"Started recording data to {save_path}")
+                else:
+                    self.handle_error("Failed to start recording")
+                    self.beginSaveButton.setChecked(False)
             except Exception as e:
-                self.handle_error(f"Failed to start recording: {e}")
+                self.handle_error(f"Failed to start recording: {str(e)}")
                 self.beginSaveButton.setChecked(False)
         else:
             self.plot_widget.stop_recording()
             self.beginSaveButton.setText("Begin Saving")
+            self.saving = False
             self.logger.info("Stopped recording data")
 
     @pyqtSlot()
@@ -1439,11 +1460,13 @@ class MainWindow(QMainWindow):
         """Handle select save path button click."""
         try:
             # Get initial directory - use current path if exists, otherwise default
-            initial_dir = str(Path(self.savePathEdit.text()).parent) if self.savePathEdit.text() else self.default_save_path
-            
+            initial_dir = str(Path(self.savePathEdit.text(
+            )).parent) if self.savePathEdit.text() else self.default_save_path
+
             # Create default filename with timestamp
-            default_filename = f"pressure_data_{time.strftime('%m%d-%H%M')}.csv"
-            
+            default_filename = f"pressure_data_{
+                time.strftime('%m%d-%H%M')}.csv"
+
             # Open file dialog
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -1451,16 +1474,16 @@ class MainWindow(QMainWindow):
                 os.path.join(initial_dir, default_filename),
                 "CSV Files (*.csv);;All Files (*.*)"
             )
-            
+
             if file_path:
                 # If user didn't add .csv extension, add it
                 if not file_path.lower().endswith('.csv'):
                     file_path += '.csv'
-                
+
                 # Update the save path text field
                 self.savePathEdit.setText(file_path)
                 self.logger.info(f"Save path set to: {file_path}")
-                
+
         except Exception as e:
             self.logger.error(f"Error setting save path: {e}")
             self.handle_error("Failed to set save path")
@@ -1818,7 +1841,8 @@ class MainWindow(QMainWindow):
                             os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
 
                     # Simulate save button click
-                    self.on_beginSaveButton_clicked()
+                    # This will trigger the slot with the correct checked state
+                    self.beginSaveButton.setChecked(True)
 
             return True
 

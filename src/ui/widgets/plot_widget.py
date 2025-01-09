@@ -12,6 +12,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib
+import csv
 matplotlib.use('QtAgg')
 
 
@@ -70,12 +71,12 @@ class PlotWidget(QWidget):
         self.max_points = max_points
         self.start_time = time.time()
 
+        self.recording = False
+        self.save_file = None
+        self.csv_writer = None
+
     def update_plot(self, readings=None):
-        """Update plot with new readings.
-        
-        Args:
-            readings: List of pressure readings from sensors
-        """
+        """Update plot with new readings and save if recording."""
         if readings is not None:
             current_time = time.time() - self.start_time
             
@@ -84,6 +85,11 @@ class PlotWidget(QWidget):
             for i, reading in enumerate(readings):
                 self.pressures[i] = np.append(self.pressures[i], reading)
             
+            # Save data if recording
+            if self.recording and self.csv_writer:
+                self.csv_writer.writerow([current_time] + readings)
+                self.save_file.flush()  # Ensure data is written to disk
+
             # Remove old data points
             if len(self.times) > self.max_points:
                 self.times = self.times[-self.max_points:]
@@ -188,3 +194,26 @@ class PlotWidget(QWidget):
 
         except Exception as e:
             self.logger.error(f"Error setting max points: {e}")
+
+    def start_recording(self, filepath: str):
+        """Start recording data to CSV file."""
+        try:
+            self.save_file = open(filepath, 'w', newline='')
+            self.csv_writer = csv.writer(self.save_file)
+            # Write header
+            self.csv_writer.writerow(['Time'] + [f'Sensor{i+1}' for i in range(4)])
+            self.recording = True
+            self.start_time = time.time()  # Reset start time for recording
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to start recording: {e}")
+            return False
+
+    def stop_recording(self):
+        """Stop recording data."""
+        if self.recording:
+            self.recording = False
+            if self.save_file:
+                self.save_file.close()
+                self.save_file = None
+                self.csv_writer = None
