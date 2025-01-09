@@ -837,6 +837,9 @@ class MainWindow(QMainWindow):
             radio.clicked.connect(
                 lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
 
+        # Connect mode change signals
+        self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
+
     @pyqtSlot()
     def handle_motor_connection(self):
         """Handle motor connection/disconnection."""
@@ -1092,14 +1095,31 @@ class MainWindow(QMainWindow):
             self.logger.info("Quick bubble complete")
 
     def disable_valve_controls(self, disabled: bool):
-        """Enable/disable valve controls."""
-        # Disable individual valve buttons - controlled by checkbox
-        for i in range(1, 6):
-            valve_button = getattr(self, f"Valve{i}Button")
-            if valve_button:
-                valve_button.setEnabled(not disabled)
-                if disabled:
-                    valve_button.setChecked(False)
+        """Enable/disable valve controls based on connection state and mode."""
+        # Only enable controls if:
+        # 1. Not disabled AND
+        # 2. Arduino is connected AND
+        # 3. In manual mode
+        enabled = (not disabled and 
+                  self.arduino_worker.running and 
+                  self.arduino_manual_radio.isChecked())
+
+        # Individual valve buttons
+        for i in range(1, 9):
+            if hasattr(self, f'Valve{i}Button'):
+                getattr(self, f'Valve{i}Button').setEnabled(enabled)
+
+        # Quick action buttons
+        self.quickBubbleButton.setEnabled(enabled)
+        self.switchGasButton.setEnabled(enabled)
+        self.buildPressureButton.setEnabled(enabled)
+        self.quickVentButton.setEnabled(enabled)
+        self.slowVentButton.setEnabled(enabled)
+
+        # Valve macro buttons
+        for i in range(1, 5):
+            if hasattr(self, f'valveMacro{i}Button'):
+                getattr(self, f'valveMacro{i}Button').setEnabled(enabled)
 
     def disable_quick_controls(self, disabled: bool):
         """Enable/disable quick action and macro controls."""
@@ -1416,10 +1436,6 @@ class MainWindow(QMainWindow):
 
         if checked:
             try:
-                # Log the checked state
-                self.logger.info(
-                    f"Begin save button clicked: checked={checked}")
-
                 # Create data directory if it doesn't exist
                 data_dir = Path("C:/ssbubble/data")
                 data_dir.mkdir(parents=True, exist_ok=True)
@@ -1874,3 +1890,21 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.logger.error(f"Error loading macro labels: {e}")
+
+    def on_arduino_connection_changed(self, connected: bool):
+        """Handle Arduino connection state changes."""
+        if connected:
+            self.arduino_connect_btn.setText("Disconnect")
+            self.arduino_warning_label.setText("")
+            # Only enable controls if in manual mode
+            self.disable_valve_controls(not self.arduino_manual_radio.isChecked())
+        else:
+            self.arduino_connect_btn.setText("Connect")
+            if not self.test_mode:
+                self.arduino_warning_label.setText("Warning: Arduino not connected")
+            self.disable_valve_controls(True)  # Disable all controls when disconnected
+
+    def on_arduino_mode_changed(self):
+        """Handle Arduino mode changes."""
+        # Disable controls if not in manual mode
+        self.disable_valve_controls(not self.arduino_manual_radio.isChecked())
