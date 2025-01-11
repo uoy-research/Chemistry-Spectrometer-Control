@@ -1,22 +1,24 @@
-2025-01-11 01:08:59 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-11 01:08:59 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-11 01:08:59 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-11 01:08:59 - SSBubble - DEBUG - Creating QApplication
-2025-01-11 01:08:59 - SSBubble - DEBUG - Setting up exception handling
-2025-01-11 01:08:59 - SSBubble - DEBUG - Loading configuration
-2025-01-11 01:08:59 - SSBubble - DEBUG - Creating main window
-2025-01-11 01:08:59 - ui.main_window - INFO - Application started
-2025-01-11 01:09:01 - ui.main_window - INFO - Connected to motor
-2025-01-11 01:09:02 - ui.main_window - INFO - Motor calibration completed
-2025-01-11 01:09:04 - ui.main_window - INFO - Connected to Arduino in mode 1
-2025-01-11 01:09:04 - ui.main_window - WARNING - Negative motor positions found in sequence. These have been defaulted to 0 (home position)
-2025-01-11 01:09:04 - ui.main_window - INFO - Test mode: Sequence file processed but preserved
-2025-01-11 01:09:04 - ui.main_window - INFO - Sequence length is 9000 ms
-2025-01-11 01:09:04 - ui.main_window - INFO - Executing step: Delay
-2025-01-11 01:09:04 - ui.main_window - INFO - Sequence execution started
-2025-01-11 01:09:05 - ui.main_window - INFO - Executing step: Pressurize
-2025-01-11 01:09:07 - ui.main_window - INFO - Executing step: Bubble
-2025-01-11 01:09:12 - ui.main_window - INFO - Executing step: Vent
-2025-01-11 01:09:13 - ui.main_window - INFO - Sequence execution completed
-2025-01-11 01:09:21 - ui.main_window - INFO - Shutdown complete
-2025-01-11 01:09:21 - SSBubble - INFO - Application shutting down
+2025-01-11 01:20:10 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-11 01:20:10 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-11 01:20:10 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-11 01:20:10 - SSBubble - DEBUG - Creating QApplication
+2025-01-11 01:20:10 - SSBubble - DEBUG - Setting up exception handling
+2025-01-11 01:20:10 - SSBubble - DEBUG - Loading configuration
+2025-01-11 01:20:10 - SSBubble - DEBUG - Creating main window
+2025-01-11 01:20:10 - ui.main_window - INFO - Application started
+2025-01-11 01:20:11 - ui.main_window - INFO - Connected to motor
+2025-01-11 01:20:12 - ui.main_window - INFO - Motor calibration completed
+2025-01-11 01:20:13 - ui.main_window - INFO - Connected to Arduino in mode 1
+2025-01-11 01:20:13 - ui.main_window - WARNING - Negative motor positions found in sequence. These have been defaulted to 0 (home position)
+2025-01-11 01:20:13 - ui.main_window - INFO - Started recording data to C:\ssbubble\data\experiment_1.csv
+2025-01-11 01:20:13 - ui.main_window - INFO - Test mode: Sequence file processed but preserved
+2025-01-11 01:20:13 - ui.main_window - INFO - Sequence length is 5000 ms
+2025-01-11 01:20:13 - ui.main_window - INFO - Executing step: Delay
+2025-01-11 01:20:13 - ui.main_window - INFO - Sequence execution started
+2025-01-11 01:20:14 - ui.main_window - INFO - Executing step: Pressurize
+2025-01-11 01:20:16 - ui.main_window - INFO - Executing step: Bubble
+2025-01-11 01:20:17 - ui.main_window - INFO - Executing step: Vent
+2025-01-11 01:20:18 - ui.main_window - INFO - Data recording stopped with sequence completion
+2025-01-11 01:20:18 - ui.main_window - INFO - Sequence execution completed
+2025-01-11 01:20:23 - ui.main_window - INFO - Shutdown complete
+2025-01-11 01:20:23 - SSBubble - INFO - Application shutting down

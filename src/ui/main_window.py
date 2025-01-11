@@ -889,7 +889,7 @@ class MainWindow(QMainWindow):
                 if success:
                     # Process successful sequence
                     self.handle_sequence_file(True)
-                    
+
                     # Calculate sequence timing
                     self.calculate_sequence_time()
 
@@ -906,7 +906,7 @@ class MainWindow(QMainWindow):
 
                     # Start sequence execution
                     self.start_sequence()
-                    
+
                     # Stop checking for files
                     self.file_timer.stop()
                 else:
@@ -916,9 +916,11 @@ class MainWindow(QMainWindow):
                     self.arduino_worker.stop()
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
-                        self.arduino_warning_label.setText("Warning: Arduino not connected")
-                    self.logger.error("Disconnected controller due to sequence file error")
-                    
+                        self.arduino_warning_label.setText(
+                            "Warning: Arduino not connected")
+                    self.logger.error(
+                        "Disconnected controller due to sequence file error")
+
             except Exception as e:
                 # Handle any unexpected errors
                 self.handle_sequence_file(False)
@@ -926,7 +928,8 @@ class MainWindow(QMainWindow):
                 self.arduino_worker.stop()
                 self.arduino_connect_btn.setText("Connect")
                 if not self.test_mode:
-                    self.arduino_warning_label.setText("Warning: Arduino not connected")
+                    self.arduino_warning_label.setText(
+                        "Warning: Arduino not connected")
                 self.logger.error(f"Disconnected controller due to error: {e}")
 
     def calculate_sequence_time(self):
@@ -1353,7 +1356,8 @@ class MainWindow(QMainWindow):
             try:
                 target = self.target_motor_pos_edit.value()
                 if target < 0:
-                    self.handle_error("Invalid target position. Motor positions must be non-negative (0 is home position at top).")
+                    self.handle_error(
+                        "Invalid target position. Motor positions must be non-negative (0 is home position at top).")
                     return
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}")
@@ -1401,9 +1405,10 @@ class MainWindow(QMainWindow):
                     position = macro["Position"]
                     # Add position validation
                     if position < 0:
-                        self.handle_error("Invalid macro position. Motor positions must be non-negative (0 is home position at top).")
+                        self.handle_error(
+                            "Invalid macro position. Motor positions must be non-negative (0 is home position at top).")
                         return
-                    
+
                     # Check the macro button
                     macro_button.setChecked(True)
 
@@ -1479,12 +1484,17 @@ class MainWindow(QMainWindow):
                 else:
                     self.handle_error("Failed to start recording")
                     self.beginSaveButton.setChecked(False)
+                    self.saving = False
+                    self.beginSaveButton.setText("Begin Saving")
             except Exception as e:
                 self.handle_error(f"Failed to start recording: {str(e)}")
                 self.beginSaveButton.setChecked(False)
+                self.saving = False
+                self.beginSaveButton.setText("Begin Saving")
         else:
             self.plot_widget.stop_recording()
             self.beginSaveButton.setText("Begin Saving")
+            self.beginSaveButton.setChecked(False)  # Ensure button is unchecked
             self.saving = False
             self.logger.info("Stopped recording data")
 
@@ -1637,9 +1647,11 @@ class MainWindow(QMainWindow):
             self.currentStepTimeEdit.setText(f"{step_time:.1f}s")
             # Handle both numeric and string values for steps_left
             if isinstance(steps_left, str):
-                self.stepsRemainingEdit.setText(steps_left)  # Show "Complete" directly
+                self.stepsRemainingEdit.setText(
+                    steps_left)  # Show "Complete" directly
             else:
-                self.stepsRemainingEdit.setText(str(steps_left))  # Convert number to string
+                self.stepsRemainingEdit.setText(
+                    str(steps_left))  # Convert number to string
             self.totalTimeEdit.setText(f"{total_time:.1f}s")
         except Exception as e:
             self.logger.error(f"Error updating sequence info: {e}")
@@ -1844,7 +1856,7 @@ class MainWindow(QMainWindow):
                         if i < len(sequence_string) and sequence_string[i] == '-':
                             is_negative = True
                             i += 1
-                        
+
                         # Collect digits
                         while i < len(sequence_string) and sequence_string[i].isdigit():
                             motor_position_str += sequence_string[i]
@@ -1856,7 +1868,8 @@ class MainWindow(QMainWindow):
                                 negative_positions_found = True
                                 motor_position = 0  # Default to home position
                         except ValueError:
-                            self.logger.error("Invalid motor position in sequence file")
+                            self.logger.error(
+                                "Invalid motor position in sequence file")
                             return False
 
                     # Create a step object and add it to the list
@@ -1865,7 +1878,8 @@ class MainWindow(QMainWindow):
 
                 # Log warning if negative positions were found
                 if negative_positions_found:
-                    self.logger.warning("Negative motor positions found in sequence. These have been defaulted to 0 (home position)")
+                    self.logger.warning(
+                        "Negative motor positions found in sequence. These have been defaulted to 0 (home position)")
 
                 # Automatically start saving at sequence start
                 if not self.saving:
@@ -1883,7 +1897,7 @@ class MainWindow(QMainWindow):
 
                     # Simulate save button click
                     # This will trigger the slot with the correct checked state
-                    self.beginSaveButton.setChecked(True)
+                    self.on_beginSaveButton_clicked(True)  # Actually start the recording
 
             return True
 
@@ -1939,27 +1953,28 @@ class MainWindow(QMainWindow):
 
     def handle_sequence_file(self, success: bool):
         """Handle sequence file cleanup after processing.
-        
+
         Args:
             success: Whether sequence processing was successful
         """
         sequence_path = Path(r"C:\ssbubble\sequence.txt")
         prospa_path = Path(r"C:\ssbubble\prospa.txt")
-        
+
         try:
             # Write status to Prospa
             with open(prospa_path, 'w') as f:
                 f.write('1' if success else '0')
-            
+
             # Delete sequence file only if not in test mode
             if success and not self.test_mode:
                 sequence_path.unlink()
                 self.logger.info("Sequence file processed and deleted")
             elif success and self.test_mode:
-                self.logger.info("Test mode: Sequence file processed but preserved")
+                self.logger.info(
+                    "Test mode: Sequence file processed but preserved")
             else:
                 self.logger.error("Failed to process sequence file")
-            
+
         except Exception as e:
             self.logger.error(f"Error handling sequence file cleanup: {e}")
 
@@ -1972,19 +1987,19 @@ class MainWindow(QMainWindow):
 
             # Execute first step
             self.execute_step(self.steps[0])
-            
+
             # Start step timer
             self.step_start_time = time.time()
             self.step_timer = QTimer()
             self.step_timer.timeout.connect(self.update_step_time)
             self.step_timer.start(100)  # Update every 100ms
-            
+
             # Schedule next step
             if len(self.steps) > 1:
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
-            
+
             self.logger.info("Sequence execution started")
-            
+
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
@@ -1992,17 +2007,17 @@ class MainWindow(QMainWindow):
     def update_step_time(self):
         """Update the time remaining display for current step and total sequence."""
         try:
-            if self.steps:
+            if self.steps and len(self.steps) > 0:
                 # Calculate current step time remaining
-                elapsed = int((time.time() - self.step_start_time) * 1000)  # Convert to ms
+                elapsed = int((time.time() - self.step_start_time)
+                              * 1000)  # Convert to ms
                 step_remaining = max(0, self.steps[0].time_length - elapsed)
-                
+
                 # Calculate total time remaining
                 total_remaining = step_remaining  # Start with current step remaining
-                # Add time for all future steps
                 for step in self.steps[1:]:
                     total_remaining += step.time_length
-                
+
                 # Update UI with remaining times
                 self.update_sequence_info(
                     step_type=self.step_types[self.steps[0].step_type],
@@ -2010,19 +2025,6 @@ class MainWindow(QMainWindow):
                     steps_left=len(self.steps),
                     total_time=total_remaining / 1000  # Convert to seconds
                 )
-                
-                # Stop timer if step is complete
-                if step_remaining <= 0:
-                    self.step_timer.stop()
-            else:
-                # No steps left - sequence complete
-                self.update_sequence_info(
-                    step_type="Complete",
-                    step_time=0,
-                    steps_left="Complete",  # Show "Complete" instead of 0
-                    total_time=0
-                )
-                self.step_timer.stop()
         except Exception as e:
             self.logger.error(f"Error updating step time: {e}")
 
@@ -2038,9 +2040,8 @@ class MainWindow(QMainWindow):
                 
                 # Reset step timer
                 self.step_start_time = time.time()
-                self.step_timer.start()
                 
-                # Schedule next step using the step's time length
+                # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
             else:
                 # Sequence complete - stop timer and update UI
@@ -2052,6 +2053,15 @@ class MainWindow(QMainWindow):
                     total_time=0
                 )
                 self.update_sequence_status("Complete")
+                
+                # Stop data recording
+                if self.saving:
+                    self.plot_widget.stop_recording()
+                    self.beginSaveButton.setText("Begin Saving")
+                    self.beginSaveButton.setChecked(False)  # Uncheck the button
+                    self.saving = False
+                    self.logger.info("Data recording stopped with sequence completion")
+                
                 self.logger.info("Sequence execution completed")
                 
         except Exception as e:
@@ -2063,7 +2073,7 @@ class MainWindow(QMainWindow):
         try:
             # Set valve states based on step type
             valve_states = [0] * 8  # Initialize all valves closed
-            
+
             if step.step_type == 'p':  # Pressurize
                 valve_states[1] = 1  # Open inlet valve
             elif step.step_type == 'v':  # Vent
@@ -2076,16 +2086,17 @@ class MainWindow(QMainWindow):
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
-            
+
             # Set valve states
             self.arduino_worker.set_valves(valve_states)
-            
+
             # Move motor if required
             if self.motor_flag and step.motor_position is not None:
                 self.motor_worker.move_to(step.motor_position)
-            
-            self.logger.info(f"Executing step: {self.step_types[step.step_type]}")
-            
+
+            self.logger.info(f"Executing step: {
+                             self.step_types[step.step_type]}")
+
         except Exception as e:
             self.logger.error(f"Error executing step: {e}")
             self.handle_error("Failed to execute sequence step")
