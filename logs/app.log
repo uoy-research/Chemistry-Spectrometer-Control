@@ -1,24 +1,39 @@
-2025-01-11 01:20:10 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-11 01:20:10 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-11 01:20:10 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-11 01:20:10 - SSBubble - DEBUG - Creating QApplication
-2025-01-11 01:20:10 - SSBubble - DEBUG - Setting up exception handling
-2025-01-11 01:20:10 - SSBubble - DEBUG - Loading configuration
-2025-01-11 01:20:10 - SSBubble - DEBUG - Creating main window
-2025-01-11 01:20:10 - ui.main_window - INFO - Application started
-2025-01-11 01:20:11 - ui.main_window - INFO - Connected to motor
-2025-01-11 01:20:12 - ui.main_window - INFO - Motor calibration completed
-2025-01-11 01:20:13 - ui.main_window - INFO - Connected to Arduino in mode 1
-2025-01-11 01:20:13 - ui.main_window - WARNING - Negative motor positions found in sequence. These have been defaulted to 0 (home position)
-2025-01-11 01:20:13 - ui.main_window - INFO - Started recording data to C:\ssbubble\data\experiment_1.csv
-2025-01-11 01:20:13 - ui.main_window - INFO - Test mode: Sequence file processed but preserved
-2025-01-11 01:20:13 - ui.main_window - INFO - Sequence length is 5000 ms
-2025-01-11 01:20:13 - ui.main_window - INFO - Executing step: Delay
-2025-01-11 01:20:13 - ui.main_window - INFO - Sequence execution started
-2025-01-11 01:20:14 - ui.main_window - INFO - Executing step: Pressurize
-2025-01-11 01:20:16 - ui.main_window - INFO - Executing step: Bubble
-2025-01-11 01:20:17 - ui.main_window - INFO - Executing step: Vent
-2025-01-11 01:20:18 - ui.main_window - INFO - Data recording stopped with sequence completion
-2025-01-11 01:20:18 - ui.main_window - INFO - Sequence execution completed
-2025-01-11 01:20:23 - ui.main_window - INFO - Shutdown complete
-2025-01-11 01:20:23 - SSBubble - INFO - Application shutting down
+2025-01-22 03:30:04 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-22 03:30:04 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-22 03:30:04 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-22 03:30:04 - SSBubble - DEBUG - Creating QApplication
+2025-01-22 03:30:04 - SSBubble - DEBUG - Setting up exception handling
+2025-01-22 03:30:04 - SSBubble - DEBUG - Loading configuration
+2025-01-22 03:30:04 - SSBubble - DEBUG - Creating main window
+2025-01-22 03:30:04 - ui.main_window - INFO - Application started
+2025-01-22 03:30:06 - ui.main_window - INFO - Connected to motor
+2025-01-22 03:30:06 - ui.main_window - INFO - Motor calibrated to home position (0)
+2025-01-22 03:30:08 - ui.main_window - INFO - Executing motor macro 1: Macro test name
+2025-01-22 03:30:09 - ui.main_window - INFO - Moving motor to home position (0)
+2025-01-22 03:30:10 - ui.main_window - INFO - Executing motor macro 1: Macro test name
+2025-01-22 03:30:11 - ui.main_window - INFO - Moving motor to home position (0)
+2025-01-22 03:30:11 - ui.main_window - INFO - Executing motor macro 1: Macro test name
+2025-01-22 03:30:13 - ui.main_window - INFO - Moving motor to position 2.0
+2025-01-22 03:30:15 - ui.main_window - INFO - Moving motor to position 5.0
+2025-01-22 03:30:16 - ui.main_window - INFO - Moving motor to position 8.0
+2025-01-22 03:30:22 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-22 03:30:25 - ui.main_window - INFO - Valve 1 opened
+2025-01-22 03:30:25 - ui.main_window - INFO - Valve 2 opened
+2025-01-22 03:30:25 - ui.main_window - INFO - Valve 3 opened
+2025-01-22 03:30:25 - ui.main_window - INFO - Valve 5 opened
+2025-01-22 03:30:26 - ui.main_window - INFO - Valve 4 opened
+2025-01-22 03:30:28 - ui.main_window - INFO - Valve 3 closed
+2025-01-22 03:30:28 - ui.main_window - INFO - Valve 4 closed
+2025-01-22 03:30:28 - ui.main_window - INFO - Valve 5 closed
+2025-01-22 03:30:29 - ui.main_window - INFO - Valve 2 closed
+2025-01-22 03:30:29 - ui.main_window - INFO - Valve 1 closed
+2025-01-22 03:30:31 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-22 03:30:32 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-22 03:30:33 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-22 03:30:37 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-22 03:30:42 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-22 03:30:43 - workers.motor_worker - INFO - Emergency stop executed
+2025-01-22 03:30:43 - ui.main_window - WARNING - Motor emergency stop activated
+2025-01-22 03:30:57 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-22 03:30:59 - ui.main_window - INFO - Shutdown complete
+2025-01-22 03:30:59 - SSBubble - INFO - Application shutting down

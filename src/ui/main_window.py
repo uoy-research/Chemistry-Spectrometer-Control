@@ -1326,13 +1326,13 @@ class MainWindow(QMainWindow):
         """Handle motor calibration button click."""
         if self.motor_worker.running:
             try:
-                # Move to position 0 for calibration
+                # Move to home position (0) for calibration
                 success = self.motor_worker.move_to(0)
                 if success:
                     self.motor_calibrated = True
                     # Enable controls after calibration
                     self.disable_motor_controls(False)
-                    self.logger.info("Motor calibration completed")
+                    self.logger.info("Motor calibrated to home position (0)")
                 else:
                     self.handle_error("Motor calibration failed")
             except Exception as e:
@@ -1357,7 +1357,7 @@ class MainWindow(QMainWindow):
                 target = self.target_motor_pos_edit.value()
                 if target < 0:
                     self.handle_error(
-                        "Invalid target position. Motor positions must be non-negative (0 is home position at top).")
+                        "Invalid target position. Position must be non-negative (0 is home position at top).")
                     return
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}")
@@ -1368,19 +1368,17 @@ class MainWindow(QMainWindow):
     def on_motorAscentButton_clicked(self):
         """Handle motor ascent button click."""
         if self.motor_worker.running:
-            # Move to max position for ascent
-            self.motor_worker.move_to(
-                self.motor_worker.controller.POSITION_MAX)
-            self.logger.info("Motor ascent started")
+            # Move to home position (0)
+            self.motor_worker.move_to(0)
+            self.logger.info("Moving motor to home position (0)")
 
     @pyqtSlot()
     def on_motorToTopButton_clicked(self):
         """Handle motor to top button click."""
         if self.motor_worker.running:
-            # Move to max position
-            self.motor_worker.move_to(
-                self.motor_worker.controller.POSITION_MAX)
-            self.logger.info("Moving motor to top position")
+            # Move to home position (0)
+            self.motor_worker.move_to(0)
+            self.logger.info("Moving motor to home position (0)")
 
     @pyqtSlot(int)
     def on_motorMacroButton_clicked(self, macro_num: int):
@@ -1725,16 +1723,16 @@ class MainWindow(QMainWindow):
         """Handle pressure reading updates."""
         self.plot_widget.update_plot(readings)
 
-    @pyqtSlot(int)
-    def handle_position_update(self, position: int):
+    @pyqtSlot(float)  # Update slot to accept float
+    def handle_position_update(self, position: float):
         """Handle motor position update.
 
         Args:
-            position: Current motor position (integer)
+            position: Current motor position (float)
         """
         try:
             # Format position to 2 decimal places and update display
-            self.position_spin.setText(str(position))
+            self.position_spin.setText(f"{position:.2f}")
         except Exception as e:
             self.logger.error(f"Error updating position display: {e}")
 

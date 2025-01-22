@@ -5,14 +5,14 @@ File: src/controllers/motor_controller.py
 import minimalmodbus
 import time
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 
 class MotorController:
     SPEED_MAX = 1000
     SPEED_MIN = 0
-    POSITION_MAX = 1000
-    POSITION_MIN = 0
+    POSITION_MAX = 1000.0  # Maximum downward position
+    POSITION_MIN = 0.0     # Home position (top)
 
     def __init__(self, port: int, address: int = 1, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
@@ -21,7 +21,7 @@ class MotorController:
         self.mode = mode
         self.instrument = None
         self.running = False
-        self._current_position = 500  # For test mode
+        self._current_position = 0.0  # Initialize at home position for test mode
         self._setup_logging()
 
     def _setup_logging(self):
@@ -49,7 +49,12 @@ class MotorController:
             self.logger.error(f"Failed to connect to motor: {e}")
             return False
 
-    def get_position(self) -> Optional[int]:
+    def get_position(self) -> Optional[float]:
+        """Get current motor position.
+        
+        Returns:
+            float: Current position or None if not available
+        """
         if not self.running:
             return None
 
@@ -57,16 +62,30 @@ class MotorController:
             if self.mode == 2:  # Test mode
                 return self._current_position
 
-            return self.instrument.read_register(0x0117)
+            # Convert from motor units if needed
+            raw_position = self.instrument.read_register(0x0117)
+            return float(raw_position)
 
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
             return None
 
-    def set_position(self, position: int, wait: bool = False) -> bool:
+    def set_position(self, position: Union[int, float], wait: bool = False) -> bool:
+        """Set motor position where 0 is home (top) position.
+        
+        Args:
+            position: Target position (0 = home/top, increasing = down)
+            wait: Whether to wait for movement to complete
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
         if not self.running:
             return False
 
+        # Convert position to float for comparison
+        position = float(position)
+        
         if not self.POSITION_MIN <= position <= self.POSITION_MAX:
             self.logger.error(f"Position {position} out of range")
             return False
@@ -76,7 +95,9 @@ class MotorController:
                 self._current_position = position
                 return True
 
-            self.instrument.write_register(0x0118, position)
+            # Convert to motor units if needed
+            motor_position = int(position)  # Or apply any necessary conversion
+            self.instrument.write_register(0x0118, motor_position)
 
             if wait:
                 while True:

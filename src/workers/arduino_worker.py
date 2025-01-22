@@ -11,6 +11,30 @@ from typing import List, Optional
 from controllers.arduino_controller import ArduinoController
 
 
+class MockArduinoController:
+    """Mock Arduino controller for testing."""
+    def __init__(self, port: int):
+        self.port = port
+        self.running = False
+        self.mode = 0
+
+    def start(self) -> bool:
+        self.running = True
+        return True
+
+    def stop(self):
+        self.running = False
+
+    def get_readings(self) -> List[float]:
+        return [1.0, 2.0, 3.0, 4.0]
+
+    def set_valves(self, states: List[int]) -> bool:
+        return True
+
+    def send_depressurise(self) -> bool:
+        return True
+
+
 class ArduinoWorker(QThread):
     """
     Worker thread for handling Arduino communication.
@@ -29,7 +53,7 @@ class ArduinoWorker(QThread):
 
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
         """Initialize worker.
-        
+
         Args:
             port: COM port number
             update_interval: Data update interval in seconds
@@ -40,7 +64,6 @@ class ArduinoWorker(QThread):
         self.port = port
         self.update_interval = update_interval
         if mock:
-            from controllers.base_controller import MockArduinoController
             self.controller = MockArduinoController(port=port)
         else:
             self.controller = ArduinoController(port=port)
