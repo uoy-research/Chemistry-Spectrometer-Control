@@ -22,7 +22,6 @@ import os
 from utils.config import Config
 from workers.arduino_worker import ArduinoWorker
 from workers.motor_worker import MotorWorker
-from models.valve_macro import MacroManager
 from .widgets.plot_widget import PlotWidget
 from .widgets.log_widget import LogWidget
 from .dialogs.valve_macro_editor import ValveMacroEditor
@@ -69,10 +68,6 @@ class MainWindow(QMainWindow):
         # Load configuration
         self.config = Config()
         self.test_mode = test_mode
-
-        # Initialize macro manager with config path
-        macro_path = Path(self.config.macro_file)
-        self.macro_manager = MacroManager(macro_path)
 
         # Initialize workers with mock controllers in test mode
         self.arduino_worker = ArduinoWorker(
