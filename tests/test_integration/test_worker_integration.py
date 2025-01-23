@@ -1,185 +1,203 @@
 """
 File: test_worker_integration.py
-Description: Integration tests between workers
+Description: Integration tests between workers and main application
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 from PyQt6.QtCore import QThread
+import time
+import logging
 
-from src.workers.arduino_worker import ArduinoWorker
-from src.workers.motor_worker import MotorWorker
-from src.models.valve_macro import MacroManager, ValveMacro
-
-
-@pytest.fixture
-def workers():
-    """Create worker instances."""
-    arduino = ArduinoWorker(mode=2)  # Test mode
-    motor = MotorWorker(mode=2)      # Test mode
-    return arduino, motor
+from src.workers.arduino_worker import ArduinoWorker, MockArduinoController
+from src.workers.motor_worker import MotorWorker, MockMotorController
+from src.ui.main_window import MainWindow
 
 
-def test_worker_initialization(workers):
-    """Test worker initialization and interaction."""
-    arduino, motor = workers
+class TestWorkerIntegration:
+    """Test suite for worker integration."""
 
-    # Start workers
-    arduino.start()
-    motor.start()
+    @pytest.fixture
+    def mock_workers(self):
+        """Create worker instances with mock controllers."""
+        arduino = ArduinoWorker(port=1, mock=True)
+        motor = MotorWorker(port=1, mock=True)
+        return arduino, motor
 
-    # Verify both running
-    assert arduino.running
-    assert motor.running
+    @pytest.fixture
+    def main_window(self):
+        """Create main window instance in test mode."""
+        return MainWindow(test_mode=True)
 
-    # Stop workers
-    arduino.stop()
-    motor.stop()
+    def test_worker_initialization(self, mock_workers):
+        """Test worker initialization and interaction."""
+        arduino, motor = mock_workers
 
-    # Verify both stopped
-    assert not arduino.running
-    assert not motor.running
+        # Verify initial state
+        assert not arduino.running
+        assert not motor.running
+        assert isinstance(arduino.controller, MockArduinoController)
+        assert isinstance(motor.controller, MockMotorController)
 
+        # Start workers
+        arduino.start()
+        motor.start()
+        time.sleep(0.05)  # Allow startup
 
-def test_synchronized_operations(workers):
-    """Test synchronized operations between workers."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        # Verify running state
+        assert arduino.running
+        assert motor.running
 
-    # Move motor and set valves
-    motor.move_to(100)
-    arduino.set_valves([1] * 8)
+        # Stop workers
+        arduino.stop()
+        motor.stop()
+        arduino.wait()
+        motor.wait()
 
-    # Verify operations completed
-    assert motor.get_position() == 100
-    assert arduino.get_readings() is not None
+        # Verify stopped state
+        assert not arduino.running
+        assert not motor.running
 
+    def test_synchronized_operations(self, mock_workers):
+        """Test synchronized operations between workers."""
+        arduino, motor = mock_workers
 
-def test_error_handling_between_workers(workers):
-    """Test error handling between workers."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        # Setup signal tracking
+        motor_updates = []
+        valve_updates = []
+        motor.position_updated.connect(lambda p: motor_updates.append(p))
+        arduino.valve_updated.connect(lambda s: valve_updates.append(s))
 
-    # Simulate error in arduino
-    with patch.object(arduino, 'get_readings', side_effect=Exception("Arduino error")):
-        readings = arduino.get_readings()
+        # Start workers
+        arduino.start()
+        motor.start()
+        time.sleep(0.05)
 
-        # Verify motor still operational
-        assert motor.get_position() is not None
-        assert readings is None
+        # Perform synchronized operations
+        motor.move_to(100.0)
+        arduino.set_valves([1] * 8)
+        time.sleep(0.15)  # Allow operations to complete
 
+        # Verify operations
+        assert motor.get_current_position() == 100.0
+        assert len(motor_updates) > 0
+        assert len(valve_updates) > 0
 
-def test_macro_execution_with_workers(workers, tmp_path):
-    """Test macro execution using both workers."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        # Cleanup
+        arduino.stop()
+        motor.stop()
+        arduino.wait()
+        motor.wait()
 
-    # Create test macro
-    macro_file = tmp_path / "test_macros.json"
-    macro_file.write_text("{}")
-    manager = MacroManager(macro_file)
+    def test_error_propagation(self, mock_workers):
+        """Test error handling and propagation between workers."""
+        arduino, motor = mock_workers
 
-    macro = ValveMacro(
-        label="Test Macro",
-        valve_states=[1] * 8,
-        timer=1.0
-    )
-    manager.macros["test"] = macro
+        # Track errors
+        arduino_errors = []
+        motor_errors = []
+        arduino.error_occurred.connect(lambda e: arduino_errors.append(e))
+        motor.error_occurred.connect(lambda e: motor_errors.append(e))
 
-    # Execute macro
-    arduino.set_valves(macro.valve_states)
-    motor.move_to(100)  # Simultaneous motor movement
+        arduino.start()
+        motor.start()
 
-    # Verify execution
-    assert arduino.get_readings() is not None
-    assert motor.get_position() == 100
+        # Test invalid operations
+        arduino.set_valves([0] * 7)  # Invalid valve states
+        motor.move_to(-1.0)  # Invalid position
+        time.sleep(0.05)
 
+        assert any("Invalid valve states" in e for e in arduino_errors)
+        assert any("Invalid position value" in e for e in motor_errors)
 
-def test_worker_thread_safety(workers):
-    """Test thread safety between workers."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        arduino.stop()
+        motor.stop()
 
-    # Create threads
-    arduino_thread = QThread()
-    motor_thread = QThread()
+    def test_main_window_integration(self, main_window):
+        """Test worker integration with main window."""
+        # Verify worker initialization
+        assert isinstance(main_window.arduino_worker, ArduinoWorker)
+        assert isinstance(main_window.motor_worker, MotorWorker)
+        assert main_window.arduino_worker.controller.mode == 2  # Test mode
+        assert main_window.motor_worker.controller.mode == 2    # Test mode
 
-    arduino.moveToThread(arduino_thread)
-    motor.moveToThread(motor_thread)
+        # Test sequence execution
+        main_window.steps = [
+            main_window.Step('p', 100),  # Pressurize
+            main_window.Step('v', 100, 500)  # Vent with motor movement
+        ]
+        
+        main_window.start_sequence()
+        time.sleep(0.3)  # Allow sequence to run
 
-    # Start threads
-    arduino_thread.start()
-    motor_thread.start()
+        # Verify sequence execution
+        assert len(main_window.steps) == 0  # Sequence completed
 
-    # Perform operations
-    arduino.set_valves([1] * 8)
-    motor.move_to(100)
+    def test_emergency_handling(self, mock_workers, main_window):
+        """Test emergency situation handling."""
+        arduino, motor = mock_workers
+        arduino.start()
+        motor.start()
 
-    # Clean up
-    arduino_thread.quit()
-    motor_thread.quit()
-    arduino_thread.wait()
-    motor_thread.wait()
+        # Track status changes
+        status_changes = []
+        arduino.status_changed.connect(lambda s: status_changes.append(s))
+        motor.status_changed.connect(lambda s: status_changes.append(s))
 
+        # Simulate emergency
+        motor.emergency_stop()
+        arduino.depressurize()
+        time.sleep(0.05)
 
-def test_worker_state_synchronization(workers):
-    """Test state synchronization between workers."""
-    arduino, motor = workers
+        # Verify emergency handling
+        assert "Motor emergency stopped" in status_changes
+        assert not motor.running
+        assert arduino.running  # Arduino should keep monitoring
 
-    # Test synchronized start
-    arduino.start()
-    motor.start()
-    assert arduino.running and motor.running
+        # Cleanup
+        arduino.stop()
+        motor.stop()
 
-    # Test synchronized stop
-    arduino.stop()
-    motor.stop()
-    assert not arduino.running and not motor.running
+    def test_concurrent_operations(self, mock_workers):
+        """Test concurrent operations between workers."""
+        arduino, motor = mock_workers
+        arduino.start()
+        motor.start()
 
+        # Perform rapid concurrent operations
+        for i in range(10):
+            motor.move_to(float(i * 100))
+            arduino.set_valves([i % 2] * 8)
+            time.sleep(0.01)
 
-def test_worker_data_exchange(workers):
-    """Test data exchange between workers."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        time.sleep(0.1)  # Allow operations to complete
 
-    # Get readings and position
-    readings = arduino.get_readings()
-    position = motor.get_position()
+        # Verify system stability
+        assert arduino.running
+        assert motor.running
+        assert isinstance(motor.get_current_position(), float)
 
-    # Verify data exchange
-    assert readings is not None
-    assert position is not None
+        arduino.stop()
+        motor.stop()
 
+    def test_worker_recovery(self, mock_workers):
+        """Test worker recovery after errors."""
+        arduino, motor = mock_workers
 
-def test_emergency_handling(workers):
-    """Test emergency situation handling."""
-    arduino, motor = workers
-    arduino.start()
-    motor.start()
+        # Start and verify initial state
+        assert arduino.start()
+        assert motor.start()
 
-    # Simulate emergency
-    motor.stop()  # Emergency stop motor
-    arduino.depressurize()  # Emergency depressurize
+        # Simulate failures and recovery
+        with patch.object(arduino.controller, 'get_readings', 
+                         side_effect=[Exception("Read error"), [1.0, 2.0, 3.0]]):
+            readings = arduino.controller.get_readings()  # Should fail
+            readings = arduino.controller.get_readings()  # Should recover
+            assert readings == [1.0, 2.0, 3.0]
 
-    # Verify safe state
-    assert not motor.running
-    assert arduino.get_readings() is not None
+        # Verify system remains operational
+        assert arduino.running
+        assert motor.running
 
-
-def test_worker_recovery(workers):
-    """Test worker recovery after errors."""
-    arduino, motor = workers
-
-    # Simulate failure and recovery
-    with patch.object(arduino, 'start', side_effect=[Exception("Start error"), True]):
-        assert not arduino.start()  # First attempt fails
-        assert arduino.start()      # Second attempt succeeds
-
-    # Verify system still operational
-    assert arduino.get_readings() is not None
-    assert motor.start()
+        arduino.stop()
+        motor.stop()
