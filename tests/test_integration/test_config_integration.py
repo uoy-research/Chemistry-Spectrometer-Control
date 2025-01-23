@@ -44,8 +44,12 @@ class TestConfigIntegration:
         yield
         # Ensure all workers are stopped after each test
         if hasattr(self, 'window'):
-            self.window.arduino_worker.stop()
-            self.window.motor_worker.stop()
+            if hasattr(self.window, 'arduino_worker'):
+                self.window.arduino_worker.stop()
+                self.window.arduino_worker.wait()  # Wait for thread to finish
+            if hasattr(self.window, 'motor_worker'):
+                self.window.motor_worker.stop()
+                self.window.motor_worker.wait()  # Wait for thread to finish
             self.window.close()
 
     def test_main_window_config_integration(self, qtbot, config):
@@ -62,16 +66,24 @@ class TestConfigIntegration:
 
     def test_worker_config_integration(self, config):
         """Test worker initialization with config."""
-        # Test Arduino worker
-        with patch('src.workers.arduino_worker.Config', return_value=config):
-            arduino_worker = ArduinoWorker()
-            assert arduino_worker.port == config.arduino_port
-            assert arduino_worker.update_interval == config.update_interval
+        workers = []
+        try:
+            # Test Arduino worker
+            with patch('src.workers.arduino_worker.Config', return_value=config):
+                arduino_worker = ArduinoWorker(port=1, mock=True)
+                workers.append(arduino_worker)
+                assert arduino_worker.port == config.arduino_port
+                assert arduino_worker.update_interval == config.update_interval
 
-        # Test Motor worker
-        with patch('src.workers.motor_worker.Config', return_value=config):
-            motor_worker = MotorWorker()
-            assert motor_worker.port == config.motor_port
+            # Test Motor worker
+            with patch('src.workers.motor_worker.Config', return_value=config):
+                motor_worker = MotorWorker(port=1, mock=True)
+                workers.append(motor_worker)
+                assert motor_worker.port == config.motor_port
+        finally:
+            for worker in workers:
+                worker.stop()
+                worker.wait()
 
     def test_logging_config_integration(self, config, caplog):
         """Test logging configuration integration."""
@@ -167,44 +179,71 @@ class TestConfigIntegration:
 
     def test_config_multi_component_sync(self, qtbot, config):
         """Test configuration synchronization across multiple components."""
-        with patch('src.ui.main_window.Config', return_value=config):
-            # Create multiple components
-            window1 = MainWindow(test_mode=True)
-            window2 = MainWindow(test_mode=True)
-            qtbot.addWidget(window1)
-            qtbot.addWidget(window2)
+        windows = []
+        try:
+            with patch('src.ui.main_window.Config', return_value=config):
+                window1 = MainWindow(test_mode=True)
+                window2 = MainWindow(test_mode=True)
+                windows = [window1, window2]
+                qtbot.addWidget(window1)
+                qtbot.addWidget(window2)
 
-            # Update config
-            config.update_interval = 250
-            config.save()
+                # Update config
+                config.update_interval = 250
+                config.save()
 
-            # Verify all components updated
-            assert window1.plot_widget.update_interval == 250
-            assert window2.plot_widget.update_interval == 250
+                # Verify all components updated
+                assert window1.plot_widget.update_interval == 250
+                assert window2.plot_widget.update_interval == 250
+        finally:
+            # Clean up windows and workers
+            for window in windows:
+                if hasattr(window, 'arduino_worker'):
+                    window.arduino_worker.stop()
+                    window.arduino_worker.wait()
+                if hasattr(window, 'motor_worker'):
+                    window.motor_worker.stop()
+                    window.motor_worker.wait()
+                window.close()
 
 
 def test_config_persistence_integration(temp_config_file):
     """Test config persistence across component restarts."""
-    with patch('src.utils.config.CONFIG_FILE', str(temp_config_file)):
-        # First instance
-        config1 = Config()
-        config1.update_interval = 300
-        config1.save()
+    worker = None
+    try:
+        with patch('src.utils.config.CONFIG_FILE', str(temp_config_file)):
+            # First instance
+            config1 = Config()
+            config1.update_interval = 300
+            config1.save()
 
-        # Create components with new config instance
-        config2 = Config()
-        worker = ArduinoWorker()
-        assert worker.update_interval == 300
+            # Create components with new config instance
+            config2 = Config()
+            worker = ArduinoWorker(port=1, mock=True)  # Use mock mode for testing
+            assert worker.update_interval == 300
+    finally:
+        if worker:
+            worker.stop()
+            worker.wait()
 
 
 def test_config_error_handling_integration(qtbot, tmp_path):
     """Test error handling in components with invalid config."""
-    invalid_config_file = tmp_path / "invalid_config.json"
-    invalid_config_file.write_text("invalid json")
+    window = None
+    try:
+        invalid_config_file = tmp_path / "invalid_config.json"
+        invalid_config_file.write_text("invalid json")
 
-    with patch('src.utils.config.CONFIG_FILE', str(invalid_config_file)):
-        # Should use default values
-        window = MainWindow()
-        qtbot.addWidget(window)
-
-        assert window.plot_widget.update_interval == 100  # Default value
+        with patch('src.utils.config.CONFIG_FILE', str(invalid_config_file)):
+            window = MainWindow(test_mode=True)
+            qtbot.addWidget(window)
+            assert window.plot_widget.update_interval == 100  # Default value
+    finally:
+        if window:
+            if hasattr(window, 'arduino_worker'):
+                window.arduino_worker.stop()
+                window.arduino_worker.wait()
+            if hasattr(window, 'motor_worker'):
+                window.motor_worker.stop()
+                window.motor_worker.wait()
+            window.close()
