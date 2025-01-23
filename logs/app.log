@@ -1,21 +1,31 @@
-2025-01-23 13:17:14 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-23 13:17:14 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-23 13:17:14 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-23 13:17:14 - SSBubble - DEBUG - Creating QApplication
-2025-01-23 13:17:14 - SSBubble - DEBUG - Setting up exception handling
-2025-01-23 13:17:14 - SSBubble - DEBUG - Loading configuration
-2025-01-23 13:17:14 - SSBubble - DEBUG - Creating main window
-2025-01-23 13:17:14 - ui.main_window - INFO - Application started
-2025-01-23 13:17:18 - ui.main_window - INFO - Connected to Arduino in mode 0
-2025-01-23 13:17:20 - ui.main_window - INFO - Executing valve macro 1: Valve test name
-2025-01-23 13:17:21 - ui.main_window - INFO - Executing valve macro 3: Valve Macro 3
-2025-01-23 13:17:22 - ui.main_window - INFO - Quick vent started
-2025-01-23 13:17:23 - ui.main_window - INFO - Executing valve macro 4: Valve Macro 4
-2025-01-23 13:17:25 - ui.main_window - INFO - Executing valve macro 2: Valve Macro 2
-2025-01-23 13:17:28 - ui.main_window - INFO - Quick vent stopped
-2025-01-23 13:17:29 - ui.main_window - INFO - Executing valve macro 3: Valve Macro 3
-2025-01-23 13:17:30 - ui.main_window - INFO - Executing valve macro 3: Valve Macro 3
-2025-01-23 13:17:31 - ui.main_window - INFO - Executing valve macro 1: Valve test name
-2025-01-23 13:17:31 - ui.main_window - INFO - Executing valve macro 1: Valve test name
-2025-01-23 13:17:34 - ui.main_window - INFO - Shutdown complete
-2025-01-23 13:17:34 - SSBubble - INFO - Application shutting down
+2025-01-23 13:48:15 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-23 13:48:15 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
+2025-01-23 13:48:15 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
+2025-01-23 13:48:15 - SSBubble - DEBUG - Creating QApplication
+2025-01-23 13:48:15 - SSBubble - DEBUG - Setting up exception handling
+2025-01-23 13:48:15 - SSBubble - DEBUG - Loading configuration
+2025-01-23 13:48:15 - SSBubble - DEBUG - Creating main window
+2025-01-23 13:48:15 - ui.main_window - INFO - Application started
+2025-01-23 13:48:16 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-23 13:48:18 - ui.main_window - INFO - Executing valve macro 1: Valve test name
+2025-01-23 13:48:19 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:20 - ui.main_window - INFO - Executing valve macro 1: Valve test name
+2025-01-23 13:48:21 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:22 - ui.main_window - INFO - Executing valve macro 4: Valve Macro 4
+2025-01-23 13:48:23 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:23 - ui.main_window - INFO - Executing valve macro 2: Valve Macro 2
+2025-01-23 13:48:25 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:25 - ui.main_window - INFO - Executing valve macro 3: Valve Macro 3
+2025-01-23 13:48:26 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:30 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:31 - ui.main_window - INFO - Valve 3 opened
+2025-01-23 13:48:32 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:33 - ui.main_window - INFO - Valve 4 opened
+2025-01-23 13:48:33 - ui.main_window - INFO - Valve 2 opened
+2025-01-23 13:48:34 - ui.main_window - INFO - Valve 1 opened
+2025-01-23 13:48:34 - ui.main_window - INFO - Valves reset to default state
+2025-01-23 13:48:41 - ui.main_window - INFO - Connected to motor
+2025-01-23 13:48:41 - ui.main_window - INFO - Motor calibrated to home position (0)
+2025-01-23 13:48:43 - ui.main_window - INFO - Moving motor to position 2.0
+2025-01-23 13:48:49 - ui.main_window - INFO - Shutdown complete
+2025-01-23 13:48:49 - SSBubble - INFO - Application shutting down

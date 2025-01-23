@@ -105,6 +105,10 @@ class MainWindow(QMainWindow):
         self.saving = False
         self.default_save_path = r"C:\ssbubble\data"
 
+        # Add this new instance variable to track active macro
+        self.active_valve_macro = None
+        self.active_macro_timer = None  # Track the active macro timer
+
     def initialize_control_states(self):
         """Initialize the enabled/disabled states of all controls."""
         # Motor controls
@@ -496,6 +500,11 @@ class MainWindow(QMainWindow):
 
     def reset_valves(self):
         """Reset all valves to their default state."""
+        # Cancel any active timer
+        if self.active_macro_timer is not None:
+            self.active_macro_timer.stop()
+            self.active_macro_timer = None
+
         # Reset valve buttons
         for button in self.valve_buttons:
             button.setChecked(False)
@@ -509,6 +518,15 @@ class MainWindow(QMainWindow):
         # Reset valve states
         if self.arduino_worker.running:
             self.arduino_worker.set_valves([0] * 8)  # Close all valves
+
+        # Clear active macro state and re-enable controls
+        self.active_valve_macro = None
+        self.enable_all_valve_controls()
+
+        # Uncheck all macro buttons
+        for i in range(1, 5):
+            macro_button = getattr(self, f"valveMacro{i}Button")
+            macro_button.setChecked(False)
 
         self.logger.info("Valves reset to default state")
 
@@ -1487,7 +1505,8 @@ class MainWindow(QMainWindow):
         else:
             self.plot_widget.stop_recording()
             self.beginSaveButton.setText("Begin Saving")
-            self.beginSaveButton.setChecked(False)  # Ensure button is unchecked
+            self.beginSaveButton.setChecked(
+                False)  # Ensure button is unchecked
             self.saving = False
             self.logger.info("Stopped recording data")
 
@@ -1551,8 +1570,27 @@ class MainWindow(QMainWindow):
                 # Get the macro button that was clicked
                 macro_button = getattr(self, f"valveMacro{macro_num}Button")
 
+                # If this macro is already active, treat as cancel
+                if self.active_valve_macro == macro_num:
+                    # Cancel any pending timer
+                    if self.active_macro_timer is not None:
+                        self.active_macro_timer.stop()
+                        self.active_macro_timer = None
+                    self.reset_valves()
+                    self.active_valve_macro = None
+                    return
+
                 macro = self.load_valve_macro(macro_num)
                 if macro:
+                    # Cancel any existing timer from previous macro
+                    if self.active_macro_timer is not None:
+                        self.active_macro_timer.stop()
+                        self.active_macro_timer = None
+
+                    # Disable other valve controls before executing macro
+                    self.active_valve_macro = macro_num
+                    self.disable_other_valve_controls(macro_num)
+
                     # Convert valve states to binary (0/1)
                     valve_states = []
                     for state in macro["Valves"]:
@@ -1577,28 +1615,32 @@ class MainWindow(QMainWindow):
                     timer = macro.get("Timer", 0)
                     if timer > 0:
                         def reset_valves():
-                            # Reset all valve states
-                            self.arduino_worker.set_valves([0] * 8)
-                            # Uncheck all valve buttons
-                            for i in range(1, 6):
-                                valve_button = getattr(self, f"Valve{i}Button")
-                                valve_button.setChecked(False)
-                            # Uncheck the macro button
-                            macro_button.setChecked(False)
+                            self.reset_valves()
+                            self.active_valve_macro = None
+                            self.active_macro_timer = None
+                            self.enable_all_valve_controls()
 
-                        QTimer.singleShot(int(timer * 1000), reset_valves)
+                        # Create and store the timer
+                        self.active_macro_timer = QTimer()
+                        self.active_macro_timer.setSingleShot(True)
+                        self.active_macro_timer.timeout.connect(reset_valves)
+                        self.active_macro_timer.start(int(timer * 1000))
 
-                    self.logger.info(f"Executing valve macro {
-                                     macro_num}: {macro['Label']}")
+                    self.logger.info(f"Executing valve macro {macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
                     macro_button.setChecked(False)
             except Exception as e:
-                self.handle_error(
-                    f"Failed to execute valve macro {macro_num}: {e}")
+                self.handle_error(f"Failed to execute valve macro {macro_num}: {e}")
                 # Ensure macro button is unchecked on error
                 macro_button = getattr(self, f"valveMacro{macro_num}Button")
                 macro_button.setChecked(False)
+                # Clean up timer and state on error
+                if self.active_macro_timer is not None:
+                    self.active_macro_timer.stop()
+                    self.active_macro_timer = None
+                self.active_valve_macro = None
+                self.enable_all_valve_controls()
 
     @pyqtSlot()
     def on_loadSequence_clicked(self):
@@ -1890,7 +1932,8 @@ class MainWindow(QMainWindow):
 
                     # Simulate save button click
                     # This will trigger the slot with the correct checked state
-                    self.on_beginSaveButton_clicked(True)  # Actually start the recording
+                    # Actually start the recording
+                    self.on_beginSaveButton_clicked(True)
 
             return True
 
@@ -2026,14 +2069,14 @@ class MainWindow(QMainWindow):
         try:
             # Remove completed step
             self.steps.pop(0)
-            
+
             if self.steps:
                 # Execute next step
                 self.execute_step(self.steps[0])
-                
+
                 # Reset step timer
                 self.step_start_time = time.time()
-                
+
                 # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
             else:
@@ -2046,17 +2089,19 @@ class MainWindow(QMainWindow):
                     total_time=0
                 )
                 self.update_sequence_status("Complete")
-                
+
                 # Stop data recording
                 if self.saving:
                     self.plot_widget.stop_recording()
                     self.beginSaveButton.setText("Begin Saving")
-                    self.beginSaveButton.setChecked(False)  # Uncheck the button
+                    self.beginSaveButton.setChecked(
+                        False)  # Uncheck the button
                     self.saving = False
-                    self.logger.info("Data recording stopped with sequence completion")
-                
+                    self.logger.info(
+                        "Data recording stopped with sequence completion")
+
                 self.logger.info("Sequence execution completed")
-                
+
         except Exception as e:
             self.logger.error(f"Error in sequence execution: {e}")
             self.handle_error("Failed to execute sequence")
@@ -2093,3 +2138,48 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error executing step: {e}")
             self.handle_error("Failed to execute sequence step")
+
+    def disable_other_valve_controls(self, active_macro_num: int):
+        """Disable all valve controls except the active macro button.
+        
+        Args:
+            active_macro_num: Number of the active macro button (1-4)
+        """
+        # Disable individual valve buttons
+        for i in range(1, 6):
+            valve_button = getattr(self, f"Valve{i}Button")
+            valve_button.setEnabled(False)
+
+        # Disable other macro buttons
+        for i in range(1, 5):
+            if i != active_macro_num:
+                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button.setEnabled(False)
+
+        # Disable quick action buttons
+        self.quickBubbleButton.setEnabled(False)
+        self.switchGasButton.setEnabled(False)
+        self.buildPressureButton.setEnabled(False)
+        self.quickVentButton.setEnabled(False)
+        self.slowVentButton.setEnabled(False)
+
+    def enable_all_valve_controls(self):
+        """Re-enable all valve controls."""
+        # Only enable if in manual mode and Arduino is connected
+        if self.arduino_worker.running and self.arduino_manual_radio.isChecked():
+            # Enable individual valve buttons
+            for i in range(1, 6):
+                valve_button = getattr(self, f"Valve{i}Button")
+                valve_button.setEnabled(True)
+
+            # Enable macro buttons
+            for i in range(1, 5):
+                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button.setEnabled(True)
+
+            # Enable quick action buttons
+            self.quickBubbleButton.setEnabled(True)
+            self.switchGasButton.setEnabled(True)
+            self.buildPressureButton.setEnabled(True)
+            self.quickVentButton.setEnabled(True)
+            self.slowVentButton.setEnabled(True)

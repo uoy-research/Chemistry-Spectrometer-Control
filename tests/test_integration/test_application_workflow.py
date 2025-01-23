@@ -23,7 +23,7 @@ class TestApplicationWorkflow:
     def mock_hardware(self):
         """Mock hardware controllers."""
         with patch('src.controllers.arduino_controller.ArduinoController') as arduino_mock, \
-             patch('src.controllers.motor_controller.MotorController') as motor_mock:
+                patch('src.controllers.motor_controller.MotorController') as motor_mock:
 
             # Setup Arduino mock
             arduino = arduino_mock.return_value
@@ -53,7 +53,8 @@ class TestApplicationWorkflow:
         # Create sequence file
         sequence_file = tmp_path / "ssbubble" / "sequence.txt"
         sequence_file.parent.mkdir(exist_ok=True)
-        sequence_file.write_text("Md1000m500p2000m-200b1000m0v1000\nC:/test/data.csv")
+        sequence_file.write_text(
+            "Md1000m500p2000m-200b1000m0v1000\nC:/test/data.csv")
 
         # Create config
         config = {
@@ -77,8 +78,8 @@ class TestApplicationWorkflow:
     def app_window(self, qtbot, setup_environment, mock_hardware):
         """Create main application window with mocked hardware."""
         with patch('src.utils.logger.LOG_DIR', setup_environment["log_dir"]), \
-             patch.dict('os.environ', {'SSBUBBLE_DATA': str(setup_environment["data_dir"])}):
-            
+                patch.dict('os.environ', {'SSBUBBLE_DATA': str(setup_environment["data_dir"])}):
+
             window = MainWindow(test_mode=True)
             window.show()
             qtbot.addWidget(window)
@@ -92,8 +93,10 @@ class TestApplicationWorkflow:
         assert not app_window.motor_worker.running
 
         # Connect hardware
-        qtbot.mouseClick(app_window.arduino_connect_btn, Qt.MouseButton.LeftButton)
-        qtbot.mouseClick(app_window.motor_connect_btn, Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(app_window.arduino_connect_btn,
+                         Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(app_window.motor_connect_btn,
+                         Qt.MouseButton.LeftButton)
         qtbot.wait(100)
 
         # Verify connections and UI state
@@ -127,7 +130,7 @@ class TestApplicationWorkflow:
         test_file = setup_environment["data_dir"] / "test_data.csv"
         app_window.savePathEdit.setText(str(test_file))
         qtbot.mouseClick(app_window.beginSaveButton, Qt.MouseButton.LeftButton)
-        
+
         # Generate some data
         for _ in range(5):
             app_window.handle_pressure_readings([1.0, 2.0, 3.0, 4.0])
@@ -135,7 +138,7 @@ class TestApplicationWorkflow:
 
         # Stop recording
         qtbot.mouseClick(app_window.beginSaveButton, Qt.MouseButton.LeftButton)
-        
+
         # Verify data saved
         assert test_file.exists()
         assert test_file.stat().st_size > 0
@@ -143,18 +146,20 @@ class TestApplicationWorkflow:
     def test_error_recovery_workflow(self, app_window, qtbot, mock_hardware):
         """Test error recovery workflow."""
         arduino_mock, motor_mock = mock_hardware
-        
+
         # Simulate connection error
         arduino_mock.start.side_effect = [Exception("Connection failed"), True]
-        
+
         # First attempt fails
-        qtbot.mouseClick(app_window.arduino_connect_btn, Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(app_window.arduino_connect_btn,
+                         Qt.MouseButton.LeftButton)
         qtbot.wait(100)
         assert not app_window.arduino_worker.running
         assert "Connection failed" in app_window.log_widget.toPlainText()
-        
+
         # Second attempt succeeds
-        qtbot.mouseClick(app_window.arduino_connect_btn, Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(app_window.arduino_connect_btn,
+                         Qt.MouseButton.LeftButton)
         qtbot.wait(100)
         assert app_window.arduino_worker.running
 
