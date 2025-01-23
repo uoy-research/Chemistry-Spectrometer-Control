@@ -74,6 +74,7 @@ class MotorWorker(QThread):
         self.update_interval = update_interval
         if mock:
             self.controller = MockMotorController()
+            self._running = False  # Don't auto-start in mock mode
         else:
             self.controller = MotorController(port=port)
 
@@ -86,6 +87,11 @@ class MotorWorker(QThread):
 
     def run(self):
         """Main worker loop."""
+        # Don't actually run if in mock mode
+        if isinstance(self.controller, MockMotorController):
+            self._running = True
+            return
+
         self.status_changed.emit("Starting motor worker...")
 
         if not self.controller.start():

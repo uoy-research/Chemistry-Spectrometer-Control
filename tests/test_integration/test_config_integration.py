@@ -45,11 +45,13 @@ class TestConfigIntegration:
         # Ensure all workers are stopped after each test
         if hasattr(self, 'window'):
             if hasattr(self.window, 'arduino_worker'):
+                self.window.arduino_worker._running = False
                 self.window.arduino_worker.stop()
-                self.window.arduino_worker.wait()  # Wait for thread to finish
+                self.window.arduino_worker.wait(1000)  # Wait with timeout
             if hasattr(self.window, 'motor_worker'):
+                self.window.motor_worker._running = False
                 self.window.motor_worker.stop()
-                self.window.motor_worker.wait()  # Wait for thread to finish
+                self.window.motor_worker.wait(1000)  # Wait with timeout
             self.window.close()
 
     def test_main_window_config_integration(self, qtbot, config):
@@ -57,12 +59,19 @@ class TestConfigIntegration:
         with patch('src.ui.main_window.Config', return_value=config):
             self.window = MainWindow(test_mode=True)
             qtbot.addWidget(self.window)
-            
+
             # Verify config values applied
             assert self.window.plot_widget.update_interval == config.update_interval
             assert self.window.plot_widget.max_points == config.max_data_points
             assert self.window.arduino_worker.port == config.arduino_port
             assert self.window.motor_worker.port == config.motor_port
+
+    def cleanup_worker(self, worker):
+        """Helper to safely cleanup a worker."""
+        if worker:
+            worker._running = False
+            worker.stop()
+            worker.wait(1000)  # Wait with timeout
 
     def test_worker_config_integration(self, config):
         """Test worker initialization with config."""
@@ -82,18 +91,17 @@ class TestConfigIntegration:
                 assert motor_worker.port == config.motor_port
         finally:
             for worker in workers:
-                worker.stop()
-                worker.wait()
+                self.cleanup_worker(worker)
 
     def test_logging_config_integration(self, config, caplog):
         """Test logging configuration integration."""
         with patch('src.ui.main_window.Config', return_value=config):
             # Set log level in config
             config.log_level = "DEBUG"
-            
+
             # Create window with logging
             window = MainWindow(test_mode=True)
-            
+
             # Verify log level applied
             assert window.logger.level == logging.DEBUG
             assert window.log_widget.logger.level == logging.DEBUG
@@ -172,7 +180,7 @@ class TestConfigIntegration:
             # Components should handle invalid config gracefully
             window = MainWindow(test_mode=True)
             qtbot.addWidget(window)
-            
+
             # Should use default values
             assert window.plot_widget.update_interval > 0
             assert window.arduino_worker.update_interval > 0
@@ -199,11 +207,9 @@ class TestConfigIntegration:
             # Clean up windows and workers
             for window in windows:
                 if hasattr(window, 'arduino_worker'):
-                    window.arduino_worker.stop()
-                    window.arduino_worker.wait()
+                    self.cleanup_worker(window.arduino_worker)
                 if hasattr(window, 'motor_worker'):
-                    window.motor_worker.stop()
-                    window.motor_worker.wait()
+                    self.cleanup_worker(window.motor_worker)
                 window.close()
 
 
@@ -219,12 +225,12 @@ def test_config_persistence_integration(temp_config_file):
 
             # Create components with new config instance
             config2 = Config()
-            worker = ArduinoWorker(port=1, mock=True)  # Use mock mode for testing
+            # Use mock mode for testing
+            worker = ArduinoWorker(port=1, mock=True)
             assert worker.update_interval == 300
     finally:
         if worker:
-            worker.stop()
-            worker.wait()
+            self.cleanup_worker(worker)
 
 
 def test_config_error_handling_integration(qtbot, tmp_path):
@@ -241,9 +247,7 @@ def test_config_error_handling_integration(qtbot, tmp_path):
     finally:
         if window:
             if hasattr(window, 'arduino_worker'):
-                window.arduino_worker.stop()
-                window.arduino_worker.wait()
+                self.cleanup_worker(window.arduino_worker)
             if hasattr(window, 'motor_worker'):
-                window.motor_worker.stop()
-                window.motor_worker.wait()
+                self.cleanup_worker(window.motor_worker)
             window.close()

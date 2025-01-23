@@ -27,6 +27,10 @@ class ArduinoController:
 
     def start(self) -> bool:
         try:
+            # If already running, just return True
+            if self.running:
+                return True
+
             if self.mode == 2:  # Test mode
                 self.running = True
                 return True
@@ -46,7 +50,7 @@ class ArduinoController:
 
         try:
             if self.mode == 2:  # Test mode
-                return [1.0, 2.0, 3.0]
+                return [1.0, 2.0, 3.0, 4.0]  # Return 4 readings in test mode
 
             response = self.serial.readline().decode().strip()
             if not response:
@@ -54,6 +58,9 @@ class ArduinoController:
 
             try:
                 readings = [float(x) for x in response.split(',')]
+                # Validate number of readings (expecting exactly 4)
+                if len(readings) != 4:
+                    return None
                 self.logger.debug(f"Readings: {readings}")
                 return readings
             except ValueError:

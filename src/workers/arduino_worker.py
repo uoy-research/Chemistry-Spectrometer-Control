@@ -65,6 +65,7 @@ class ArduinoWorker(QThread):
         self.update_interval = update_interval
         if mock:
             self.controller = MockArduinoController(port=port)
+            self._running = False  # Don't auto-start in mock mode
         else:
             self.controller = ArduinoController(port=port)
 
@@ -76,6 +77,11 @@ class ArduinoWorker(QThread):
 
     def run(self):
         """Main worker loop."""
+        # Don't actually run if in mock mode
+        if isinstance(self.controller, MockArduinoController):
+            self._running = True
+            return
+
         self.status_changed.emit("Starting Arduino worker...")
 
         if not self.controller.start():
