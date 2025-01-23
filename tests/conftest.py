@@ -2,10 +2,17 @@
 File: tests/conftest.py
 """
 
-import pytest
+from src.controllers.motor_controller import MotorController
+from src.controllers.arduino_controller import ArduinoController
+from unittest.mock import Mock
 from PyQt6.QtWidgets import QApplication
+import pytest
+import json
 import sys
 from pathlib import Path
+
+# Add src directory to Python path
+sys.path.append(str(Path(__file__).parent.parent))
 
 
 @pytest.fixture(scope="session")
