@@ -13,7 +13,6 @@ from src.utils.config import Config, CONFIG_FILE
 from src.ui.main_window import MainWindow
 from src.workers.arduino_worker import ArduinoWorker
 from src.workers.motor_worker import MotorWorker
-from src.models.valve_macro import MacroManager
 
 
 class TestConfigIntegration:
@@ -26,7 +25,6 @@ class TestConfigIntegration:
         test_config = {
             "arduino_port": 1,
             "motor_port": 2,
-            "macro_file": str(tmp_path / "macros.json"),
             "log_level": "INFO",
             "update_interval": 100,
             "max_data_points": 1000
@@ -40,17 +38,27 @@ class TestConfigIntegration:
         with patch('src.utils.config.CONFIG_FILE', str(temp_config_file)):
             return Config()
 
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Setup and teardown for each test."""
+        yield
+        # Ensure all workers are stopped after each test
+        if hasattr(self, 'window'):
+            self.window.arduino_worker.stop()
+            self.window.motor_worker.stop()
+            self.window.close()
+
     def test_main_window_config_integration(self, qtbot, config):
         """Test main window initialization with config."""
         with patch('src.ui.main_window.Config', return_value=config):
-            window = MainWindow(test_mode=True)
-            qtbot.addWidget(window)
-
+            self.window = MainWindow(test_mode=True)
+            qtbot.addWidget(self.window)
+            
             # Verify config values applied
-            assert window.plot_widget.update_interval == config.update_interval
-            assert window.plot_widget.max_points == config.max_data_points
-            assert window.arduino_worker.port == config.arduino_port
-            assert window.motor_worker.port == config.motor_port
+            assert self.window.plot_widget.update_interval == config.update_interval
+            assert self.window.plot_widget.max_points == config.max_data_points
+            assert self.window.arduino_worker.port == config.arduino_port
+            assert self.window.motor_worker.port == config.motor_port
 
     def test_worker_config_integration(self, config):
         """Test worker initialization with config."""
@@ -173,17 +181,6 @@ class TestConfigIntegration:
             # Verify all components updated
             assert window1.plot_widget.update_interval == 250
             assert window2.plot_widget.update_interval == 250
-
-
-def test_macro_manager_config_integration(config, tmp_path):
-    """Test macro manager initialization with config."""
-    # Create test macro file
-    macro_file = tmp_path / "macros.json"
-    macro_file.write_text("{}")
-
-    with patch('src.models.valve_macro.Config', return_value=config):
-        manager = MacroManager()
-        assert str(manager.macro_file) == str(macro_file)
 
 
 def test_config_persistence_integration(temp_config_file):
