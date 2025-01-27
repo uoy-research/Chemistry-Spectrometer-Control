@@ -118,7 +118,7 @@ class MotorWorker(QThread):
                     if self._target_position is not None:
                         # Add initial offset to current position for comparison
                         current_adjusted = -position #self.controller._initial_offset - position
-                        self.logger.info(f"Current: {current_adjusted}, Target: {self._target_position}")
+                        #self.logger.info(f"Current: {current_adjusted}, Target: {self._target_position}")
                         if abs(current_adjusted - self._target_position) < 0.005:
                             self._target_position = None
                             self.movement_completed.emit(True)
