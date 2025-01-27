@@ -131,9 +131,9 @@ class MainWindow(QMainWindow):
                 margin-top: 0px;
                 padding-top: 0px;
             }
-                    QPushButton:disabled {
-            background-color: grey;
-            color: white;
+            QPushButton:disabled {
+                background-color: grey;
+                color: white;
             }
             QLineEdit:disabled {
                 background-color: grey;
@@ -143,18 +143,37 @@ class MainWindow(QMainWindow):
                 background-color: grey;
                 color: black;
             }
+            QMenuBar {
+                margin: 0;
+                padding: 0;
+            }
+            QMainWindow::separator {
+                height: 0px;
+                margin: 0px;
+                padding: 0px;
+            }
             """)
+
+        # Create menu and status bars first
+        self.setup_menu_bar()
+        self.setup_status_bar()
 
         # Create central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 0, 10, 10)  # Adjust top margin to 0
+        main_layout.setSpacing(0)
 
         # Create containers for top and bottom sections
         top_container = QWidget()
         bottom_container = QWidget()
         top_layout = QGridLayout(top_container)
         bottom_layout = QGridLayout(bottom_container)
+        
+        # Set container layout margins
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create top section (y < 300)
         self.setup_arduino_section(top_layout)
@@ -172,10 +191,6 @@ class MainWindow(QMainWindow):
         # Add containers to main layout
         main_layout.addWidget(top_container)
         main_layout.addWidget(bottom_container)
-
-        # Create menu and status bars
-        self.setup_menu_bar()
-        self.setup_status_bar()
 
         # Load macro labels
         self.load_macro_labels()
