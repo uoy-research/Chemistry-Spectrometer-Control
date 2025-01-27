@@ -16,7 +16,7 @@ class MockMotorController:
     def __init__(self):
         self.running = False
         self._position = 0.0  # Store position as float
-        self.POSITION_MAX = 1000.0
+        self.POSITION_MAX = 100.0
         self.POSITION_MIN = 0.0
 
     def start(self) -> bool:
@@ -85,6 +85,7 @@ class MotorWorker(QThread):
         self._target_position: Optional[float] = None
         self._current_position: Optional[float] = None
         self._is_calibrated = False
+        self._pause_updates = False  # Add new flag for pausing position updates
 
         self.logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class MotorWorker(QThread):
         self.status_changed.emit("Motor worker running")
 
         while self._running:
-            if not self._paused:
+            if not self._paused and not self._pause_updates:  # Add check for pause_updates
                 # Get current position
                 position = self.controller.get_position()
                 if position is not None:
@@ -116,16 +117,14 @@ class MotorWorker(QThread):
 
                     # Check if target reached
                     if self._target_position is not None:
-                        # Add initial offset to current position for comparison
-                        current_adjusted = -position #self.controller._initial_offset - position
-                        #self.logger.info(f"Current: {current_adjusted}, Target: {self._target_position}")
+                        current_adjusted = -position
                         if abs(current_adjusted - self._target_position) < 0.005:
                             self._target_position = None
                             self.movement_completed.emit(True)
                 else:
                     self.error_occurred.emit("Failed to get motor position")
 
-                time.sleep(self.update_interval)
+            time.sleep(self.update_interval)
 
         self.controller.stop()
         self.status_changed.emit("Motor worker stopped")
@@ -172,13 +171,16 @@ class MotorWorker(QThread):
             return False
         
         try:
+            self._pause_updates = True  # Pause position updates
+            # Reset target position when starting calibration
+            self._target_position = None
             self.status_changed.emit("Starting motor calibration...")
             if self.controller.start_calibration():
                 # Start a timer to check calibration status
                 self._calibration_check_timer = QTimer()
-                self._calibration_check_timer.setInterval(200)  # Check every 200ms
+                self._calibration_check_timer.setInterval(200)
                 self._calibration_attempts = 0
-                self._max_calibration_attempts = 25  # 5 seconds total
+                self._max_calibration_attempts = 100
 
                 def check_calibration():
                     try:
@@ -186,8 +188,11 @@ class MotorWorker(QThread):
                             self._calibration_check_timer.stop()
                             self.status_changed.emit("Motor calibration complete")
                             self._is_calibrated = True
+                            # Set target position to 0 after calibration
+                            self._target_position = 0
                             self.calibration_state_changed.emit(True)
                             self.movement_completed.emit(True)
+                            self._pause_updates = False  # Resume position updates
                         else:
                             self._calibration_attempts += 1
                             if self._calibration_attempts >= self._max_calibration_attempts:
@@ -196,20 +201,24 @@ class MotorWorker(QThread):
                                 self._is_calibrated = False
                                 self.calibration_state_changed.emit(False)
                                 self.movement_completed.emit(False)
+                                self._pause_updates = False  # Resume position updates
                     except Exception as e:
                         self._calibration_check_timer.stop()
                         self.error_occurred.emit(f"Calibration error: {str(e)}")
                         self._is_calibrated = False
                         self.calibration_state_changed.emit(False)
                         self.movement_completed.emit(False)
+                        self._pause_updates = False  # Resume position updates
 
                 self._calibration_check_timer.timeout.connect(check_calibration)
                 self._calibration_check_timer.start()
                 return True
             else:
+                self._pause_updates = False  # Resume position updates if calibration fails to start
                 self.error_occurred.emit("Failed to start calibration")
                 return False
         except Exception as e:
+            self._pause_updates = False  # Resume position updates on error
             self.error_occurred.emit(f"Calibration error: {str(e)}")
             return False
 
