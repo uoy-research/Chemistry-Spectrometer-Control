@@ -43,9 +43,9 @@ class ArduinoController:
         """Setup logging configuration."""
         self.logger = logging.getLogger(__name__)
         if self.verbose:
-            self.logger.setLevel(logging.DEBUG)
-        else:
             self.logger.setLevel(logging.INFO)
+        else:
+            self.logger.setLevel(logging.DEBUG)
 
         # Add a console handler if none exists
         if not self.logger.handlers:
@@ -88,19 +88,27 @@ class ArduinoController:
             return False
 
     def get_readings(self) -> Optional[List[float]]:
-        """Get pressure readings from Arduino.
+        """Get pressure readings from Arduino and convert to standard units.
         
         Returns:
-            List of 4 pressure readings or None if error
+            List of 4 pressure readings in standard units or None if error
         """
         if not self.running:
             return None
 
         try:
             # Read 4 pressure registers using function code 4
-            readings = self.arduino.read_registers(0, 4, 4)
-            self.logger.debug(f"Pressure readings: {readings}")
-            return readings
+            raw_readings = self.arduino.read_registers(0, 4, 4)
+            
+            # Convert readings to standard units
+            converted_readings = [
+                (float(raw) - 203.53) / 0.8248 / 100 
+                for raw in raw_readings
+            ]
+            
+            self.logger.debug(f"Raw pressure readings: {raw_readings}")
+            self.logger.debug(f"Converted pressure readings: {converted_readings}")
+            return converted_readings
 
         except Exception as e:
             self.logger.error(f"Error getting readings: {e}")

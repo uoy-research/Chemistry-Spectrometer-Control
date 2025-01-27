@@ -1611,7 +1611,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker.running:
             try:
                 # Get the macro button that was clicked
-                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button = getattr(self, f"valveMacro{macro_num}Button")
 
                 # If this macro is already active, treat as cancel
                 if self.active_valve_macro == macro_num:

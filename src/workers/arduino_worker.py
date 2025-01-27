@@ -26,7 +26,9 @@ class MockArduinoController:
         self.running = False
 
     def get_readings(self) -> List[float]:
-        return [1.0, 2.0, 3.0, 4.0]
+        # Return mock values that are already "converted"
+        # These values represent typical pressure readings in standard units
+        return [0.5, 1.0, 1.5, 2.0]
 
     def set_valves(self, states: List[int]) -> bool:
         return True
