@@ -33,7 +33,7 @@ class MotorController:
         """Setup logging for the Arduino controller."""
         self.logger = logging.getLogger(__name__)
         if self.verbose:
-            self.logger.setLevel(logging.INFO)
+            self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.DEBUG)
 
@@ -100,11 +100,10 @@ class MotorController:
                     # Read registers with explicit function code
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
                     raw_steps = self.assemble(readings[0], readings[1])
-                    # Log raw values for debugging
-                    self.logger.debug(f"Raw position (steps): {raw_steps}")
-                    # Convert to millimeters with proper rounding
-                    position = round(raw_steps / 25600.0, 5)
-                    self.logger.debug(f"Converted position (mm): {position}")
+                    #self.logger.debug(f"Raw position (steps): {raw_steps}")
+                    # Convert to millimeters with proper rounding and apply static offset
+                    position = round(raw_steps / 25600.0, 5) - 2  # Subtract 2mm offset
+                    #self.logger.debug(f"Converted position (mm): {position}")
                     self.motor_position = position
                     return float(position)
                 except Exception as e:
@@ -162,9 +161,12 @@ class MotorController:
                 return True
 
             if self.check_calibrated():
+                # Add static offset to target position
+                adjusted_position = position  # Add 2mm offset
                 # Convert from mm to microsteps with proper rounding
-                position_steps = int(round(position * 25600.0))
+                position_steps = int(round(adjusted_position * 25600.0))
                 self.logger.debug(f"Target position (mm): {position}")
+                self.logger.debug(f"Adjusted position (mm): {adjusted_position}")
                 self.logger.debug(f"Target position (steps): {position_steps}")
                 
                 # Convert position to high and low words
