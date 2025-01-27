@@ -209,3 +209,23 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Failed to stop motor: {str(e)}")
             self.logger.error(f"Failed to stop motor: {e}")
+
+    def start(self) -> bool:
+        """Start the worker thread.
+        
+        Returns:
+            bool: True if successfully started, False otherwise
+        """
+        try:
+            # First try to connect the controller
+            if not self.controller.start():
+                return False
+            
+            # If controller connected successfully, start the thread
+            super().start()  # Start the QThread
+            return True
+        
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to start motor worker: {str(e)}")
+            self.logger.error(f"Failed to start motor worker: {e}")
+            return False

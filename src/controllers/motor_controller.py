@@ -14,13 +14,14 @@ class MotorController:
     POSITION_MAX = 1000.0  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
 
-    def __init__(self, port: int, address: int = 1, verbose: bool = False, mode: int = 1):
+    def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
         self.address = address
         self.verbose = verbose
         self.mode = mode
         self.instrument = None
         self.running = False
+        self.serial_connected = False  # Add serial connection state tracking
         self._current_position = 0.0  # Initialize at home position for test mode
         self._setup_logging()
 
@@ -28,22 +29,48 @@ class MotorController:
         """Setup logging for the Arduino controller."""
         self.logger = logging.getLogger(__name__)
         if self.verbose:
-            self.logger.setLevel(logging.DEBUG)
-        else:
             self.logger.setLevel(logging.INFO)
+        else:
+            self.logger.setLevel(logging.DEBUG)
 
     def start(self) -> bool:
+        """Start and initialize the motor controller.
+        
+        Returns:
+            bool: True if successfully started and initialized, False otherwise
+        """
         try:
             if self.mode == 2:  # Test mode
                 self.running = True
+                self.serial_connected = True
                 return True
 
             self.instrument = minimalmodbus.Instrument(self.port, self.address)
             self.instrument.serial.baudrate = 9600
-            self.instrument.serial.timeout = 1
-            self.running = True
-            self.logger.info(f"Connected to motor on {self.port}")
-            return True
+            self.instrument.serial.timeout = 3
+            
+            # Wait for connection to stabilize
+            time.sleep(1)
+            
+            try:
+                # Set initialization flag
+                self.instrument.write_bit(3, 1)
+                self.serial_connected = True
+                self.logger.info(f"Connected to motor on {self.port}")
+                
+                # Verify initialization
+                result = self.instrument.read_bit(3, 1)
+                if result:
+                    self.logger.info("Motor controller initialized")
+                    self.running = True
+                    return True
+                else:
+                    self.logger.error("Motor controller not initialized")
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to initialize motor controller: {e}")
+                return False
 
         except Exception as e:
             self.logger.error(f"Failed to connect to motor: {e}")
@@ -62,9 +89,14 @@ class MotorController:
             if self.mode == 2:  # Test mode
                 return self._current_position
 
-            # Convert from motor units if needed
-            raw_position = self.instrument.read_register(0x0117)
-            return float(raw_position)
+            # Read two registers (high word first, then low word)
+            registers = self.instrument.read_registers(5, 2, 3)
+            
+            # Combine high and low words into a single value
+            # High word is shifted left 16 bits and combined with low word
+            position = (registers[0] << 16) | registers[1]
+            
+            return float(position)
 
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
@@ -112,18 +144,25 @@ class MotorController:
             self.logger.error(f"Error setting position: {e}")
             return False
 
-    def stop_motor(self) -> bool:
-        """Stop motor movement.
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
+    def stop(self):
+        """Stop the motor controller and clean up."""
         try:
-            if self.running:
-                # Send stop command to motor
-                self.send_command('STOP')
-                return True
-            return False
+            if self.serial_connected:
+                # Clear initialization flag before disconnecting
+                try:
+                    self.instrument.write_bit(3, 0)
+                except Exception as e:
+                    self.logger.warning(f"Failed to clear init flag: {e}")
+                    
+            if self.instrument is not None:
+                try:
+                    self.instrument.serial.close()
+                except Exception as e:
+                    self.logger.warning(f"Failed to close serial port: {e}")
+                    
+            self.running = False
+            self.serial_connected = False
+            self.logger.info("Motor controller stopped")
+            
         except Exception as e:
-            self.logger.error(f"Failed to stop motor: {e}")
-            return False
+            self.logger.error(f"Error stopping motor controller: {e}")

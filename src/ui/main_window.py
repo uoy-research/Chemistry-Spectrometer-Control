@@ -410,9 +410,6 @@ class MainWindow(QMainWindow):
         for i in range(5):
             valve_button = QPushButton(f"Valve {i+1}")
             valve_button.setMinimumSize(QSize(0, 30))
-            font = QFont()
-            font.setPointSize(10)
-            valve_button.setFont(font)
             valve_button.setCheckable(True)
             valve_button.setEnabled(False)
             setattr(self, f"Valve{i+1}Button", valve_button)
@@ -918,8 +915,22 @@ class MainWindow(QMainWindow):
         """Handle motor connection/disconnection."""
         try:
             if not self.motor_worker.running:
-                # Start the worker - note that in test mode this should always succeed
-                if self.motor_worker.start() or self.test_mode:  # Add test_mode check here
+                # Get the port value from the spin box
+                port = self.motor_com_port_spin.value()
+                
+                # Create new worker with current port value
+                self.motor_worker = MotorWorker(
+                    port=port,
+                    mock=self.test_mode
+                )
+                
+                # Reconnect signals for new worker instance
+                self.motor_worker.position_updated.connect(self.handle_position_update)
+                self.motor_worker.error_occurred.connect(self.handle_error)
+                self.motor_worker.status_changed.connect(self.handle_status_message)
+                
+                # Start the worker - in test mode we don't need actual connection
+                if self.test_mode or self.motor_worker.start():
                     self.motor_connect_btn.setText("Disconnect")
                     self.motor_warning_label.setText("")
                     self.motor_warning_label.setVisible(False)
@@ -927,19 +938,17 @@ class MainWindow(QMainWindow):
                     self.motor_calibrate_btn.setEnabled(True)
                     # Keep controls disabled until calibrated
                     self.disable_motor_controls(True)
-                    self.logger.info("Connected to motor")
+                    self.logger.info(f"Connected to motor on COM{port}")
                 else:
                     self.handle_error("Failed to connect to motor")
-                    self.motor_warning_label.setText(
-                        "Warning: Motor not connected")
+                    self.motor_warning_label.setText("Warning: Motor not connected")
                     self.motor_calibrate_btn.setEnabled(False)
                     self.disable_motor_controls(True)
             else:
                 self.motor_worker.stop()
                 self.motor_connect_btn.setText("Connect")
                 self.motor_calibrated = False
-                self.motor_warning_label.setText(
-                    "Warning: Motor not connected")
+                self.motor_warning_label.setText("Warning: Motor not connected")
                 self.motor_calibrate_btn.setEnabled(False)
                 self.disable_motor_controls(True)
                 self.logger.info("Disconnected from motor")
@@ -992,6 +1001,7 @@ class MainWindow(QMainWindow):
                                 Q_ARG(float, self.steps[0].time_length),
                                 Q_ARG(int, len(self.steps)),
                                 Q_ARG(float, self.total_sequence_time))
+                            
                         
                             QMetaObject.invokeMethod(self, "update_sequence_status",
                                 Qt.ConnectionType.QueuedConnection,
@@ -1360,62 +1370,6 @@ class MainWindow(QMainWindow):
                 self.arduino_warning_label.setText(
                     "Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
-
-    @pyqtSlot()
-    def on_motorConnectButton_clicked(self):
-        """Handle motor connect button click."""
-        try:
-            if not self.motor_worker.running:
-                port = self.motor_com_port_spin.value()
-                try:
-                    # Create new worker with updated port
-                    self.motor_worker = MotorWorker(
-                        port=port, mock=self.test_mode)
-                    # Reconnect signals
-                    self.motor_worker.position_updated.connect(
-                        self.handle_position_update)
-                    self.motor_worker.error_occurred.connect(self.handle_error)
-                    self.motor_worker.status_changed.connect(
-                        self.handle_status_message)
-
-                    success = self.motor_worker.start()  # Start the thread
-                    if success or self.test_mode:  # Success or test mode
-                        self.motor_connect_btn.setText("Disconnect")
-                        self.motor_warning_label.setText("")
-                        self.motor_warning_label.setVisible(False)
-                        self.logger.info(f"Connected to motor on COM{port}")
-                    else:
-                        self.handle_error("Failed to connect to motor")
-                        if not self.test_mode:
-                            self.motor_warning_label.setText(
-                                "Warning: Motor not connected")
-                            self.motor_warning_label.setVisible(True)
-                except Exception as e:
-                    self.handle_error(f"Failed to connect to motor: {str(e)}")
-                    self.motor_connect_btn.setText("Connect")
-                    if not self.test_mode:
-                        self.motor_warning_label.setText(
-                            "Warning: Motor not connected")
-                        self.motor_warning_label.setVisible(True)
-            else:
-                try:
-                    self.motor_worker.stop()
-                    self.motor_connect_btn.setText("Connect")
-                    if not self.test_mode:
-                        self.motor_warning_label.setText(
-                            "Warning: Motor not connected")
-                        self.motor_warning_label.setVisible(True)
-                    self.logger.info("Disconnected from motor")
-                except Exception as e:
-                    self.handle_error(f"Error disconnecting motor: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Uncaught exception in motor connection: {str(e)}")
-            self.handle_error("An unexpected error occurred while connecting to motor")
-            self.motor_connect_btn.setText("Connect")
-            if not self.test_mode:
-                self.motor_warning_label.setText(
-                    "Warning: Motor not connected")
-                self.motor_warning_label.setVisible(True)
 
     @pyqtSlot()
     def on_motorCalibrateButton_clicked(self):
