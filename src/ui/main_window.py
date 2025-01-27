@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QCheckBox, QLineEdit, QDoubleSpinBox, QSizePolicy,
     QFileDialog, QFormLayout, QComboBox
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
 from PyQt6.QtGui import QFont
 import logging
 from typing import List, Optional, Union
@@ -949,60 +949,82 @@ class MainWindow(QMainWindow):
 
     def find_sequence_file(self):
         """Look for sequence file in the specified location."""
-        self.file_timer = QTimer()
-        self.file_timer.timeout.connect(self.check_sequence_file)
-        self.file_timer.start(500)  # Check every 500ms
+        try:
+            self.file_timer = QTimer()
+            self.file_timer.timeout.connect(self.check_sequence_file)
+            self.file_timer.start(500)  # Check every 500ms
+        except Exception as e:
+            self.logger.error(f"Error setting up sequence file timer: {e}")
+            self.handle_error("Failed to start sequence file monitoring")
 
     def check_sequence_file(self):
         """Check for and process sequence file."""
-        if Path(r"C:\ssbubble\sequence.txt").exists():
-            try:
-                success = self.load_sequence()
-                if success:
-                    # Process successful sequence
-                    self.handle_sequence_file(True)
+        try:
+            if not self.arduino_worker.running:
+                self.logger.error("Arduino worker not running")
+                self.file_timer.stop()
+                return
 
-                    # Calculate sequence timing
-                    self.calculate_sequence_time()
+            if Path(r"C:\ssbubble\sequence.txt").exists():
+                try:
+                    success = self.load_sequence()
+                    if success:
+                        # Process successful sequence
+                        self.handle_sequence_file(True)
 
-                    # Update UI with first step
-                    if self.steps:
-                        step_type = self.step_types[self.steps[0].step_type]
-                        self.update_sequence_info(
-                            step_type=step_type,
-                            step_time=self.steps[0].time_length,
-                            steps_left=len(self.steps),
-                            total_time=self.total_sequence_time
-                        )
-                        self.update_sequence_status("Running")
+                        # Calculate sequence timing
+                        self.calculate_sequence_time()
 
-                    # Start sequence execution
-                    self.start_sequence()
+                        # Update UI with first step - use invokeMethod to ensure thread safety
+                        if self.steps:
+                            QMetaObject.invokeMethod(self, "update_sequence_info",
+                                Qt.ConnectionType.QueuedConnection,
+                                Q_ARG(str, self.step_types[self.steps[0].step_type]),
+                                Q_ARG(float, self.steps[0].time_length),
+                                Q_ARG(int, len(self.steps)),
+                                Q_ARG(float, self.total_sequence_time))
+                        
+                            QMetaObject.invokeMethod(self, "update_sequence_status",
+                                Qt.ConnectionType.QueuedConnection,
+                                Q_ARG(str, "Running"))
 
-                    # Stop checking for files
-                    self.file_timer.stop()
-                else:
-                    # On failure, disconnect the controller and stop timer
+                            # Start sequence execution
+                            QMetaObject.invokeMethod(self, "start_sequence",
+                                Qt.ConnectionType.QueuedConnection)
+
+                        # Stop checking for files
+                        self.file_timer.stop()
+                    else:
+                        # On failure, disconnect the controller and stop timer
+                        self.handle_sequence_file(False)
+                        self.file_timer.stop()
+                        self.arduino_worker.stop()
+                        
+                        # Update UI using the main thread
+                        QMetaObject.invokeMethod(self, "_update_arduino_disconnect_state",
+                            Qt.ConnectionType.QueuedConnection)
+
+                except Exception as e:
+                    self.logger.error(f"Error processing sequence file: {e}")
                     self.handle_sequence_file(False)
                     self.file_timer.stop()
                     self.arduino_worker.stop()
-                    self.arduino_connect_btn.setText("Connect")
-                    if not self.test_mode:
-                        self.arduino_warning_label.setText(
-                            "Warning: Arduino not connected")
-                    self.logger.error(
-                        "Disconnected controller due to sequence file error")
+                    
+                    # Update UI using the main thread
+                    QMetaObject.invokeMethod(self, "_update_arduino_disconnect_state",
+                        Qt.ConnectionType.QueuedConnection)
 
-            except Exception as e:
-                # Handle any unexpected errors
-                self.handle_sequence_file(False)
-                self.file_timer.stop()
-                self.arduino_worker.stop()
-                self.arduino_connect_btn.setText("Connect")
-                if not self.test_mode:
-                    self.arduino_warning_label.setText(
-                        "Warning: Arduino not connected")
-                self.logger.error(f"Disconnected controller due to error: {e}")
+        except Exception as e:
+            self.logger.error(f"Error in sequence file check: {e}")
+            self.handle_error(f"Sequence file check failed: {str(e)}")
+
+    @pyqtSlot()
+    def _update_arduino_disconnect_state(self):
+        """Update UI elements when Arduino disconnects. This method runs in the main thread."""
+        self.arduino_connect_btn.setText("Connect")
+        if not self.test_mode:
+            self.arduino_warning_label.setText("Warning: Arduino not connected")
+            self.arduino_warning_label.setVisible(True)
 
     def calculate_sequence_time(self):
         """Calculate total sequence time."""
@@ -1188,7 +1210,7 @@ class MainWindow(QMainWindow):
                    self.arduino_manual_radio.isChecked())
 
         # Individual valve buttons
-        for i in range(1, 9):
+        for i in range(1, 6):
             if hasattr(self, f'Valve{i}Button'):
                 getattr(self, f'Valve{i}Button').setEnabled(enabled)
 
@@ -1237,14 +1259,21 @@ class MainWindow(QMainWindow):
         if self.arduino_worker.running:
             # Only enable valve buttons if Arduino is connected and in manual mode
             if self.arduino_worker.controller.mode == 0:  # Manual mode
-                self.disable_valve_controls(not enabled)  # Note the 'not' here
+                # Only toggle the individual valve buttons 1-5
+                for i in range(1, 6):
+                    if hasattr(self, f'Valve{i}Button'):
+                        getattr(self, f'Valve{i}Button').setEnabled(enabled)
             else:
                 # Force disable if not in manual mode
-                self.disable_valve_controls(True)
+                for i in range(1, 6):
+                    if hasattr(self, f'Valve{i}Button'):
+                        getattr(self, f'Valve{i}Button').setEnabled(False)
                 self.dev_checkbox.setChecked(False)
         else:
             # Force disable if Arduino not connected
-            self.disable_valve_controls(True)
+            for i in range(1, 6):
+                if hasattr(self, f'Valve{i}Button'):
+                    getattr(self, f'Valve{i}Button').setEnabled(False)
             self.dev_checkbox.setChecked(False)
 
     @pyqtSlot()
@@ -1273,8 +1302,7 @@ class MainWindow(QMainWindow):
                         if mode == 0:  # Manual mode
                             # Enable checkbox for valve buttons
                             self.dev_checkbox.setEnabled(True)
-                            self.disable_quick_controls(
-                                False)  # Enable other controls
+                            self.disable_quick_controls(False)  # Enable other controls
                         else:
                             self.dev_checkbox.setEnabled(False)
                             self.disable_valve_controls(True)
@@ -1283,12 +1311,13 @@ class MainWindow(QMainWindow):
                         # Set valve mode
                         self.set_valve_mode(mode == 1)
 
-                        # If in automatic mode, start looking for sequence file
+                        # If in automatic mode, start looking for sequence file after a delay
                         if mode == 1:
-                            self.find_sequence_file()
+                            # Wait 2 seconds before starting sequence file monitoring
+                            QTimer.singleShot(2000, self.find_sequence_file)
+                            self.logger.info("Will start sequence file monitoring in 2 seconds")
 
-                        self.logger.info(
-                            f"Connected to Arduino in mode {mode}")
+                        self.logger.info(f"Connected to Arduino in mode {mode}")
                     else:
                         self.handle_error("Failed to connect to Arduino")
                         if not self.test_mode:
@@ -1296,8 +1325,7 @@ class MainWindow(QMainWindow):
                                 "Warning: Arduino not connected")
                             self.arduino_warning_label.setVisible(True)
                 except Exception as e:
-                    self.handle_error(
-                        f"Failed to connect to Arduino: {str(e)}")
+                    self.handle_error(f"Failed to connect to Arduino: {str(e)}")
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
                         self.arduino_warning_label.setText(
@@ -1324,10 +1352,8 @@ class MainWindow(QMainWindow):
                     self.handle_error(f"Error disconnecting Arduino: {str(e)}")
 
         except Exception as e:
-            self.logger.error(
-                f"Uncaught exception in Arduino connection: {str(e)}")
-            self.handle_error(
-                "An unexpected error occurred while connecting to Arduino")
+            self.logger.error(f"Uncaught exception in Arduino connection: {str(e)}")
+            self.handle_error("An unexpected error occurred while connecting to Arduino")
             self.arduino_connect_btn.setText("Connect")
             if not self.test_mode:
                 self.arduino_warning_label.setText(
@@ -1382,10 +1408,8 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self.handle_error(f"Error disconnecting motor: {str(e)}")
         except Exception as e:
-            self.logger.error(
-                f"Uncaught exception in motor connection: {str(e)}")
-            self.handle_error(
-                "An unexpected error occurred while connecting to motor")
+            self.logger.error(f"Uncaught exception in motor connection: {str(e)}")
+            self.handle_error("An unexpected error occurred while connecting to motor")
             self.motor_connect_btn.setText("Connect")
             if not self.test_mode:
                 self.motor_warning_label.setText(
@@ -1484,8 +1508,7 @@ class MainWindow(QMainWindow):
                     # Start the movement
                     success = self.motor_worker.move_to(position)
                     if success:
-                        self.logger.info(f"Executing motor macro {
-                                         macro_num}: {macro['Label']}")
+                        self.logger.info(f"Executing motor macro {macro_num}: {macro['Label']}")
 
                         # Create a timer to check position periodically
                         self.position_check_timer = QTimer(self)
@@ -1742,6 +1765,18 @@ class MainWindow(QMainWindow):
         self.logger.info("Stopping sequence")
         # Add sequence stop logic here
 
+    @pyqtSlot(str, float, int, float)
+    def update_sequence_info(self, step_type: str, step_time: float, steps_left: int, total_time: float):
+        """Update sequence information displays."""
+        try:
+            self.currentStepTypeEdit.setText(str(step_type))
+            self.currentStepTimeEdit.setText(f"{step_time:.1f}s")
+            self.stepsRemainingEdit.setText(str(steps_left))
+            self.totalTimeEdit.setText(f"{total_time:.1f}s")
+        except Exception as e:
+            self.logger.error(f"Error updating sequence info: {e}")
+
+    @pyqtSlot(str)
     def update_sequence_status(self, status: str):
         """Update sequence status display.
 
@@ -1750,21 +1785,175 @@ class MainWindow(QMainWindow):
         """
         self.sequence_status_label.setText(f"Status: {status}")
 
-    def update_sequence_info(self, step_type: str, step_time: float, steps_left: Union[int, str], total_time: float):
-        """Update sequence information displays."""
+    @pyqtSlot()
+    def start_sequence(self):
+        """Start executing the loaded sequence."""
         try:
-            self.currentStepTypeEdit.setText(str(step_type))
-            self.currentStepTimeEdit.setText(f"{step_time:.1f}s")
-            # Handle both numeric and string values for steps_left
-            if isinstance(steps_left, str):
-                self.stepsRemainingEdit.setText(
-                    steps_left)  # Show "Complete" directly
-            else:
-                self.stepsRemainingEdit.setText(
-                    str(steps_left))  # Convert number to string
-            self.totalTimeEdit.setText(f"{total_time:.1f}s")
+            if not self.steps:
+                self.logger.error("No sequence loaded")
+                return
+
+            # Execute first step
+            self.execute_step(self.steps[0])
+
+            # Start step timer
+            self.step_start_time = time.time()
+            self.step_timer = QTimer()
+            self.step_timer.timeout.connect(self.update_step_time)
+            self.step_timer.start(100)  # Update every 100ms
+
+            # Schedule next step
+            if len(self.steps) > 1:
+                QTimer.singleShot(self.steps[0].time_length, self.next_step)
+
+            self.logger.info("Sequence execution started")
+
         except Exception as e:
-            self.logger.error(f"Error updating sequence info: {e}")
+            self.logger.error(f"Error starting sequence: {e}")
+            self.handle_error("Failed to start sequence")
+
+    def update_step_time(self):
+        """Update the time remaining display for current step and total sequence."""
+        try:
+            if self.steps and len(self.steps) > 0:
+                # Calculate current step time remaining
+                elapsed = int((time.time() - self.step_start_time)
+                              * 1000)  # Convert to ms
+                step_remaining = max(0, self.steps[0].time_length - elapsed)
+
+                # Calculate total time remaining
+                total_remaining = step_remaining  # Start with current step remaining
+                for step in self.steps[1:]:
+                    total_remaining += step.time_length
+
+                # Update UI with remaining times
+                self.update_sequence_info(
+                    step_type=self.step_types[self.steps[0].step_type],
+                    step_time=step_remaining / 1000,  # Convert to seconds for display
+                    steps_left=len(self.steps),
+                    total_time=total_remaining / 1000  # Convert to seconds
+                )
+        except Exception as e:
+            self.logger.error(f"Error updating step time: {e}")
+
+    def next_step(self):
+        """Execute the next step in the sequence."""
+        try:
+            # Remove completed step
+            self.steps.pop(0)
+
+            if self.steps:
+                # Execute next step
+                self.execute_step(self.steps[0])
+
+                # Reset step timer
+                self.step_start_time = time.time()
+
+                # Schedule next step
+                QTimer.singleShot(self.steps[0].time_length, self.next_step)
+            else:
+                # Sequence complete - stop timer and update UI
+                self.step_timer.stop()
+                self.update_sequence_info(
+                    step_type="Complete",
+                    step_time=0,
+                    steps_left=0,
+                    total_time=0
+                )
+                self.update_sequence_status("Complete")
+
+                # Stop data recording
+                if self.saving:
+                    self.plot_widget.stop_recording()
+                    self.beginSaveButton.setText("Begin Saving")
+                    self.beginSaveButton.setChecked(
+                        False)  # Uncheck the button
+                    self.saving = False
+                    self.logger.info(
+                        "Data recording stopped with sequence completion")
+
+                self.logger.info("Sequence execution completed")
+
+        except Exception as e:
+            self.logger.error(f"Error in sequence execution: {e}")
+            self.handle_error("Failed to execute sequence")
+
+    def execute_step(self, step):
+        """Execute a single sequence step."""
+        try:
+            # Set valve states based on step type
+            valve_states = [0] * 8  # Initialize all valves closed
+
+            if step.step_type == 'p':  # Pressurize
+                valve_states[1] = 1  # Open inlet valve
+            elif step.step_type == 'v':  # Vent
+                valve_states[3] = 1  # Open vent valve
+            elif step.step_type == 'b':  # Bubble
+                valve_states[1] = 1  # Open inlet valve
+                valve_states[2] = 1  # Open outlet valve
+            elif step.step_type == 'f':  # Flow
+                valve_states[2] = 1  # Open outlet valve
+            elif step.step_type == 'e':  # Evacuate
+                valve_states[3] = 1  # Open vent valve
+                valve_states[4] = 1  # Open short valve
+
+            # Set valve states
+            self.arduino_worker.set_valves(valve_states)
+
+            # Move motor if required
+            if self.motor_flag and step.motor_position is not None:
+                self.motor_worker.move_to(step.motor_position)
+
+            self.logger.info(f"Executing step: {self.step_types[step.step_type]}")
+
+        except Exception as e:
+            self.logger.error(f"Error executing step: {e}")
+            self.handle_error("Failed to execute sequence step")
+
+    def disable_other_valve_controls(self, active_macro_num: int):
+        """Disable all valve controls except the active macro button.
+        
+        Args:
+            active_macro_num: Number of the active macro button (1-4)
+        """
+        # Disable individual valve buttons
+        for i in range(1, 6):
+            valve_button = getattr(self, f"Valve{i}Button")
+            valve_button.setEnabled(False)
+
+        # Disable other macro buttons
+        for i in range(1, 5):
+            if i != active_macro_num:
+                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button.setEnabled(False)
+
+        # Disable quick action buttons
+        self.quickBubbleButton.setEnabled(False)
+        self.switchGasButton.setEnabled(False)
+        self.buildPressureButton.setEnabled(False)
+        self.quickVentButton.setEnabled(False)
+        self.slowVentButton.setEnabled(False)
+
+    def enable_all_valve_controls(self):
+        """Re-enable all valve controls."""
+        # Only enable if in manual mode and Arduino is connected
+        if self.arduino_worker.running and self.arduino_manual_radio.isChecked():
+            # Enable individual valve buttons
+            for i in range(1, 6):
+                valve_button = getattr(self, f"Valve{i}Button")
+                valve_button.setEnabled(True)
+
+            # Enable macro buttons
+            for i in range(1, 5):
+                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button.setEnabled(True)
+
+            # Enable quick action buttons
+            self.quickBubbleButton.setEnabled(True)
+            self.switchGasButton.setEnabled(True)
+            self.buildPressureButton.setEnabled(True)
+            self.quickVentButton.setEnabled(True)
+            self.slowVentButton.setEnabled(True)
 
     def load_valve_macro(self, macro_num: int) -> dict:
         """Load valve macro data from JSON file.
@@ -2089,32 +2278,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error handling sequence file cleanup: {e}")
 
-    def start_sequence(self):
-        """Start executing the loaded sequence."""
-        try:
-            if not self.steps:
-                self.logger.error("No sequence loaded")
-                return
-
-            # Execute first step
-            self.execute_step(self.steps[0])
-
-            # Start step timer
-            self.step_start_time = time.time()
-            self.step_timer = QTimer()
-            self.step_timer.timeout.connect(self.update_step_time)
-            self.step_timer.start(100)  # Update every 100ms
-
-            # Schedule next step
-            if len(self.steps) > 1:
-                QTimer.singleShot(self.steps[0].time_length, self.next_step)
-
-            self.logger.info("Sequence execution started")
-
-        except Exception as e:
-            self.logger.error(f"Error starting sequence: {e}")
-            self.handle_error("Failed to start sequence")
-
     def update_step_time(self):
         """Update the time remaining display for current step and total sequence."""
         try:
@@ -2207,8 +2370,7 @@ class MainWindow(QMainWindow):
             if self.motor_flag and step.motor_position is not None:
                 self.motor_worker.move_to(step.motor_position)
 
-            self.logger.info(f"Executing step: {
-                             self.step_types[step.step_type]}")
+            self.logger.info(f"Executing step: {self.step_types[step.step_type]}")
 
         except Exception as e:
             self.logger.error(f"Error executing step: {e}")
