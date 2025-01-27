@@ -78,7 +78,7 @@ class MotorController:
                         raw_steps = self.assemble(readings[0], readings[1])
                         initial_position = round(raw_steps / 25600.0, 5)
                         self._initial_offset = initial_position
-                        self.logger.info(f"Initial position offset set to: {initial_position}")
+                        #self.logger.info(f"Initial position offset set to: {initial_position}")
                     except Exception as e:
                         self.logger.error(f"Failed to get initial position: {e}")
                         self._initial_offset = 0
