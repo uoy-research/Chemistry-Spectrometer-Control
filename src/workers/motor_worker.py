@@ -111,8 +111,8 @@ class MotorWorker(QThread):
                 if position is not None:
                     if position != self._current_position:
                         self._current_position = position
-                        # Position is already offset-adjusted by controller
-                        self.position_updated.emit(float(position))
+                        # Invert position value for UI display
+                        self.position_updated.emit(-float(position))
 
                     # Check if target reached
                     if self._target_position is not None:
@@ -164,7 +164,7 @@ class MotorWorker(QThread):
             return False
 
     def calibrate(self) -> bool:
-        """Calibrate the motor and establish home position."""
+        """Calibrate the motor."""
         if not self.controller.running:
             self.error_occurred.emit("Motor not connected")
             return False

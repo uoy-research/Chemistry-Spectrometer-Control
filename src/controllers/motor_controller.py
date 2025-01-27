@@ -22,11 +22,10 @@ class MotorController:
         self.mode = mode
         self.instrument = None
         self.running = False
-        self.serial_connected = False  # Add serial connection state tracking
-        self._current_position = 0.0  # Initialize at home position for test mode
+        self.serial_connected = False
+        self._current_position = 0.0
         self.motor_position = 0
         self.target_position = 0
-        self._position_offset = 0  # Add position offset tracking
         self._is_calibrated = False
         self._setup_logging()
 
@@ -100,14 +99,18 @@ class MotorController:
                 try:
                     # Read registers with explicit function code
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
-                    motor_position = self.assemble(readings[0], readings[1])
-                    position = -motor_position
+                    raw_steps = self.assemble(readings[0], readings[1])
+                    # Log raw values for debugging
+                    self.logger.debug(f"Raw position (steps): {raw_steps}")
+                    # Convert to millimeters with proper rounding
+                    position = round(raw_steps / 25600.0, 5)
+                    self.logger.debug(f"Converted position (mm): {position}")
                     self.motor_position = position
                     return float(position)
                 except Exception as e:
                     if attempt == max_retries - 1:  # Last attempt
                         raise
-                    time.sleep(0.1)  # Short delay before retry
+                    time.sleep(0.1)
 
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
@@ -159,24 +162,29 @@ class MotorController:
                 return True
 
             if self.check_calibrated():
-                # Invert the sign of the position for the motor
-                motor_position = -position
+                # Convert from mm to microsteps with proper rounding
+                position_steps = int(round(position * 25600.0))
+                self.logger.debug(f"Target position (mm): {position}")
+                self.logger.debug(f"Target position (steps): {position_steps}")
                 
                 # Convert position to high and low words
-                high, low = self.disassemble(int(motor_position))
+                high, low = self.disassemble(position_steps)
+                self.logger.debug(f"High word: {high}, Low word: {low}")
                 
                 # Send the position to the motor
-                self.instrument.write_register(3, high)  # Write high word
-                self.instrument.write_register(4, low)   # Write low word
-                self.instrument.write_register(2, ord('x'))  # Position command
-                self.instrument.write_bit(1, 1)  # Toggle command flag
+                self.instrument.write_register(3, high)
+                self.instrument.write_register(4, low)
+                self.instrument.write_register(2, ord('x'))
+                self.instrument.write_bit(1, 1)
                 self.serial_connected = True
 
                 if wait:
                     while True:
                         current = self.get_position()
-                        if current is not None and abs(current - position) < 0.01:
-                            break
+                        if current is not None:
+                            self.logger.debug(f"Current: {current}, Target: {position}, Diff: {abs(current - position)}")
+                            if abs(current - position) < 0.005:
+                                break
                         time.sleep(0.1)
 
                 return True
@@ -229,13 +237,15 @@ class MotorController:
             self.serial_connected = False
             return False
 
-    def get_top_position(self) -> Optional[int]:
+    def get_top_position(self) -> Optional[float]:
         """Get the top position of the motor."""
         try:
             readings = self.instrument.read_registers(7, 2, 3)
-            top_position = self.assemble(readings[0], readings[1])
+            raw_position = self.assemble(readings[0], readings[1])
+            # Apply offset to top position reading
+            position = raw_position - self._position_offset
             self.serial_connected = True
-            return top_position
+            return float(position)
         except Exception as e:
             self.logger.error(f"Couldn't read top position: {e}")
             self.serial_connected = False
@@ -279,13 +289,30 @@ class MotorController:
 
     def disassemble(self, combined):
         """Disassemble a 32-bit value into high and low 16-bit words."""
-        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+        # Ensure we're working with a 32-bit integer
+        combined = int(combined)
+        # Extract high and low words
         high = (combined >> 16) & 0xFFFF
         low = combined & 0xFFFF
         return high, low
 
     def assemble(self, high, low):
         """Assemble high and low 16-bit words into a 32-bit value."""
-        high = ctypes.c_int16(high).value   # Convert high to signed int16
+        # Convert high word to signed 16-bit
+        high = ctypes.c_int16(high).value
+        # Combine into 32-bit value
         combined = (high << 16) | (low & 0xFFFF)
         return combined
+
+    def set_position_offset(self, offset: float):
+        """Set the position offset value."""
+        self._position_offset = offset
+        self.logger.info(f"Position offset set to {offset}")
+        # Update current position with new offset
+        if self.running:
+            try:
+                readings = self.instrument.read_registers(5, 2, functioncode=3)
+                raw_position = self.assemble(readings[0], readings[1])
+                self.motor_position = raw_position - offset
+            except Exception as e:
+                self.logger.error(f"Failed to update position after setting offset: {e}")
