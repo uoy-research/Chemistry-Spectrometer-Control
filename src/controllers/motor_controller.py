@@ -71,6 +71,18 @@ class MotorController:
                 if result:
                     self.logger.info("Motor controller initialized")
                     self.running = True
+                    
+                    # Get initial position reading
+                    try:
+                        readings = self.instrument.read_registers(5, 2, functioncode=3)
+                        raw_steps = self.assemble(readings[0], readings[1])
+                        initial_position = round(raw_steps / 25600.0, 5)
+                        self._initial_offset = initial_position
+                        self.logger.info(f"Initial position offset set to: {initial_position}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to get initial position: {e}")
+                        self._initial_offset = 0
+                    
                     return True
                 else:
                     self.logger.error("Motor controller not initialized")
@@ -165,13 +177,9 @@ class MotorController:
                 adjusted_position = position  # Add 2mm offset
                 # Convert from mm to microsteps with proper rounding
                 position_steps = int(round(adjusted_position * 25600.0))
-                self.logger.debug(f"Target position (mm): {position}")
-                self.logger.debug(f"Adjusted position (mm): {adjusted_position}")
-                self.logger.debug(f"Target position (steps): {position_steps}")
                 
                 # Convert position to high and low words
                 high, low = self.disassemble(position_steps)
-                self.logger.debug(f"High word: {high}, Low word: {low}")
                 
                 # Send the position to the motor
                 self.instrument.write_register(3, high)
@@ -184,8 +192,10 @@ class MotorController:
                     while True:
                         current = self.get_position()
                         if current is not None:
-                            self.logger.debug(f"Current: {current}, Target: {position}, Diff: {abs(current - position)}")
-                            if abs(current - position) < 0.005:
+                            # Add 2mm to current position for comparison
+                            current_adjusted = current + 2
+                            self.logger.info(f"Current: {current}, Target: {position}, Diff: {abs(current_adjusted - position)}")
+                            if abs(current_adjusted - position) < 0.005:
                                 break
                         time.sleep(0.1)
 

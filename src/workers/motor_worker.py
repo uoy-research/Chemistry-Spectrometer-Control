@@ -116,14 +116,16 @@ class MotorWorker(QThread):
 
                     # Check if target reached
                     if self._target_position is not None:
-                        if abs(position - self._target_position) < 0.01:
+                        # Add initial offset to current position for comparison
+                        current_adjusted = -position #self.controller._initial_offset - position
+                        self.logger.info(f"Current: {current_adjusted}, Target: {self._target_position}")
+                        if abs(current_adjusted - self._target_position) < 0.005:
                             self._target_position = None
                             self.movement_completed.emit(True)
                 else:
                     self.error_occurred.emit("Failed to get motor position")
 
-            # Sleep for update interval
-            time.sleep(self.update_interval)
+                time.sleep(self.update_interval)
 
         self.controller.stop()
         self.status_changed.emit("Motor worker stopped")
