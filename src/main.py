@@ -33,7 +33,13 @@ def setup_exception_handling(app):
 def main():
     """Main application entry point."""
     # Initialize logging first, before any other operations
-    setup_logging(level="DEBUG")
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
     logger = logging.getLogger('SSBubble')
     
     # Log that we're starting
@@ -59,10 +65,11 @@ def main():
 
         # Check for --test flag
         test_mode = "--test" in sys.argv
+        logger.info(f"Test mode: {test_mode}")
         
         # Create and show main window
         logger.debug("Creating main window")
-        window = MainWindow(test_mode=True)
+        window = MainWindow(test_mode=test_mode)
         logger.debug("Showing main window")
         window.show()
 

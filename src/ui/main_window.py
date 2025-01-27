@@ -790,9 +790,64 @@ class MainWindow(QMainWindow):
 
     def setup_connections(self):
         """Setup signal connections."""
+        # First disconnect any existing connections to prevent duplicates
+        try:
+            # Worker signal connections
+            self.arduino_worker.readings_updated.disconnect()
+            self.arduino_worker.error_occurred.disconnect()
+            self.arduino_worker.status_changed.disconnect()
+
+            self.motor_worker.position_updated.disconnect()
+            self.motor_worker.error_occurred.disconnect()
+            self.motor_worker.status_changed.disconnect()
+
+            # Arduino and valve connections
+            self.arduino_connect_btn.clicked.disconnect()
+            
+            # Valve buttons
+            self.Valve1Button.clicked.disconnect()
+            self.Valve2Button.clicked.disconnect()
+            self.Valve3Button.clicked.disconnect()
+            self.Valve4Button.clicked.disconnect()
+            self.Valve5Button.clicked.disconnect()
+
+            # Quick action buttons
+            self.quickVentButton.clicked.disconnect()
+            self.slowVentButton.clicked.disconnect()
+            self.buildPressureButton.clicked.disconnect()
+            self.switchGasButton.clicked.disconnect()
+            self.quickBubbleButton.clicked.disconnect()
+
+            # Motor control buttons
+            self.motor_connect_btn.clicked.disconnect()
+            self.motor_calibrate_btn.clicked.disconnect()
+            self.motor_stop_btn.clicked.disconnect()
+            self.motor_move_to_target_button.clicked.disconnect()
+            self.motor_ascent_button.clicked.disconnect()
+            self.motor_to_top_button.clicked.disconnect()
+
+            # Motor macro buttons
+            for i in range(1, 7):
+                btn = getattr(self, f"motor_macro{i}_button")
+                btn.clicked.disconnect()
+
+            # Valve macro buttons
+            for i in range(1, 5):
+                btn = getattr(self, f"valveMacro{i}Button")
+                btn.clicked.disconnect()
+
+            # Pressure radio buttons
+            for i in range(1, 5):
+                radio = getattr(self, f"pressure{i}RadioButton")
+                radio.clicked.disconnect()
+
+        except Exception:
+            # Ignore disconnection errors for signals that weren't connected
+            pass
+
+        # Now set up new connections
         # Worker signal connections
-        self.arduino_worker.readings_updated.connect(
-            self.handle_pressure_readings)
+        self.arduino_worker.readings_updated.connect(self.handle_pressure_readings)
         self.arduino_worker.error_occurred.connect(self.handle_error)
         self.arduino_worker.status_changed.connect(self.handle_status_message)
 
@@ -801,8 +856,7 @@ class MainWindow(QMainWindow):
         self.motor_worker.status_changed.connect(self.handle_status_message)
 
         # Arduino and valve connections
-        self.arduino_connect_btn.clicked.connect(
-            self.on_ardConnectButton_clicked)
+        self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
 
         # Valve buttons
         self.Valve1Button.clicked.connect(self.on_Valve1Button_clicked)
@@ -814,45 +868,35 @@ class MainWindow(QMainWindow):
         # Quick action buttons
         self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
         self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
-        self.buildPressureButton.clicked.connect(
-            self.on_buildPressureButton_clicked)
+        self.buildPressureButton.clicked.connect(self.on_buildPressureButton_clicked)
         self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
-        self.quickBubbleButton.clicked.connect(
-            self.on_quickBubbleButton_clicked)
+        self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
 
         # Motor control buttons
         self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
-        self.motor_calibrate_btn.clicked.connect(
-            self.on_motorCalibrateButton_clicked)
+        self.motor_calibrate_btn.clicked.connect(self.on_motorCalibrateButton_clicked)
         self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
-        self.motor_move_to_target_button.clicked.connect(
-            self.on_motorMoveToTargetButton_clicked)
-        self.motor_ascent_button.clicked.connect(
-            self.on_motorAscentButton_clicked)
-        self.motor_to_top_button.clicked.connect(
-            self.on_motorToTopButton_clicked)
+        self.motor_move_to_target_button.clicked.connect(self.on_motorMoveToTargetButton_clicked)
+        self.motor_ascent_button.clicked.connect(self.on_motorAscentButton_clicked)
+        self.motor_to_top_button.clicked.connect(self.on_motorToTopButton_clicked)
 
         # Motor macro buttons
         for i in range(1, 7):
             btn = getattr(self, f"motor_macro{i}_button")
-            btn.clicked.connect(
-                lambda checked, x=i: self.on_motorMacroButton_clicked(x))
+            btn.clicked.connect(lambda checked, x=i: self.on_motorMacroButton_clicked(x))
 
         # Valve macro buttons
         for i in range(1, 5):
             btn = getattr(self, f"valveMacro{i}Button")
-            btn.clicked.connect(
-                lambda checked, x=i: self.on_valveMacroButton_clicked(x))
+            btn.clicked.connect(lambda checked, x=i: self.on_valveMacroButton_clicked(x))
 
         # Pressure radio buttons
         for i in range(1, 5):
             radio = getattr(self, f"pressure{i}RadioButton")
-            radio.clicked.connect(
-                lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
+            radio.clicked.connect(lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
 
         # Connect mode change signals
-        self.arduino_connect_button_group.buttonClicked.connect(
-            self.on_arduino_mode_changed)
+        self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
 
     @pyqtSlot()
     def handle_motor_connection(self):
@@ -1078,8 +1122,7 @@ class MainWindow(QMainWindow):
             valve_states = [0] * 8
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
             self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Pressure build {
-                             'started' if checked else 'stopped'}")
+            self.logger.info(f"Pressure build {'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
     def on_switchGasButton_clicked(self, checked: bool):
@@ -1568,7 +1611,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker.running:
             try:
                 # Get the macro button that was clicked
-                macro_button = getattr(self, f"valveMacro{macro_num}Button")
+                macro_button = getattr(self, f"valveMacro{i}Button")
 
                 # If this macro is already active, treat as cancel
                 if self.active_valve_macro == macro_num:
@@ -1599,8 +1642,13 @@ class MainWindow(QMainWindow):
                         else:  # "Closed" or "Ignore"
                             valve_states.append(0)
 
-                    # Set valve states
+                    # Ensure we have 8 valve states (pad with zeros if needed)
+                    while len(valve_states) < 8:
+                        valve_states.append(0)
+
+                    # Send valve states to Arduino
                     self.arduino_worker.set_valves(valve_states)
+                    self.logger.info(f"Sent valve states for macro {macro_num}: {valve_states}")
 
                     # Update valve button states
                     # Only first 5 valves have buttons
@@ -1615,9 +1663,21 @@ class MainWindow(QMainWindow):
                     timer = macro.get("Timer", 0)
                     if timer > 0:
                         def reset_valves():
-                            self.reset_valves()
+                            # Reset all valves to closed
+                            self.arduino_worker.set_valves([0] * 8)
+                            self.logger.info("Reset valves after macro timer")
+                            
+                            # Reset button states
+                            for i in range(1, 6):
+                                valve_button = getattr(self, f"Valve{i}Button")
+                                valve_button.setChecked(False)
+                            
+                            # Reset macro state
                             self.active_valve_macro = None
                             self.active_macro_timer = None
+                            macro_button.setChecked(False)
+                            
+                            # Re-enable controls
                             self.enable_all_valve_controls()
 
                         # Create and store the timer
@@ -1626,7 +1686,7 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer.timeout.connect(reset_valves)
                         self.active_macro_timer.start(int(timer * 1000))
 
-                    self.logger.info(f"Executing valve macro {macro_num}: {macro['Label']}")
+                    self.logger.info(f"Executed valve macro {macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
                     macro_button.setChecked(False)

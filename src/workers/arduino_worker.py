@@ -65,30 +65,49 @@ class ArduinoWorker(QThread):
         self.update_interval = update_interval
         if mock:
             self.controller = MockArduinoController(port=port)
-            self._running = False  # Don't auto-start in mock mode
+            self._running = False
         else:
-            self.controller = ArduinoController(port=port)
+            self.controller = ArduinoController(port=port, verbose=True)
 
         self._running = False
         self._paused = False
         self._valve_queue = []
 
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+
+    def start(self) -> bool:
+        """Start the worker thread.
+        
+        Returns:
+            bool: True if started successfully
+        """
+        self.logger.info("Starting Arduino worker thread...")
+        if not self._running:
+            super().start()
+            return True
+        return False
 
     def run(self):
         """Main worker loop."""
+        self.logger.info("Arduino worker thread running")
+        self.status_changed.emit("Starting Arduino worker...")
+
         # Don't actually run if in mock mode
         if isinstance(self.controller, MockArduinoController):
             self._running = True
+            self.logger.info("Mock Arduino controller started")
+            self.status_changed.emit("Mock Arduino worker running")
             return
 
-        self.status_changed.emit("Starting Arduino worker...")
-
+        # Try to start the controller
         if not self.controller.start():
             self.error_occurred.emit("Failed to connect to Arduino")
+            self.logger.error("Failed to start Arduino controller")
             return
 
         self._running = True
+        self.logger.info("Arduino controller started successfully")
         self.status_changed.emit("Arduino worker running")
 
         while self._running:

@@ -1,15 +1,19 @@
-2025-01-23 14:01:08 - SSBubble - INFO - === Starting SSBubble application ===
-2025-01-23 14:01:08 - SSBubble - DEBUG - Python path: ['C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\win32\\lib', 'C:\\Users\\Jonat\\AppData\\Roaming\\Python\\Python312\\site-packages\\Pythonwin', 'C:\\Users\\Jonat\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'C:\\Users\\Jonat\\Documents\\NMR project\\NMR Git\\ssbubble\\src']
-2025-01-23 14:01:08 - SSBubble - DEBUG - Current working directory: C:\Users\Jonat\Documents\NMR project\NMR Git\ssbubble
-2025-01-23 14:01:08 - SSBubble - DEBUG - Creating QApplication
-2025-01-23 14:01:08 - SSBubble - DEBUG - Setting up exception handling
-2025-01-23 14:01:08 - SSBubble - DEBUG - Loading configuration
-2025-01-23 14:01:08 - SSBubble - DEBUG - Creating main window
-2025-01-23 14:01:08 - ui.main_window - INFO - Application started
-2025-01-23 14:01:09 - ui.main_window - INFO - Connected to Arduino in mode 0
-2025-01-23 14:01:10 - ui.main_window - INFO - Executing valve macro 1: Synced Valve Macro
-2025-01-23 14:01:11 - ui.main_window - INFO - Valves reset to default state
-2025-01-23 14:01:11 - ui.main_window - INFO - Executing valve macro 2: Valve Macro 2
-2025-01-23 14:01:12 - ui.main_window - INFO - Valves reset to default state
-2025-01-23 14:01:14 - ui.main_window - INFO - Shutdown complete
-2025-01-23 14:01:14 - SSBubble - INFO - Application shutting down
+2025-01-27 12:53:49 - SSBubble - INFO - === Starting SSBubble application ===
+2025-01-27 12:53:49 - SSBubble - DEBUG - Python path: ['C:\\Users\\gnw510\\Documents\\ssbubble\\src', 'C:\\Users\\gnw510\\AppData\\Local\\Programs\\Python\\Python313\\python313.zip', 'C:\\Users\\gnw510\\AppData\\Local\\Programs\\Python\\Python313\\DLLs', 'C:\\Users\\gnw510\\AppData\\Local\\Programs\\Python\\Python313\\Lib', 'C:\\Users\\gnw510\\AppData\\Local\\Programs\\Python\\Python313', 'C:\\Users\\gnw510\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages']
+2025-01-27 12:53:49 - SSBubble - DEBUG - Current working directory: C:\Users\gnw510\Documents\ssbubble
+2025-01-27 12:53:49 - SSBubble - DEBUG - Creating QApplication
+2025-01-27 12:53:49 - SSBubble - DEBUG - Setting up exception handling
+2025-01-27 12:53:49 - SSBubble - DEBUG - Loading configuration
+2025-01-27 12:53:49 - SSBubble - DEBUG - Creating main window
+2025-01-27 12:53:50 - ui.main_window - INFO - Application started
+2025-01-27 12:53:51 - ui.main_window - INFO - Connected to Arduino in mode 0
+2025-01-27 12:53:54 - ui.main_window - INFO - Valve 1 opened
+2025-01-27 12:53:55 - ui.main_window - INFO - Valve 1 closed
+2025-01-27 12:53:56 - ui.main_window - INFO - Valve 1 opened
+2025-01-27 12:53:56 - ui.main_window - INFO - Valve 1 closed
+2025-01-27 12:53:57 - ui.main_window - INFO - Valve 3 opened
+2025-01-27 12:53:58 - ui.main_window - INFO - Valve 2 opened
+2025-01-27 12:53:59 - ui.main_window - INFO - Valve 4 opened
+2025-01-27 12:54:08 - ui.main_window - INFO - Disconnected from Arduino
+2025-01-27 12:54:10 - ui.main_window - INFO - Shutdown complete
+2025-01-27 12:54:10 - SSBubble - INFO - Application shutting down
