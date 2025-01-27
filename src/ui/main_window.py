@@ -1376,13 +1376,12 @@ class MainWindow(QMainWindow):
         """Handle motor calibration button click."""
         if self.motor_worker.running:
             try:
-                # Move to home position (0) for calibration
-                success = self.motor_worker.move_to(0)
-                if success:
+                # Call calibrate instead of move_to(0)
+                if self.motor_worker.calibrate():
                     self.motor_calibrated = True
                     # Enable controls after calibration
                     self.disable_motor_controls(False)
-                    self.logger.info("Motor calibrated to home position (0)")
+                    self.logger.info("Motor calibration started")
                 else:
                     self.handle_error("Motor calibration failed")
             except Exception as e:
@@ -1418,17 +1417,19 @@ class MainWindow(QMainWindow):
     def on_motorAscentButton_clicked(self):
         """Handle motor ascent button click."""
         if self.motor_worker.running:
-            # Move to home position (0)
-            self.motor_worker.move_to(0)
-            self.logger.info("Moving motor to home position (0)")
+            if self.motor_worker.ascent():
+                self.logger.info("Starting motor ascent")
+            else:
+                self.handle_error("Failed to start motor ascent")
 
     @pyqtSlot()
     def on_motorToTopButton_clicked(self):
         """Handle motor to top button click."""
         if self.motor_worker.running:
-            # Move to home position (0)
-            self.motor_worker.move_to(0)
-            self.logger.info("Moving motor to home position (0)")
+            if self.motor_worker.to_top():
+                self.logger.info("Moving motor to top position")
+            else:
+                self.handle_error("Failed to move motor to top")
 
     @pyqtSlot(int)
     def on_motorMacroButton_clicked(self, macro_num: int):

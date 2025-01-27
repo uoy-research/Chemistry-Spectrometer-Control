@@ -108,12 +108,12 @@ class MotorWorker(QThread):
                 if position is not None:
                     if position != self._current_position:
                         self._current_position = position
-                        # Ensure position is sent as float
+                        # Position is already offset-adjusted by controller
                         self.position_updated.emit(float(position))
 
                     # Check if target reached
                     if self._target_position is not None:
-                        if abs(position - self._target_position) < 0.01:  # Add small tolerance for float comparison
+                        if abs(position - self._target_position) < 0.01:
                             self._target_position = None
                             self.movement_completed.emit(True)
                 else:
@@ -160,6 +160,95 @@ class MotorWorker(QThread):
             self.error_occurred.emit("Invalid position value")
             return False
 
+    def calibrate(self) -> bool:
+        """Calibrate the motor and establish home position."""
+        if not self.controller.running:
+            self.error_occurred.emit("Motor not connected")
+            return False
+        
+        try:
+            self.status_changed.emit("Starting motor calibration...")
+            if self.controller.calibrate():
+                self.status_changed.emit("Motor calibration complete")
+                # Get initial position reading after calibration
+                position = self.controller.get_position()
+                if position is not None:
+                    self._current_position = position
+                    self.position_updated.emit(position)
+                return True
+            else:
+                self.error_occurred.emit("Calibration failed")
+                return False
+        except Exception as e:
+            self.error_occurred.emit(f"Calibration error: {str(e)}")
+            return False
+
+    def check_calibrated(self) -> bool:
+        """Check if motor is calibrated."""
+        if not self.controller.running:
+            return False
+        
+        try:
+            return self.controller.check_calibrated()
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to check calibration: {str(e)}")
+            return False
+
+    def emergency_stop(self):
+        """Execute emergency stop."""
+        try:
+            if self.running:
+                # Stop any current movement
+                self.controller.stop_motor()
+                self._target_position = None
+                # Signal that we've stopped
+                self.status_changed.emit("Motor emergency stopped")
+                self.logger.info("Emergency stop executed")
+        except Exception as e:
+            self.error_occurred.emit(f"Emergency stop failed: {str(e)}")
+            self.logger.error(f"Emergency stop failed: {e}")
+
+    def stop_movement(self):
+        """Stop current movement without stopping the worker thread."""
+        try:
+            if self.running:
+                self.controller.stop_motor()
+                self._target_position = None
+                self.status_changed.emit("Motor movement stopped")
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to stop motor: {str(e)}")
+            self.logger.error(f"Failed to stop motor: {e}")
+
+    def ascent(self) -> bool:
+        """Move motor up."""
+        if not self.controller.running:
+            self.error_occurred.emit("Motor not connected")
+            return False
+        
+        try:
+            if self.controller.ascent():
+                self.status_changed.emit("Moving motor up")
+                return True
+            return False
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to move up: {str(e)}")
+            return False
+
+    def to_top(self) -> bool:
+        """Move motor to top position."""
+        if not self.controller.running:
+            self.error_occurred.emit("Motor not connected")
+            return False
+        
+        try:
+            if self.controller.to_top():
+                self.status_changed.emit("Moving motor to top")
+                return True
+            return False
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to move to top: {str(e)}")
+            return False
+
     def set_speed(self, speed: int):
         """Set motor speed."""
         if not self.controller.running:
@@ -176,19 +265,6 @@ class MotorWorker(QThread):
         """Get the running state of the worker."""
         return self._running
 
-    def emergency_stop(self):
-        """Execute emergency stop."""
-        try:
-            if self.running:
-                # Stop any current movement
-                self.controller.stop_motor()
-                # Signal that we've stopped
-                self.status_changed.emit("Motor emergency stopped")
-                self.logger.info("Emergency stop executed")
-        except Exception as e:
-            self.error_occurred.emit(f"Emergency stop failed: {str(e)}")
-            self.logger.error(f"Emergency stop failed: {e}")
-
     def get_current_position(self) -> Optional[float]:
         """Get the current motor position.
         
@@ -198,17 +274,6 @@ class MotorWorker(QThread):
         if not self.running:
             return None
         return self._current_position
-
-    def stop_movement(self):
-        """Stop current movement without stopping the worker thread."""
-        try:
-            if self.running:
-                self.controller.stop_motor()
-                self._target_position = None
-                self.status_changed.emit("Motor movement stopped")
-        except Exception as e:
-            self.error_occurred.emit(f"Failed to stop motor: {str(e)}")
-            self.logger.error(f"Failed to stop motor: {e}")
 
     def start(self) -> bool:
         """Start the worker thread.
