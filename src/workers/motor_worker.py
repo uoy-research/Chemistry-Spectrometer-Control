@@ -3,7 +3,7 @@ File: motor_worker.py
 Description: Worker thread for motor control
 """
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, QTimer
 import time
 import logging
 from typing import Optional, Union
@@ -53,12 +53,14 @@ class MotorWorker(QThread):
         movement_completed(bool): Emitted when movement is complete
         error_occurred(str): Emitted when an error occurs
         status_changed(str): Emitted when worker status changes
+        calibration_state_changed(bool): Emitted when motor calibration state changes
     """
 
     position_updated = pyqtSignal(float)
     movement_completed = pyqtSignal(bool)
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
+    calibration_state_changed = pyqtSignal(bool)
 
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
         """Initialize worker.
@@ -82,6 +84,7 @@ class MotorWorker(QThread):
         self._paused = False
         self._target_position: Optional[float] = None
         self._current_position: Optional[float] = None
+        self._is_calibrated = False
 
         self.logger = logging.getLogger(__name__)
 
@@ -168,16 +171,41 @@ class MotorWorker(QThread):
         
         try:
             self.status_changed.emit("Starting motor calibration...")
-            if self.controller.calibrate():
-                self.status_changed.emit("Motor calibration complete")
-                # Get initial position reading after calibration
-                position = self.controller.get_position()
-                if position is not None:
-                    self._current_position = position
-                    self.position_updated.emit(position)
+            if self.controller.start_calibration():
+                # Start a timer to check calibration status
+                self._calibration_check_timer = QTimer()
+                self._calibration_check_timer.setInterval(200)  # Check every 200ms
+                self._calibration_attempts = 0
+                self._max_calibration_attempts = 25  # 5 seconds total
+
+                def check_calibration():
+                    try:
+                        if self.controller.check_calibrated():
+                            self._calibration_check_timer.stop()
+                            self.status_changed.emit("Motor calibration complete")
+                            self._is_calibrated = True
+                            self.calibration_state_changed.emit(True)
+                            self.movement_completed.emit(True)
+                        else:
+                            self._calibration_attempts += 1
+                            if self._calibration_attempts >= self._max_calibration_attempts:
+                                self._calibration_check_timer.stop()
+                                self.error_occurred.emit("Calibration timed out")
+                                self._is_calibrated = False
+                                self.calibration_state_changed.emit(False)
+                                self.movement_completed.emit(False)
+                    except Exception as e:
+                        self._calibration_check_timer.stop()
+                        self.error_occurred.emit(f"Calibration error: {str(e)}")
+                        self._is_calibrated = False
+                        self.calibration_state_changed.emit(False)
+                        self.movement_completed.emit(False)
+
+                self._calibration_check_timer.timeout.connect(check_calibration)
+                self._calibration_check_timer.start()
                 return True
             else:
-                self.error_occurred.emit("Calibration failed")
+                self.error_occurred.emit("Failed to start calibration")
                 return False
         except Exception as e:
             self.error_occurred.emit(f"Calibration error: {str(e)}")
@@ -189,7 +217,11 @@ class MotorWorker(QThread):
             return False
         
         try:
-            return self.controller.check_calibrated()
+            is_calibrated = self.controller.check_calibrated()
+            if is_calibrated != self._is_calibrated:
+                self._is_calibrated = is_calibrated
+                self.calibration_state_changed.emit(is_calibrated)
+            return is_calibrated
         except Exception as e:
             self.error_occurred.emit(f"Failed to check calibration: {str(e)}")
             return False

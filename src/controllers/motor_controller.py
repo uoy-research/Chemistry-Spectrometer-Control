@@ -114,8 +114,8 @@ class MotorController:
             self.serial_connected = False
             return None
 
-    def calibrate(self) -> bool:
-        """Calibrate the motor."""
+    def start_calibration(self) -> bool:
+        """Start the calibration process."""
         try:
             # Send calibration command
             self.instrument.write_register(2, ord('c'))
@@ -123,25 +123,9 @@ class MotorController:
             self.instrument.write_bit(1, 1)
             self.serial_connected = True
             self.logger.info("Calibrating motor, please wait")
-            
-            # Wait for calibration to complete
-            time.sleep(4)  # Initial wait time
-            
-            # Wait until calibration bit is set
-            max_attempts = 10  # 5 seconds timeout
-            for _ in range(max_attempts):
-                if self.check_calibrated():
-                    time.sleep(0.5)  # Wait for motor to settle
-                    self._is_calibrated = True
-                    self.logger.info("Calibration complete")
-                    return True
-                time.sleep(1)
-            
-            self.logger.error("Calibration timed out waiting for calibration bit")
-            return False
-            
+            return True
         except Exception as e:
-            self.logger.error(f"Couldn't calibrate motor: {e}")
+            self.logger.error(f"Couldn't start calibration: {e}")
             self.serial_connected = False
             return False
 
@@ -150,6 +134,8 @@ class MotorController:
         try:
             calibrated = self.instrument.read_bit(2, 1)
             self.serial_connected = True
+            if calibrated:
+                self._is_calibrated = True
             return bool(calibrated)
         except Exception as e:
             self.logger.error(f"Couldn't read calibration status: {e}")

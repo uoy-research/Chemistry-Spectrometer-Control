@@ -866,6 +866,7 @@ class MainWindow(QMainWindow):
         self.motor_worker.position_updated.connect(self.handle_position_update)
         self.motor_worker.error_occurred.connect(self.handle_error)
         self.motor_worker.status_changed.connect(self.handle_status_message)
+        self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state)
 
         # Arduino and valve connections
         self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
@@ -928,15 +929,14 @@ class MainWindow(QMainWindow):
                 self.motor_worker.position_updated.connect(self.handle_position_update)
                 self.motor_worker.error_occurred.connect(self.handle_error)
                 self.motor_worker.status_changed.connect(self.handle_status_message)
+                self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state)
                 
                 # Start the worker - in test mode we don't need actual connection
                 if self.test_mode or self.motor_worker.start():
                     self.motor_connect_btn.setText("Disconnect")
                     self.motor_warning_label.setText("")
                     self.motor_warning_label.setVisible(False)
-                    # Enable calibration after connection
                     self.motor_calibrate_btn.setEnabled(True)
-                    # Keep controls disabled until calibrated
                     self.disable_motor_controls(True)
                     self.logger.info(f"Connected to motor on COM{port}")
                 else:
@@ -944,17 +944,21 @@ class MainWindow(QMainWindow):
                     self.motor_warning_label.setText("Warning: Motor not connected")
                     self.motor_calibrate_btn.setEnabled(False)
                     self.disable_motor_controls(True)
-            else:
-                self.motor_worker.stop()
-                self.motor_connect_btn.setText("Connect")
-                self.motor_calibrated = False
-                self.motor_warning_label.setText("Warning: Motor not connected")
-                self.motor_calibrate_btn.setEnabled(False)
-                self.disable_motor_controls(True)
-                self.logger.info("Disconnected from motor")
+
         except Exception as e:
             self.logger.error(f"Error in motor connection handler: {e}")
             self.handle_error(f"Motor connection error: {str(e)}")
+
+    @pyqtSlot(bool)
+    def handle_calibration_state(self, is_calibrated: bool):
+        """Handle changes in motor calibration state."""
+        self.motor_calibrated = is_calibrated
+        self.disable_motor_controls(not is_calibrated)
+        if is_calibrated:
+            self.motor_calibrate_btn.setEnabled(True)
+            self.logger.info("Motor calibration state: Calibrated")
+        else:
+            self.logger.info("Motor calibration state: Not calibrated")
 
     def find_sequence_file(self):
         """Look for sequence file in the specified location."""
@@ -1000,9 +1004,9 @@ class MainWindow(QMainWindow):
                                 Q_ARG(str, self.step_types[self.steps[0].step_type]),
                                 Q_ARG(float, self.steps[0].time_length),
                                 Q_ARG(int, len(self.steps)),
-                                Q_ARG(float, self.total_sequence_time))
+                                Q_ARG(float, self.total_sequence_time)
+                            )
                             
-                        
                             QMetaObject.invokeMethod(self, "update_sequence_status",
                                 Qt.ConnectionType.QueuedConnection,
                                 Q_ARG(str, "Running"))
@@ -1376,16 +1380,28 @@ class MainWindow(QMainWindow):
         """Handle motor calibration button click."""
         if self.motor_worker.running:
             try:
-                # Call calibrate instead of move_to(0)
+                # Disable controls during calibration
+                self.disable_motor_controls(True)
+                self.motor_calibrate_btn.setEnabled(False)
+                
                 if self.motor_worker.calibrate():
-                    self.motor_calibrated = True
-                    # Enable controls after calibration
-                    self.disable_motor_controls(False)
                     self.logger.info("Motor calibration started")
                 else:
-                    self.handle_error("Motor calibration failed")
+                    self.handle_error("Failed to start motor calibration")
             except Exception as e:
                 self.handle_error(f"Calibration error: {e}")
+            self.motor_calibrate_btn.setEnabled(True)
+
+    @pyqtSlot(bool)
+    def handle_calibration_complete(self, success: bool):
+        """Handle completion of motor calibration."""
+        if success:
+            self.motor_calibrated = True
+            self.disable_motor_controls(False)
+        else:
+            self.motor_calibrated = False
+            self.handle_error("Motor calibration failed")
+        self.motor_calibrate_btn.setEnabled(True)
 
     @pyqtSlot()
     def on_motorStopButton_clicked(self):
