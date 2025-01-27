@@ -944,6 +944,16 @@ class MainWindow(QMainWindow):
                     self.motor_warning_label.setText("Warning: Motor not connected")
                     self.motor_calibrate_btn.setEnabled(False)
                     self.disable_motor_controls(True)
+            else:
+                # Disconnect the motor
+                self.motor_worker.stop()  # This stops the worker thread and closes the connection
+                self.motor_connect_btn.setText("Connect")
+                self.motor_calibrated = False
+                self.motor_warning_label.setText("Warning: Motor not connected")
+                self.motor_warning_label.setVisible(True)
+                self.motor_calibrate_btn.setEnabled(False)
+                self.disable_motor_controls(True)
+                self.logger.info("Disconnected from motor")
 
         except Exception as e:
             self.logger.error(f"Error in motor connection handler: {e}")

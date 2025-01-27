@@ -12,7 +12,7 @@ from typing import Optional, Union, Tuple
 class MotorController:
     SPEED_MAX = 1000
     SPEED_MIN = 0
-    POSITION_MAX = 1000.0  # Maximum downward position
+    POSITION_MAX = 91.62  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
 
     def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
@@ -214,16 +214,22 @@ class MotorController:
         return self.set_position(position)
 
     def stop_motor(self) -> bool:
-        """Stop motor movement."""
-        try:
-            self.instrument.write_register(2, ord('s'))
-            self.instrument.write_bit(1, 1)
-            self.serial_connected = True
-            return True
-        except Exception as e:
-            self.logger.error(f"Couldn't stop motor: {e}")
-            self.serial_connected = False
-            return False
+        """Stop motor movement with retries."""
+        max_retries = 10
+        for attempt in range(max_retries):
+            try:
+                self.instrument.write_register(2, ord('s'))
+                self.instrument.write_bit(1, 1)
+                self.serial_connected = True
+                self.logger.info("Motor stop command sent successfully")
+                return True
+            except Exception as e:
+                if attempt == max_retries - 1:  # Last attempt
+                    self.logger.error(f"Failed to stop motor after {max_retries} attempts: {e}")
+                    self.serial_connected = False
+                    return False
+                self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
+                time.sleep(0.1)  # Short delay between retries
 
     def ascent(self) -> bool:
         """Move motor up."""

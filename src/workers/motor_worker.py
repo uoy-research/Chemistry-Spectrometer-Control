@@ -238,15 +238,34 @@ class MotorWorker(QThread):
             return False
 
     def emergency_stop(self):
-        """Execute emergency stop."""
+        """Execute emergency stop with retries."""
         try:
             if self.running:
-                # Stop any current movement
-                self.controller.stop_motor()
-                self._target_position = None
-                # Signal that we've stopped
-                self.status_changed.emit("Motor emergency stopped")
-                self.logger.info("Emergency stop executed")
+                success = False
+                max_retries = 10
+                
+                for attempt in range(max_retries):
+                    try:
+                        # Stop any current movement
+                        if self.controller.stop_motor():
+                            success = True
+                            break
+                        else:
+                            self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            raise
+                        self.logger.warning(f"Stop attempt {attempt + 1} failed: {e}, retrying...")
+                    time.sleep(0.1)  # Short delay between retries
+                
+                if success:
+                    self._target_position = None
+                    self.status_changed.emit("Motor emergency stopped")
+                    self.logger.info("Emergency stop executed successfully")
+                else:
+                    self.error_occurred.emit(f"Emergency stop failed after {max_retries} attempts")
+                    self.logger.error(f"Emergency stop failed after {max_retries} attempts")
+                
         except Exception as e:
             self.error_occurred.emit(f"Emergency stop failed: {str(e)}")
             self.logger.error(f"Emergency stop failed: {e}")
