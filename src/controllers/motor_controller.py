@@ -5,7 +5,8 @@ File: src/controllers/motor_controller.py
 import minimalmodbus
 import time
 import logging
-from typing import Optional, Union
+import ctypes
+from typing import Optional, Union, Tuple
 
 
 class MotorController:
@@ -23,6 +24,8 @@ class MotorController:
         self.running = False
         self.serial_connected = False  # Add serial connection state tracking
         self._current_position = 0.0  # Initialize at home position for test mode
+        self.motor_position = 0
+        self.target_position = 0
         self._setup_logging()
 
     def _setup_logging(self):
@@ -94,13 +97,39 @@ class MotorController:
             
             # Combine high and low words into a single value
             # High word is shifted left 16 bits and combined with low word
-            position = (registers[0] << 16) | registers[1]
+            self.motor_position = self.assemble(registers[0], registers[1])
             
-            return float(position)
+            return float(self.motor_position)
 
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
+            self.serial_connected = False
             return None
+
+    def calibrate(self) -> bool:
+        """Calibrate the motor."""
+        try:
+            self.instrument.write_register(2, ord('c'))
+            time.sleep(1)
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            self.logger.info("Calibrating motor, please wait")
+            return True
+        except Exception as e:
+            self.logger.error(f"Couldn't calibrate motor: {e}")
+            self.serial_connected = False
+            return False
+
+    def check_calibrated(self) -> bool:
+        """Check if motor is calibrated."""
+        try:
+            calibrated = self.instrument.read_bit(2, 1)
+            self.serial_connected = True
+            return calibrated
+        except Exception as e:
+            self.logger.error(f"Couldn't read calibration status: {e}")
+            self.serial_connected = False
+            return False
 
     def set_position(self, position: Union[int, float], wait: bool = False) -> bool:
         """Set motor position where 0 is home (top) position.
@@ -127,28 +156,96 @@ class MotorController:
                 self._current_position = position
                 return True
 
-            # Convert to motor units if needed
-            motor_position = int(position)  # Or apply any necessary conversion
-            self.instrument.write_register(0x0118, motor_position)
+            if self.check_calibrated():
+                # Convert to motor units if needed
+                position_int = int(position)  # Or apply any necessary conversion
+                high, low = self.disassemble(position_int)
+                self.instrument.write_register(3, high)
+                self.instrument.write_register(4, low)
+                self.instrument.write_register(2, ord('x'))
+                self.instrument.write_bit(1, 1)
+                self.serial_connected = True
 
-            if wait:
-                while True:
-                    current = self.get_position()
-                    if current == position:
-                        break
-                    time.sleep(0.1)
+                if wait:
+                    while True:
+                        current = self.get_position()
+                        if current == position:
+                            break
+                        time.sleep(0.1)
 
             return True
 
         except Exception as e:
             self.logger.error(f"Error setting position: {e}")
+            self.serial_connected = False
             return False
+
+    def stop_motor(self) -> bool:
+        """Stop motor movement."""
+        try:
+            self.instrument.write_register(2, ord('s'))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            return True
+        except Exception as e:
+            self.logger.error(f"Couldn't stop motor: {e}")
+            self.serial_connected = False
+            return False
+
+    def ascent(self) -> bool:
+        """Move motor up."""
+        try:
+            self.instrument.write_register(2, ord('u'))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            return True
+        except Exception as e:
+            self.logger.error(f"Couldn't move up: {e}")
+            self.serial_connected = False
+            return False
+
+    def to_top(self) -> bool:
+        """Move motor to top position."""
+        try:
+            self.instrument.write_register(2, ord('t'))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            return True
+        except Exception as e:
+            self.logger.error(f"Couldn't move to top: {e}")
+            self.serial_connected = False
+            return False
+
+    def get_top_position(self) -> Optional[int]:
+        """Get the top position of the motor."""
+        try:
+            readings = self.instrument.read_registers(7, 2, 3)
+            top_position = self.assemble(readings[0], readings[1])
+            self.serial_connected = True
+            return top_position
+        except Exception as e:
+            self.logger.error(f"Couldn't read top position: {e}")
+            self.serial_connected = False
+            return None
+
+    def reset(self):
+        """Reset the motor controller."""
+        try:
+            self.instrument.write_register(2, ord('e'))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+        except Exception as e:
+            self.logger.error(f"Couldn't reset motor: {e}")
+            self.serial_connected = False
+        finally:
+            if hasattr(self, 'instrument') and self.instrument:
+                self.instrument.serial.close()
 
     def stop(self):
         """Stop the motor controller and clean up."""
         try:
             if self.serial_connected:
-                # Clear initialization flag before disconnecting
+                self.stop_motor()
                 try:
                     self.instrument.write_bit(3, 0)
                 except Exception as e:
@@ -166,3 +263,18 @@ class MotorController:
             
         except Exception as e:
             self.logger.error(f"Error stopping motor controller: {e}")
+
+    @staticmethod
+    def disassemble(combined: int) -> Tuple[int, int]:
+        """Disassemble a 32-bit value into high and low 16-bit words."""
+        combined &= 0xFFFFFFFF  # Simulate 32-bit integer overflow
+        high = (combined >> 16) & 0xFFFF
+        low = combined & 0xFFFF
+        return high, low
+
+    @staticmethod
+    def assemble(high: int, low: int) -> int:
+        """Assemble high and low 16-bit words into a 32-bit value."""
+        high = ctypes.c_int16(high).value   # Convert high to signed int16
+        combined = (high << 16) | (low & 0xFFFF)
+        return combined
