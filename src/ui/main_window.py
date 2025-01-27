@@ -966,11 +966,20 @@ class MainWindow(QMainWindow):
                 return
 
             if Path(r"C:\ssbubble\sequence.txt").exists():
+                start_time = time.time()  # Start timing
+                self.logger.info("Found sequence file, beginning processing")
+                
                 try:
                     success = self.load_sequence()
+                    load_time = time.time()  # Time after loading
+                    self.logger.info(f"Sequence loading took {(load_time - start_time):.3f} seconds")
+
                     if success:
                         # Process successful sequence
                         self.handle_sequence_file(True)
+                        prospa_time = time.time()  # Time after writing to Prospa
+                        self.logger.info(f"Prospa file write took {(prospa_time - load_time):.3f} seconds")
+                        self.logger.info(f"Total sequence processing took {(prospa_time - start_time):.3f} seconds")
 
                         # Calculate sequence timing
                         self.calculate_sequence_time()
@@ -997,22 +1006,14 @@ class MainWindow(QMainWindow):
                     else:
                         # On failure, disconnect the controller and stop timer
                         self.handle_sequence_file(False)
-                        self.file_timer.stop()
-                        self.arduino_worker.stop()
-                        
-                        # Update UI using the main thread
-                        QMetaObject.invokeMethod(self, "_update_arduino_disconnect_state",
-                            Qt.ConnectionType.QueuedConnection)
+                        fail_time = time.time()
+                        self.logger.info(f"Failure handling took {(fail_time - start_time):.3f} seconds")
 
                 except Exception as e:
+                    error_time = time.time()
                     self.logger.error(f"Error processing sequence file: {e}")
-                    self.handle_sequence_file(False)
-                    self.file_timer.stop()
-                    self.arduino_worker.stop()
-                    
-                    # Update UI using the main thread
-                    QMetaObject.invokeMethod(self, "_update_arduino_disconnect_state",
-                        Qt.ConnectionType.QueuedConnection)
+                    self.logger.error(f"Error occurred after {(error_time - start_time):.3f} seconds")
+                    # Rest of the error handling...
 
         except Exception as e:
             self.logger.error(f"Error in sequence file check: {e}")
