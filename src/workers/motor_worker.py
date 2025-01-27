@@ -156,8 +156,11 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)  # Ensure position is float
-            if self.controller.set_position(position, wait=False):
-                self._target_position = position
+            success, actual_target = self.controller.set_position(position, wait=False)
+            if success:
+                self._target_position = actual_target  # Use the actual target position
+                if actual_target != position:
+                    self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
                 return True
             return False
         except (ValueError, TypeError):

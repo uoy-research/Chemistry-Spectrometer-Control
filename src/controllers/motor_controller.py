@@ -156,25 +156,31 @@ class MotorController:
             self.serial_connected = False
             return False
 
-    def set_position(self, position: Union[int, float], wait: bool = False) -> bool:
-        """Set motor position."""
+    def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
+        """Set motor position.
+        
+        Returns:
+            Tuple[bool, float]: (success, actual_target_position)
+        """
         if not self.running:
-            return False
+            return False, position
 
         try:
             position = float(position)
+            actual_target = position  # Store the actual target that will be used
             
             if position > self.POSITION_MAX:
-                self.logger.error(f"Position {position} exceeds maximum {self.POSITION_MAX}")
-                return False
+                self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
+                actual_target = self.POSITION_MAX
+                position = self.POSITION_MAX
 
             if self.mode == 2:  # Test mode
                 self._current_position = position
-                return True
+                return True, actual_target
 
             if self.check_calibrated():
                 # Add static offset to target position
-                adjusted_position = position  # Add 2mm offset
+                adjusted_position = position
                 # Convert from mm to microsteps with proper rounding
                 position_steps = int(round(adjusted_position * 25600.0))
                 
@@ -192,22 +198,21 @@ class MotorController:
                     while True:
                         current = self.get_position()
                         if current is not None:
-                            # Add 2mm to current position for comparison
                             current_adjusted = current + 2
                             self.logger.info(f"Current: {current}, Target: {position}, Diff: {abs(current_adjusted - position)}")
                             if abs(current_adjusted - position) < 0.005:
                                 break
                         time.sleep(0.1)
 
-                return True
+                return True, actual_target
             else:
                 self.logger.error("Motor not calibrated")
-                return False
+                return False, position
 
         except Exception as e:
             self.logger.error(f"Error setting position: {e}")
             self.serial_connected = False
-            return False
+            return False, position
 
     def move_to_position(self, position: Union[int, float]) -> bool:
         """Alternative method for moving to position (for compatibility)."""
