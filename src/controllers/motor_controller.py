@@ -109,13 +109,10 @@ class MotorController:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    # Read registers with explicit function code
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
                     raw_steps = self.assemble(readings[0], readings[1])
-                    #self.logger.debug(f"Raw position (steps): {raw_steps}")
-                    # Convert to millimeters with proper rounding and apply static offset
-                    position = round(raw_steps / 25600.0, 5) - 2  # Subtract 2mm offset
-                    #self.logger.debug(f"Converted position (mm): {position}")
+                    # Convert to millimeters and apply offset from calibration
+                    position = round((raw_steps / 25600.0) - self._initial_offset, 5)
                     self.motor_position = position
                     return float(position)
                 except Exception as e:
@@ -131,6 +128,9 @@ class MotorController:
     def start_calibration(self) -> bool:
         """Start the calibration process."""
         try:
+            # Reset calibration flag so offset will be recalculated
+            self._is_calibrated = False
+            
             # Send calibration command
             self.instrument.write_register(2, ord('c'))
             time.sleep(1)
@@ -148,11 +148,29 @@ class MotorController:
         try:
             calibrated = self.instrument.read_bit(2, 1)
             self.serial_connected = True
+            
+            # First check if calibration is complete from controller
             if calibrated:
-                self._is_calibrated = True
+                if not self._is_calibrated:
+                    # Now we know calibration is truly complete, wait for motor to settle
+                    time.sleep(0.5)
+                    
+                    # Record position offset after calibration is complete
+                    try:
+                        readings = self.instrument.read_registers(5, 2, functioncode=3)
+                        raw_steps = self.assemble(readings[0], readings[1])
+                        calibration_position = round(raw_steps / 25600.0, 5)
+                        self._initial_offset = calibration_position
+                        self.logger.info(f"Calibration complete - Position offset set to: {calibration_position}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to get calibration position: {e}")
+                        self._initial_offset = 0
+                    
+                    self._is_calibrated = True
+                
             return bool(calibrated)
         except Exception as e:
-            self.logger.error(f"Couldn't read calibration status: {e}")
+            self.logger.error(f"Couldn't read calibration status")
             self.serial_connected = False
             return False
 
