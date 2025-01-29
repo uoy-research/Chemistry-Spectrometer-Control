@@ -1,0 +1,11 @@
+#Launch the main program
+python src/main.py
+
+#Launch the main program in test mode
+python src/main.py --test
+
+#Create installer
+.\build.bat
+
+#Run installer
+.\build\dist\SSBubble.exe
