@@ -14,7 +14,7 @@ class MotorController:
     SPEED_MIN = 0
     POSITION_MAX = 364.40  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
-    STEPS_PER_MM = 8000.0
+    STEPS_PER_MM = 6400.0
 
     def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
