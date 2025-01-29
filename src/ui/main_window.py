@@ -1431,11 +1431,21 @@ class MainWindow(QMainWindow):
             try:
                 target = self.target_motor_pos_edit.value()
                 if target < 0:
-                    self.handle_error(
+                    QMessageBox.warning(self, "Invalid Position", 
                         "Invalid target position. Position must be non-negative (0 is home position at top).")
                     return
+                if target > self.motor_worker.controller.POSITION_MAX:
+                    response = QMessageBox.question(self, "Position Limit Exceeded",
+                        f"Target position {target}mm exceeds maximum allowed position of {self.motor_worker.controller.POSITION_MAX}mm.\n\n"
+                        f"Would you like to move to the maximum position of {self.motor_worker.controller.POSITION_MAX}mm?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+                    
+                    if response == QMessageBox.StandardButton.Cancel:
+                        return
+                target = self.motor_worker.controller.POSITION_MAX
+            
                 self.motor_worker.move_to(target)
-                self.logger.info(f"Moving motor to position {target}")
+                self.logger.info(f"Moving motor to position {target}mm")
             except ValueError:
                 self.handle_error("Invalid target position")
 
