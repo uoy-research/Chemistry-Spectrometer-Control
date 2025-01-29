@@ -86,9 +86,16 @@ class MainWindow(QMainWindow):
         self.position_check_timer = None  # Track the position check timer
         self.motor_calibrated = False  # Track motor calibration state
 
+        # Add connection tracking flag
+        self._connections_initialized = False
+
         # Setup UI
         self.setup_ui()
-        self.setup_connections()
+
+        # Setup connections
+        if not self._connections_initialized:
+            self.setup_connections()
+            self._connections_initialized = True
 
         # Initialize control states
         self.initialize_control_states()
@@ -802,6 +809,9 @@ class MainWindow(QMainWindow):
 
     def setup_connections(self):
         """Setup signal connections."""
+        if self._connections_initialized:
+            return
+        
         # First disconnect any existing connections to prevent duplicates
         try:
             # Worker signal connections
