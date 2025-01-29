@@ -37,7 +37,7 @@ class ArduinoController:
         
         # Log mode
         modes = {0: "Manual", 1: "Sequence", 2: "TTL"}
-        self.logger.info(f"Initializing in {modes.get(mode, 'Unknown')} mode")
+        self.logger.debug(f"Initializing in {modes.get(mode, 'Unknown')} mode")
 
     def _setup_logging(self):
         """Setup logging configuration."""

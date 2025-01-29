@@ -816,12 +816,13 @@ class MainWindow(QMainWindow):
             # Arduino and valve connections
             self.arduino_connect_btn.clicked.disconnect()
             
-            # Valve buttons
-            self.Valve1Button.clicked.disconnect()
-            self.Valve2Button.clicked.disconnect()
-            self.Valve3Button.clicked.disconnect()
-            self.Valve4Button.clicked.disconnect()
-            self.Valve5Button.clicked.disconnect()
+            # Valve buttons - Add explicit disconnections
+            for i in range(1, 6):
+                valve_button = getattr(self, f"Valve{i}Button")
+                try:
+                    valve_button.clicked.disconnect()
+                except TypeError:
+                    pass  # Ignore if not connected
 
             # Quick action buttons
             self.quickVentButton.clicked.disconnect()
@@ -871,12 +872,8 @@ class MainWindow(QMainWindow):
         # Arduino and valve connections
         self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
 
-        # Valve buttons
-        self.Valve1Button.clicked.connect(self.on_Valve1Button_clicked)
-        self.Valve2Button.clicked.connect(self.on_Valve2Button_clicked)
-        self.Valve3Button.clicked.connect(self.on_Valve3Button_clicked)
-        self.Valve4Button.clicked.connect(self.on_Valve4Button_clicked)
-        self.Valve5Button.clicked.connect(self.on_Valve5Button_clicked)
+        # Valve buttons - Use a method instead of lambda
+        self.connect_valve_buttons()
 
         # Quick action buttons
         self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
@@ -910,6 +907,14 @@ class MainWindow(QMainWindow):
 
         # Connect mode change signals
         self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
+
+    def connect_valve_buttons(self):
+        """Connect valve button signals using a dedicated method."""
+        self.Valve1Button.clicked.connect(self.on_Valve1Button_clicked)
+        self.Valve2Button.clicked.connect(self.on_Valve2Button_clicked)
+        self.Valve3Button.clicked.connect(self.on_Valve3Button_clicked)
+        self.Valve4Button.clicked.connect(self.on_Valve4Button_clicked)
+        self.Valve5Button.clicked.connect(self.on_Valve5Button_clicked)
 
     @pyqtSlot()
     def handle_motor_connection(self):
@@ -2019,7 +2024,7 @@ class MainWindow(QMainWindow):
             mock=self.test_mode
         )
         self.setup_connections()
-        self.logger.info(f"Arduino port updated to COM{port}")
+        #self.logger.debug(f"Arduino port updated to COM{port}")
 
     @pyqtSlot(list)
     def handle_pressure_readings(self, readings: List[float]):
