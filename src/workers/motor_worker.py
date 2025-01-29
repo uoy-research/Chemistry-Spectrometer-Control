@@ -145,7 +145,7 @@ class MotorWorker(QThread):
         self.status_changed.emit("Motor worker running")
 
     def move_to(self, position: Union[int, float]) -> bool:
-        """Move motor to specified position."""
+        """Move motor to specified position with retries."""
         if not self.controller.running:
             self.error_occurred.emit("Motor not connected")
             return False
@@ -156,15 +156,32 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)  # Ensure position is float
-            success, actual_target = self.controller.set_position(position, wait=False)
-            if success:
-                self._target_position = actual_target  # Use the actual target position
-                if actual_target != position:
-                    self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
-                return True
-            return False
+            success = False
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    success, actual_target = self.controller.set_position(position, wait=False)
+                    if success:
+                        self._target_position = actual_target  # Use the actual target position
+                        if actual_target != position:
+                            self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
+                        break
+                    else:
+                        self.logger.warning(f"Move attempt {attempt + 1} failed, retrying...")
+                except Exception as e:
+                    if attempt == max_retries - 1:  # Last attempt
+                        raise
+                    self.logger.warning(f"Move attempt {attempt + 1} failed: {e}, retrying...")
+                time.sleep(0.1)  # Short delay between retries
+            
+            return success
+
         except (ValueError, TypeError):
             self.error_occurred.emit("Invalid position value")
+            return False
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to move motor: {str(e)}")
             return False
 
     def calibrate(self) -> bool:
@@ -274,42 +291,91 @@ class MotorWorker(QThread):
             self.logger.error(f"Emergency stop failed: {e}")
 
     def stop_movement(self):
-        """Stop current movement without stopping the worker thread."""
+        """Stop current movement without stopping the worker thread, with retries."""
         try:
             if self.running:
-                self.controller.stop_motor()
-                self._target_position = None
-                self.status_changed.emit("Motor movement stopped")
+                success = False
+                max_retries = 3
+                
+                for attempt in range(max_retries):
+                    try:
+                        if self.controller.stop_motor():
+                            success = True
+                            self._target_position = None
+                            self.status_changed.emit("Motor movement stopped")
+                            break
+                        else:
+                            self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            raise
+                        self.logger.warning(f"Stop attempt {attempt + 1} failed: {e}, retrying...")
+                    time.sleep(0.1)  # Short delay between retries
+                
+                if not success:
+                    self.error_occurred.emit(f"Failed to stop motor after {max_retries} attempts")
+                    self.logger.error(f"Failed to stop motor after {max_retries} attempts")
+                
         except Exception as e:
             self.error_occurred.emit(f"Failed to stop motor: {str(e)}")
             self.logger.error(f"Failed to stop motor: {e}")
 
     def ascent(self) -> bool:
-        """Move motor up."""
+        """Move motor up with retries."""
         if not self.controller.running:
             self.error_occurred.emit("Motor not connected")
             return False
         
         try:
-            if self.controller.ascent():
-                self.status_changed.emit("Moving motor up")
-                return True
-            return False
+            success = False
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    if self.controller.ascent():
+                        success = True
+                        self.status_changed.emit("Moving motor up")
+                        break
+                    else:
+                        self.logger.warning(f"Ascent attempt {attempt + 1} failed, retrying...")
+                except Exception as e:
+                    if attempt == max_retries - 1:  # Last attempt
+                        raise
+                    self.logger.warning(f"Ascent attempt {attempt + 1} failed: {e}, retrying...")
+                time.sleep(0.1)  # Short delay between retries
+            
+            return success
+
         except Exception as e:
             self.error_occurred.emit(f"Failed to move up: {str(e)}")
             return False
 
     def to_top(self) -> bool:
-        """Move motor to top position."""
+        """Move motor to top position with retries."""
         if not self.controller.running:
             self.error_occurred.emit("Motor not connected")
             return False
         
         try:
-            if self.controller.to_top():
-                self.status_changed.emit("Moving motor to top")
-                return True
-            return False
+            success = False
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    if self.controller.to_top():
+                        success = True
+                        self.status_changed.emit("Moving motor to top")
+                        break
+                    else:
+                        self.logger.warning(f"To top attempt {attempt + 1} failed, retrying...")
+                except Exception as e:
+                    if attempt == max_retries - 1:  # Last attempt
+                        raise
+                    self.logger.warning(f"To top attempt {attempt + 1} failed: {e}, retrying...")
+                time.sleep(0.1)  # Short delay between retries
+            
+            return success
+
         except Exception as e:
             self.error_occurred.emit(f"Failed to move to top: {str(e)}")
             return False
