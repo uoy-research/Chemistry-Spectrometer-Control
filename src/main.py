@@ -63,8 +63,8 @@ def main():
         logger.debug("Loading configuration")
         config = Config()
 
-        # Check for --test flag
-        test_mode = "--test" in sys.argv
+        # Check for --test or -t flag
+        test_mode = '--test' in sys.argv or '-t' in sys.argv
         logger.info(f"Test mode: {test_mode}")
         
         # Create and show main window

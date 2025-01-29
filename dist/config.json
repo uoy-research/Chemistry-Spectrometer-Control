@@ -1,5 +1,5 @@
 {
-    "arduino_port": 4,
+    "arduino_port": 1,
     "motor_port": 1,
     "macro_file": "macros.json",
     "log_level": "INFO",

@@ -12,7 +12,7 @@ from typing import Optional, Union, Tuple
 class MotorController:
     SPEED_MAX = 1000
     SPEED_MIN = 0
-    POSITION_MAX = 91.62  # Maximum downward position
+    POSITION_MAX = 91.10  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
 
     def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
