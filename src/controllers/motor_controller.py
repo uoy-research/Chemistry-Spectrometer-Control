@@ -12,8 +12,9 @@ from typing import Optional, Union, Tuple
 class MotorController:
     SPEED_MAX = 1000
     SPEED_MIN = 0
-    POSITION_MAX = 91.10  # Maximum downward position
+    POSITION_MAX = 364.40  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
+    STEPS_PER_MM = 8000.0
 
     def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
@@ -76,7 +77,7 @@ class MotorController:
                     try:
                         readings = self.instrument.read_registers(5, 2, functioncode=3)
                         raw_steps = self.assemble(readings[0], readings[1])
-                        initial_position = round(raw_steps / 25600.0, 5)
+                        initial_position = round(raw_steps / self.STEPS_PER_MM, 5)
                         self._initial_offset = initial_position
                         #self.logger.info(f"Initial position offset set to: {initial_position}")
                     except Exception as e:
@@ -112,7 +113,7 @@ class MotorController:
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
                     raw_steps = self.assemble(readings[0], readings[1])
                     # Convert to millimeters and apply offset from calibration
-                    position = round((raw_steps / 25600.0) - self._initial_offset, 5)
+                    position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
                     self.motor_position = position
                     return float(position)
                 except Exception as e:
@@ -159,7 +160,7 @@ class MotorController:
                     try:
                         readings = self.instrument.read_registers(5, 2, functioncode=3)
                         raw_steps = self.assemble(readings[0], readings[1])
-                        calibration_position = round(raw_steps / 25600.0, 5)
+                        calibration_position = round(raw_steps / self.STEPS_PER_MM, 5)
                         self._initial_offset = calibration_position
                         self.logger.info(f"Calibration complete - Position offset set to: {calibration_position}")
                     except Exception as e:
@@ -200,7 +201,7 @@ class MotorController:
                 # Add static offset to target position
                 adjusted_position = position
                 # Convert from mm to microsteps with proper rounding
-                position_steps = int(round(adjusted_position * 25600.0))
+                position_steps = int(round(adjusted_position * self.STEPS_PER_MM))
                 
                 # Convert position to high and low words
                 high, low = self.disassemble(position_steps)
