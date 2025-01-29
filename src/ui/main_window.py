@@ -1430,6 +1430,16 @@ class MainWindow(QMainWindow):
         if self.motor_worker.running:
             try:
                 target = self.target_motor_pos_edit.value()
+                
+                # Special case: if target is 0, use to_top command instead
+                if target == 0:
+                    if self.motor_worker.to_top():
+                        self.logger.info("Moving motor to top position (0.00)")
+                        return
+                    else:
+                        self.handle_error("Failed to move motor to top")
+                        return
+                
                 if target < 0:
                     QMessageBox.warning(self, "Invalid Position", 
                         "Invalid target position. Position must be non-negative (0 is home position at top).")
@@ -1442,7 +1452,7 @@ class MainWindow(QMainWindow):
                     
                     if response == QMessageBox.StandardButton.Cancel:
                         return
-                target = self.motor_worker.controller.POSITION_MAX
+                    target = self.motor_worker.controller.POSITION_MAX
             
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}mm")
