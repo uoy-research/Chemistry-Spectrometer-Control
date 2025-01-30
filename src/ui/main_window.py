@@ -1335,6 +1335,10 @@ class MainWindow(QMainWindow):
 
                         # If in automatic mode, start looking for sequence file after a delay
                         if mode == 1:
+                            # Set motor to sequence mode if connected
+                            if self.motor_worker.running:
+                                self.motor_worker.set_sequence_mode(True)
+                                self.logger.info("Motor set to sequence mode")
                             # Wait 2 seconds before starting sequence file monitoring
                             QTimer.singleShot(2000, self.find_sequence_file)
                             self.logger.info("Will start sequence file monitoring in 2 seconds")
@@ -1799,7 +1803,10 @@ class MainWindow(QMainWindow):
                     self.logger.error("Motor not calibrated - cannot start sequence")
                     self.handle_error("Motor must be calibrated before starting sequence")
                     return
+                    
+                # Explicitly set sequence mode
                 self.motor_worker.set_sequence_mode(True)
+                self.logger.info("Motor set to sequence mode for sequence execution")
 
             # Execute first step
             self.execute_step(self.steps[0])
