@@ -11,13 +11,14 @@ from PyQt6.QtWidgets import (
     QFileDialog, QFormLayout, QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QAction  # Moved QAction to QtGui import
 import logging
 from typing import List, Optional, Union
 from pathlib import Path
 import time
 import json
 import os
+import csv
 
 from utils.config import Config
 from workers.arduino_worker import ArduinoWorker
@@ -790,12 +791,21 @@ class MainWindow(QMainWindow):
         layout.addWidget(macro_group, 1, 3)
 
     def setup_menu_bar(self):
-        """Setup application menu bar."""
+        """Setup menu bar."""
         menubar = self.menuBar()
-
-        file_menu = menubar.addMenu("File")
+        
+        # File menu
+        file_menu = menubar.addMenu('File')
         exit_action = file_menu.addAction("Exit")
         exit_action.triggered.connect(self.close)
+
+        # Action menu
+        action_menu = menubar.addMenu('Action')
+        
+        # Add motor sequence action
+        motor_sequence_action = QAction('Start Motor Sequence', self)
+        motor_sequence_action.triggered.connect(self.start_motor_sequence)
+        action_menu.addAction(motor_sequence_action)
 
         tools_menu = menubar.addMenu("Tools")
         valve_macro_action = tools_menu.addAction("Valve Macros")
@@ -2436,3 +2446,82 @@ class MainWindow(QMainWindow):
             self.buildPressureButton.setEnabled(True)
             self.quickVentButton.setEnabled(True)
             self.slowVentButton.setEnabled(True)
+
+    def start_motor_sequence(self):
+        """Load and start a motor-only sequence from CSV."""
+        try:
+            # Check if motor is connected and calibrated
+            if not self.motor_worker.running:
+                self.handle_error("Motor not connected")
+                return
+                
+            if not self.motor_worker.controller.check_calibrated():
+                self.handle_error("Motor must be calibrated before starting sequence")
+                return
+
+            # Load sequence from CSV - updated path
+            sequence_path = Path(r"C:\ssbubble\motor_sequence.csv")
+            if not sequence_path.exists():
+                self.handle_error("Motor sequence file not found")
+                return
+
+            # Read CSV file
+            motor_steps = []
+            with open(sequence_path, 'r') as f:
+                csv_reader = csv.reader(f)
+                for row in csv_reader:
+                    try:
+                        position = float(row[0])
+                        time_ms = int(float(row[1]) * 1000)  # Convert to milliseconds
+                        motor_steps.append((position, time_ms))
+                    except (ValueError, IndexError) as e:
+                        self.logger.error(f"Invalid row in sequence file: {row}")
+                        self.handle_error("Invalid motor sequence file format")
+                        return
+
+            if not motor_steps:
+                self.handle_error("No valid steps found in sequence file")
+                return
+
+            # Enable sequence mode
+            self.motor_worker.set_sequence_mode(True)
+            self.logger.info("Starting motor-only sequence")
+
+            # Execute first step
+            self.execute_motor_step(motor_steps[0])
+            
+            # Schedule subsequent steps
+            def schedule_next_step(step_index):
+                if step_index < len(motor_steps):
+                    QTimer.singleShot(motor_steps[step_index-1][1], 
+                                    lambda: self.execute_motor_step(motor_steps[step_index], 
+                                    lambda: schedule_next_step(step_index + 1)))
+
+            schedule_next_step(1)
+
+        except Exception as e:
+            self.logger.error(f"Error starting motor sequence: {e}")
+            self.handle_error(f"Failed to start motor sequence: {str(e)}")
+            self.motor_worker.set_sequence_mode(False)
+
+    def execute_motor_step(self, step, callback=None):
+        """Execute a single motor sequence step.
+        
+        Args:
+            step: Tuple of (position, time_ms)
+            callback: Optional callback function to execute after movement starts
+        """
+        try:
+            position, _ = step
+            self.logger.info(f"Moving to position: {position}")
+            success = self.motor_worker.move_to(position)
+            
+            if success and callback:
+                callback()
+            elif not success:
+                self.logger.error("Failed to execute motor movement")
+                self.motor_worker.set_sequence_mode(False)
+                
+        except Exception as e:
+            self.logger.error(f"Error executing motor step: {e}")
+            self.motor_worker.set_sequence_mode(False)

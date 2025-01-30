@@ -3,7 +3,10 @@ File: motor_worker.py
 Description: Worker thread for motor control
 """
 
-from PyQt6.QtCore import QThread, pyqtSignal, QTimer
+from PyQt6.QtCore import (
+    QThread, pyqtSignal, QTimer, pyqtSlot, 
+    Qt  # Added Qt import
+)
 import time
 import logging
 from typing import Optional, Union
@@ -59,6 +62,7 @@ class MotorWorker(QThread):
         error_occurred(str): Emitted when an error occurs
         status_changed(str): Emitted when worker status changes
         calibration_state_changed(bool): Emitted when motor calibration state changes
+        retry_requested(int): Emitted to request retry with delay
     """
 
     position_updated = pyqtSignal(float)
@@ -66,6 +70,7 @@ class MotorWorker(QThread):
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
+    retry_requested = pyqtSignal(int)  # Signal to request retry with delay
 
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
         """Initialize worker.
@@ -96,6 +101,10 @@ class MotorWorker(QThread):
         self._retry_count = 0
         self._pending_position = None
         self._max_retries = 50
+        self._retry_delay = 10  # 10ms delay between retries
+        
+        # Connect retry signal to slot in constructor
+        self.retry_requested.connect(self._schedule_retry, Qt.ConnectionType.QueuedConnection)
 
         self.logger = logging.getLogger(__name__)
 
@@ -149,7 +158,17 @@ class MotorWorker(QThread):
 
     def stop(self):
         """Stop the worker."""
-        self._cleanup_retry()  # Clean up any pending retries
+        if self._retry_timer:
+            # Ensure timer is stopped in the thread it was created in
+            if self._retry_timer.thread() == QThread.currentThread():
+                self._retry_timer.stop()
+            else:
+                # Use moveToThread to ensure proper cleanup
+                self._retry_timer.moveToThread(QThread.currentThread())
+                self._retry_timer.stop()
+            self._retry_timer = None
+        self._retry_count = 0
+        self._pending_position = None
         self._running = False
         self.wait()
 
@@ -178,6 +197,16 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)
+            
+            # Cancel any existing retry sequence
+            self._cleanup_retry()
+            
+            # Clear serial buffers before starting new command
+            if hasattr(self.controller.instrument, 'serial'):
+                self.controller.instrument.serial.reset_input_buffer()
+                self.controller.instrument.serial.reset_output_buffer()
+                time.sleep(0.05)  # Small delay after clearing buffers
+            
             self._pending_position = position
             self._retry_count = 0
             
@@ -198,6 +227,12 @@ class MotorWorker(QThread):
     def _try_move(self):
         """Attempt a single move command."""
         try:
+            # Clear buffers before each attempt
+            if hasattr(self.controller.instrument, 'serial'):
+                self.controller.instrument.serial.reset_input_buffer()
+                self.controller.instrument.serial.reset_output_buffer()
+                time.sleep(0.02)  # Small delay after clearing buffers
+            
             success, actual_target = self.controller.set_position(self._pending_position, wait=False)
             if success:
                 self._target_position = actual_target
@@ -216,27 +251,43 @@ class MotorWorker(QThread):
         """Handle move command failure."""
         self._retry_count += 1
         
-        # Continue retrying if in sequence mode or within retry limit
+        # Continue retrying if within retry limit
         if self._retry_count < self._max_retries:
-            # Schedule next retry
-            if not self._retry_timer:
-                self._retry_timer = QTimer()
-                self._retry_timer.setSingleShot(True)
-                self._retry_timer.timeout.connect(self._try_move)
-            
-            self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in 100ms...")
-            self._retry_timer.start(100)  # 100ms delay between retries
+            # Emit signal to schedule retry in main thread
+            self.retry_requested.emit(self._retry_delay)
+            self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in {self._retry_delay}ms...")
         else:
             # Max retries reached
             if error_msg:
                 self.error_occurred.emit(f"Move failed after {self._max_retries} attempts: {error_msg}")
             self._cleanup_retry()
 
+    @pyqtSlot(int)
+    def _schedule_retry(self, delay: int):
+        """Schedule retry in main thread."""
+        if not self._retry_timer:
+            self._retry_timer = QTimer()
+            self._retry_timer.setSingleShot(True)
+            self._retry_timer.timeout.connect(self._try_move)
+        self._retry_timer.start(delay)
+
     def _cleanup_retry(self):
         """Clean up retry mechanism."""
         if self._retry_timer:
-            self._retry_timer.stop()
+            # Ensure timer is stopped in the thread it was created in
+            if self._retry_timer.thread() == QThread.currentThread():
+                self._retry_timer.stop()
+            else:
+                # Use moveToThread to ensure proper cleanup
+                self._retry_timer.moveToThread(QThread.currentThread())
+                self._retry_timer.stop()
             self._retry_timer = None
+            
+            # Clear any pending retries
+            if hasattr(self.controller.instrument, 'serial'):
+                self.controller.instrument.serial.reset_input_buffer()
+                self.controller.instrument.serial.reset_output_buffer()
+        
         self._retry_count = 0
         self._pending_position = None
 
