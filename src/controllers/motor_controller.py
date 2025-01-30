@@ -55,16 +55,14 @@ class MotorController:
             self.instrument = minimalmodbus.Instrument(self.port, self.address)
             # Configure Modbus RTU settings
             self.instrument.serial.baudrate = 9600
-            self.instrument.serial.timeout = 0.5
+            self.instrument.serial.timeout = 0.2  # Reduce timeout to prevent blocking
             self.instrument.serial.bytesize = 8
             self.instrument.serial.parity = 'N'
             self.instrument.serial.stopbits = 1
             self.instrument.mode = minimalmodbus.MODE_RTU
             self.instrument.clear_buffers_before_each_transaction = True
             
-            # Wait for connection to stabilize
-            time.sleep(1)
-            
+            # Remove blocking sleep and try immediate connection test
             try:
                 self.instrument.write_bit(3, 1)
                 self.serial_connected = True

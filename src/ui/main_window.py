@@ -1003,56 +1003,38 @@ class MainWindow(QMainWindow):
                 self.file_timer.stop()
                 return
 
-            if Path(r"C:\ssbubble\sequence.txt").exists():
-                start_time = time.time()  # Start timing
-                self.logger.info("Found sequence file, beginning processing")
-                
+            sequence_path = Path(r"C:\ssbubble\sequence.txt")
+            if not sequence_path.exists():
+                return
+
+            # Process in chunks to avoid blocking
+            def process_sequence():
                 try:
                     success = self.load_sequence()
-                    load_time = time.time()  # Time after loading
-                    self.logger.info(f"Sequence loading took {(load_time - start_time):.3f} seconds")
-
                     if success:
-                        # Process successful sequence
                         self.handle_sequence_file(True)
-                        prospa_time = time.time()  # Time after writing to Prospa
-                        self.logger.info(f"Prospa file write took {(prospa_time - load_time):.3f} seconds")
-                        self.logger.info(f"Total sequence processing took {(prospa_time - start_time):.3f} seconds")
-
-                        # Calculate sequence timing
                         self.calculate_sequence_time()
-
-                        # Update UI with first step - use invokeMethod to ensure thread safety
+                        
+                        # Update UI with first step using invokeMethod
                         if self.steps:
                             QMetaObject.invokeMethod(self, "update_sequence_info",
                                 Qt.ConnectionType.QueuedConnection,
                                 Q_ARG(str, self.step_types[self.steps[0].step_type]),
                                 Q_ARG(float, self.steps[0].time_length),
                                 Q_ARG(int, len(self.steps)),
-                                Q_ARG(float, self.total_sequence_time)
-                            )
+                                Q_ARG(float, self.total_sequence_time))
                             
-                            QMetaObject.invokeMethod(self, "update_sequence_status",
-                                Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, "Running"))
-
-                            # Start sequence execution
                             QMetaObject.invokeMethod(self, "start_sequence",
                                 Qt.ConnectionType.QueuedConnection)
-
-                        # Stop checking for files
+                        
                         self.file_timer.stop()
                     else:
-                        # On failure, disconnect the controller and stop timer
                         self.handle_sequence_file(False)
-                        fail_time = time.time()
-                        self.logger.info(f"Failure handling took {(fail_time - start_time):.3f} seconds")
-
                 except Exception as e:
-                    error_time = time.time()
-                    self.logger.error(f"Error processing sequence file: {e}")
-                    self.logger.error(f"Error occurred after {(error_time - start_time):.3f} seconds")
-                    # Rest of the error handling...
+                    self.logger.error(f"Error processing sequence: {e}")
+                    
+            # Process sequence in a separate thread to avoid blocking
+            QTimer.singleShot(0, process_sequence)
 
         except Exception as e:
             self.logger.error(f"Error in sequence file check: {e}")

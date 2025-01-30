@@ -64,23 +64,23 @@ class ArduinoController:
             # Create Modbus instrument
             self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
             self.arduino.serial.baudrate = 9600
-            self.arduino.serial.timeout = 3
-
-            # Wait for Arduino to boot
-            time.sleep(1)
+            self.arduino.serial.timeout = 0.5  # Reduce timeout
             
-            # Test connection by reading pressure values
-            _ = self.arduino.read_registers(0, 4, 4)
-            
-            # Set TTL mode if needed
-            if self.mode == 2:
-                self.arduino.write_bit(self.TTL_ADDRESS, 1)
-            else:
-                self.arduino.write_bit(self.TTL_ADDRESS, 0)
-            
-            self.running = True
-            self.logger.info(f"Connected to Arduino on COM{self.port}")
-            return True
+            # Test connection immediately instead of sleeping
+            try:
+                _ = self.arduino.read_registers(0, 4, 4)
+                # Set TTL mode if needed
+                if self.mode == 2:
+                    self.arduino.write_bit(self.TTL_ADDRESS, 1)
+                else:
+                    self.arduino.write_bit(self.TTL_ADDRESS, 0)
+                
+                self.running = True
+                self.logger.info(f"Connected to Arduino on COM{self.port}")
+                return True
+            except Exception as e:
+                self.logger.error(f"Connection test failed: {e}")
+                return False
 
         except Exception as e:
             self.logger.error(f"Failed to connect to Arduino: {e}")
