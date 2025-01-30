@@ -128,8 +128,8 @@ class MotorController:
             self.serial_connected = False
             self._consecutive_errors += 1
             
-            # If too many consecutive errors, stop the controller
-            if self._consecutive_errors >= self._max_consecutive_errors:
+            # Only stop on consecutive errors if not in sequence mode
+            if not self._in_sequence and self._consecutive_errors >= self._max_consecutive_errors:
                 self.logger.error("Too many consecutive errors, stopping motor controller")
                 self.running = False
                 self.serial_connected = False
@@ -227,11 +227,28 @@ class MotorController:
             
             # Send position commands with minimal delay
             try:
-                self.instrument.write_register(3, high)
-                self.instrument.write_register(4, low)
-                self.instrument.write_register(2, ord('x'))
-                self.instrument.write_bit(1, 1)
-                self.serial_connected = True
+                # Clear buffers before sending new commands
+                self.instrument.serial.reset_input_buffer()
+                self.instrument.serial.reset_output_buffer()
+                
+                # Increase timeout temporarily for these operations
+                original_timeout = self.instrument.serial.timeout
+                self.instrument.serial.timeout = 0.5  # 500ms timeout
+                
+                try:
+                    self.instrument.write_register(3, high)
+                    time.sleep(0.01)  # Small delay between writes
+                    self.instrument.write_register(4, low)
+                    time.sleep(0.01)
+                    self.instrument.write_register(2, ord('x'))
+                    time.sleep(0.01)
+                    self.instrument.write_bit(1, 1)
+                    self.serial_connected = True
+                    return True, actual_target
+                finally:
+                    # Restore original timeout
+                    self.instrument.serial.timeout = original_timeout
+                
             except Exception as e:
                 if self._in_sequence:
                     # Fail fast in sequence mode

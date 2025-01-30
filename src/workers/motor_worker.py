@@ -95,7 +95,7 @@ class MotorWorker(QThread):
         self._retry_timer = None
         self._retry_count = 0
         self._pending_position = None
-        self._max_retries = 10
+        self._max_retries = 50
 
         self.logger = logging.getLogger(__name__)
 

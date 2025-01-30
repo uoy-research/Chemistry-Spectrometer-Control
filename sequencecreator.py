@@ -11,7 +11,7 @@ directory = r"C:\ssbubble"
 os.makedirs(directory, exist_ok=True)
 
 # Generate the pattern starting from 364 and repeating 3 times
-pattern = generate_pattern(364, 50, 1, 5000)
+pattern = generate_pattern(364, 50, 1, 1000)
 
 # Write both lines to the file
 file_path = os.path.join(directory, "sequence.txt")
