@@ -388,7 +388,7 @@ class MainWindow(QMainWindow):
     def setup_valve_section(self, layout):
         """Setup valve controls with switchable views."""
         valve_group = QGroupBox()
-        valve_group.setFixedSize(96, 294)
+        valve_group.setFixedSize(96, 294)  # May need to adjust height to fit extra button
         valve_group.move(10, 320)
         valve_layout = QVBoxLayout(valve_group)
         valve_layout.setContentsMargins(0, 0, 0, 0)
@@ -414,7 +414,7 @@ class MainWindow(QMainWindow):
 
         # Create valve control buttons
         self.valve_buttons = []
-        for i in range(5):
+        for i in range(6):  # Changed from 5 to 6
             valve_button = QPushButton(f"Valve {i+1}")
             valve_button.setMinimumSize(QSize(0, 30))
             valve_button.setCheckable(True)
@@ -925,6 +925,7 @@ class MainWindow(QMainWindow):
         self.Valve3Button.clicked.connect(self.on_Valve3Button_clicked)
         self.Valve4Button.clicked.connect(self.on_Valve4Button_clicked)
         self.Valve5Button.clicked.connect(self.on_Valve5Button_clicked)
+        self.Valve6Button.clicked.connect(self.on_Valve6Button_clicked)  # Add connection for 6th valve
 
     @pyqtSlot()
     def handle_motor_connection(self):
@@ -1118,6 +1119,16 @@ class MainWindow(QMainWindow):
             self.logger.info(f"Valve 5 {'opened' if checked else 'closed'}")
 
     @pyqtSlot(bool)
+    def on_Valve6Button_clicked(self, checked: bool):
+        """Handle Valve 6 button click."""
+        if self.arduino_worker.running:
+            # Create valve states list with all valves off except the target valve
+            valve_states = [0] * 8  # 8 valve states
+            valve_states[5] = 1 if checked else 0  # Valve 6 is index 5
+            self.arduino_worker.set_valves(valve_states)
+            self.logger.info(f"Valve 6 {'opened' if checked else 'closed'}")
+
+    @pyqtSlot(bool)
     def on_quickVentButton_clicked(self, checked: bool):
         """Handle quick vent button click."""
         if not self.arduino_worker.running:
@@ -1222,19 +1233,16 @@ class MainWindow(QMainWindow):
             self.logger.info("Quick bubble complete")
 
     def disable_valve_controls(self, disabled: bool):
-        """Enable/disable valve controls based on connection state and mode."""
-        # Only enable controls if:
-        # 1. Not disabled AND
-        # 2. Arduino is connected AND
-        # 3. In manual mode
-        enabled = (not disabled and
-                   self.arduino_worker.running and
-                   self.arduino_manual_radio.isChecked())
+        """Enable/disable valve controls."""
+        # Only enable if in manual mode and Arduino is connected
+        enabled = (not disabled and 
+                  self.arduino_worker.running and 
+                  self.arduino_manual_radio.isChecked())
 
-        # Individual valve buttons
-        for i in range(1, 6):
-            if hasattr(self, f'Valve{i}Button'):
-                getattr(self, f'Valve{i}Button').setEnabled(enabled)
+        # Disable individual valve buttons
+        for i in range(1, 7):  # Changed from 6 to 7 to include Valve6
+            valve_button = getattr(self, f"Valve{i}Button")
+            valve_button.setEnabled(enabled)
 
         # Quick action buttons
         self.quickBubbleButton.setEnabled(enabled)

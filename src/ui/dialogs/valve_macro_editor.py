@@ -9,15 +9,15 @@ class ValveMacroEditor(QtWidgets.QDialog):
         self.parent = parent
 
         self.setWindowTitle("Valve Macro Editor")
-        self.setGeometry(100, 100, 650, 190)
-        self.setFixedSize(623, 170)
+        self.setGeometry(100, 100, 700, 190)
+        self.setFixedSize(673, 170)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
         self.table.setRowCount(4)
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(
-            ["Macro No.", "Label", "V1", "V2", "V3", "V4", "V5", "Timer (s)"])
+            ["Macro No.", "Label", "V1", "V2", "V3", "V4", "V5", "V6", "Timer (s)"])
 
         # Set layout
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -30,7 +30,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
         # Resize columns
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 120)  # Label column
-        self.table.setColumnWidth(7, 80)   # Timer column
+        self.table.setColumnWidth(8, 80)   # Timer column
 
     def load_data(self):
         json_path = Path("C:/ssbubble/valve_macro_data.json")
@@ -49,7 +49,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
                     label_item = QtWidgets.QTableWidgetItem(label_text)
                     self.table.setItem(i, 1, label_item)
                     # Valve States
-                    for j, state in enumerate(macro["Valves"][:5], start=2):
+                    for j, state in enumerate(macro["Valves"][:6], start=2):
                         combo = QtWidgets.QComboBox()
                         combo.addItems(["Open", "Closed", "Ignore"])
                         combo.setCurrentText(state)
@@ -60,7 +60,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
                     timer_spinbox.setSingleStep(0.1)
                     timer_val = macro.get("Timer", 1.0)
                     timer_spinbox.setValue(timer_val)
-                    self.table.setCellWidget(i, 7, timer_spinbox)
+                    self.table.setCellWidget(i, 8, timer_spinbox)
             except Exception:
                 self.set_default_values()
         else:
@@ -76,7 +76,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
             label_item = QtWidgets.QTableWidgetItem(f"Valve Macro {i+1}")
             self.table.setItem(i, 1, label_item)
             # Valve States
-            for j in range(2, 7):
+            for j in range(2, 8):
                 combo = QtWidgets.QComboBox()
                 combo.addItems(["Open", "Closed", "Ignore"])
                 combo.setCurrentIndex(1)  # Default to "Closed"
@@ -86,7 +86,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
             timer_spinbox.setRange(0.1, 3600)
             timer_spinbox.setSingleStep(0.1)
             timer_spinbox.setValue(1.0)
-            self.table.setCellWidget(i, 7, timer_spinbox)
+            self.table.setCellWidget(i, 8, timer_spinbox)
 
     def get_macro_data(self):
         data = []
@@ -94,9 +94,9 @@ class ValveMacroEditor(QtWidgets.QDialog):
             macro_number = self.table.item(row, 0).text()
             label_text = self.table.item(row, 1).text()
             valve_states = [self.table.cellWidget(row, col).currentText()
-                            for col in range(2, 7)]
-            valve_states.extend(["Closed", "Closed", "Closed"])
-            timer_spinbox = self.table.cellWidget(row, 7)
+                            for col in range(2, 8)]
+            valve_states.extend(["Closed", "Closed"])
+            timer_spinbox = self.table.cellWidget(row, 8)
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0
             data.append({
                 "Macro No.": macro_number,
