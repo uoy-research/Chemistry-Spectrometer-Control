@@ -31,6 +31,7 @@ class MotorController:
         self._setup_logging()
         self._consecutive_errors = 0  # Add counter for consecutive errors
         self._max_consecutive_errors = 5  # Maximum allowed consecutive errors
+        self._in_sequence = False  # Add flag for sequence mode
 
     def _setup_logging(self):
         """Setup logging for the Arduino controller."""
@@ -184,19 +185,27 @@ class MotorController:
             self.serial_connected = False
             return False
 
-    def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set motor position.
+    def set_sequence_mode(self, enabled: bool):
+        """Enable or disable sequence mode for continuous movement."""
+        self._in_sequence = enabled
+        self.logger.info(f"Sequence mode {'enabled' if enabled else 'disabled'}")
+    
+    def move_to(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
+        """Wrapper for set_position to maintain compatibility."""
+        # During sequence mode, ignore "movement in progress" state
+        if self._in_sequence:
+            return self.set_position(position, wait=False)
+        return self.set_position(position, wait)
         
-        Returns:
-            Tuple[bool, float]: (success, actual_target_position)
-        """
+    def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
+        """Set motor position."""
         if not self.running:
             return False, position
 
         try:
             position = float(position)
-            actual_target = position  # Store the actual target that will be used
-            
+            actual_target = position
+
             if position > self.POSITION_MAX:
                 self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
                 actual_target = self.POSITION_MAX
@@ -206,36 +215,39 @@ class MotorController:
                 self._current_position = position
                 return True, actual_target
 
-            if self.check_calibrated():
-                # Add static offset to target position
-                adjusted_position = position
-                # Convert from mm to microsteps with proper rounding
-                position_steps = int(round(adjusted_position * self.STEPS_PER_MM))
-                
-                # Convert position to high and low words
-                high, low = self.disassemble(position_steps)
-                
-                # Send the position to the motor
+            # Only check calibration if not in sequence mode
+            if not self._in_sequence:
+                if not self.check_calibrated():
+                    self.logger.error("Motor not calibrated")
+                    return False, position
+
+            # Convert to steps with proper rounding
+            position_steps = int(round(position * self.STEPS_PER_MM))
+            high, low = self.disassemble(position_steps)
+            
+            # Send position commands with minimal delay
+            try:
                 self.instrument.write_register(3, high)
                 self.instrument.write_register(4, low)
                 self.instrument.write_register(2, ord('x'))
                 self.instrument.write_bit(1, 1)
                 self.serial_connected = True
-
-                if wait:
-                    while True:
-                        current = self.get_position()
-                        if current is not None:
-                            current_adjusted = current + 2
-                            self.logger.info(f"Current: {current}, Target: {position}, Diff: {abs(current_adjusted - position)}")
-                            if abs(current_adjusted - position) < 0.005:
-                                break
-                        time.sleep(0.1)
-
-                return True, actual_target
-            else:
-                self.logger.error("Motor not calibrated")
+            except Exception as e:
+                if self._in_sequence:
+                    # Fail fast in sequence mode
+                    raise
+                self.logger.error(f"Failed to send position commands: {e}")
                 return False, position
+
+            if wait and not self._in_sequence:
+                while True:
+                    current = self.get_position()
+                    if current is not None:
+                        if abs(current + 2 - position) < 0.005:
+                            break
+                    time.sleep(0.1)
+
+            return True, actual_target
 
         except Exception as e:
             self.logger.error(f"Error setting position: {e}")

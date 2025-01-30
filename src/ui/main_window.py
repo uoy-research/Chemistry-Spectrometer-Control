@@ -1792,6 +1792,15 @@ class MainWindow(QMainWindow):
                 self.logger.error("No sequence loaded")
                 return
 
+            # Enable sequence mode for motor if motor movements are part of sequence
+            if self.motor_flag and self.motor_worker.running:
+                # Check calibration once at sequence start
+                if not self.motor_worker.controller.check_calibrated():
+                    self.logger.error("Motor not calibrated - cannot start sequence")
+                    self.handle_error("Motor must be calibrated before starting sequence")
+                    return
+                self.motor_worker.set_sequence_mode(True)
+
             # Execute first step
             self.execute_step(self.steps[0])
 
@@ -1810,30 +1819,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
-
-    def update_step_time(self):
-        """Update the time remaining display for current step and total sequence."""
-        try:
-            if self.steps and len(self.steps) > 0:
-                # Calculate current step time remaining
-                elapsed = int((time.time() - self.step_start_time)
-                              * 1000)  # Convert to ms
-                step_remaining = max(0, self.steps[0].time_length - elapsed)
-
-                # Calculate total time remaining
-                total_remaining = step_remaining  # Start with current step remaining
-                for step in self.steps[1:]:
-                    total_remaining += step.time_length
-
-                # Update UI with remaining times
-                self.update_sequence_info(
-                    step_type=self.step_types[self.steps[0].step_type],
-                    step_time=step_remaining / 1000,  # Convert to seconds for display
-                    steps_left=len(self.steps),
-                    total_time=total_remaining / 1000  # Convert to seconds
-                )
-        except Exception as e:
-            self.logger.error(f"Error updating step time: {e}")
+            # Disable sequence mode on error
+            if self.motor_flag and self.motor_worker.running:
+                self.motor_worker.set_sequence_mode(False)
 
     def next_step(self):
         """Execute the next step in the sequence."""
@@ -1844,38 +1832,36 @@ class MainWindow(QMainWindow):
             if self.steps:
                 # Execute next step
                 self.execute_step(self.steps[0])
-
-                # Reset step timer
+                # Reset step timer and schedule next step
                 self.step_start_time = time.time()
-
-                # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
             else:
-                # Sequence complete - stop timer and update UI
+                # Sequence complete
                 self.step_timer.stop()
-                self.update_sequence_info(
-                    step_type="Complete",
-                    step_time=0,
-                    steps_left=0,
-                    total_time=0
-                )
+                # Disable sequence mode when complete
+                if self.motor_flag and self.motor_worker.running:
+                    self.motor_worker.set_sequence_mode(False)
+                
+                # Update UI and handle completion
+                self.update_sequence_info("Complete", 0, 0, 0)
                 self.update_sequence_status("Complete")
-
-                # Stop data recording
+                
+                # Stop data recording if active
                 if self.saving:
                     self.plot_widget.stop_recording()
                     self.beginSaveButton.setText("Begin Saving")
-                    self.beginSaveButton.setChecked(
-                        False)  # Uncheck the button
+                    self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
+                    self.logger.info("Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
         except Exception as e:
             self.logger.error(f"Error in sequence execution: {e}")
             self.handle_error("Failed to execute sequence")
+            # Disable sequence mode on error
+            if self.motor_flag and self.motor_worker.running:
+                self.motor_worker.set_sequence_mode(False)
 
     def execute_step(self, step):
         """Execute a single sequence step."""
@@ -2324,38 +2310,36 @@ class MainWindow(QMainWindow):
             if self.steps:
                 # Execute next step
                 self.execute_step(self.steps[0])
-
-                # Reset step timer
+                # Reset step timer and schedule next step
                 self.step_start_time = time.time()
-
-                # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
             else:
-                # Sequence complete - stop timer and update UI
+                # Sequence complete
                 self.step_timer.stop()
-                self.update_sequence_info(
-                    step_type="Complete",
-                    step_time=0,
-                    steps_left=0,
-                    total_time=0
-                )
+                # Disable sequence mode when complete
+                if self.motor_flag and self.motor_worker.running:
+                    self.motor_worker.set_sequence_mode(False)
+                
+                # Update UI and handle completion
+                self.update_sequence_info("Complete", 0, 0, 0)
                 self.update_sequence_status("Complete")
-
-                # Stop data recording
+                
+                # Stop data recording if active
                 if self.saving:
                     self.plot_widget.stop_recording()
                     self.beginSaveButton.setText("Begin Saving")
-                    self.beginSaveButton.setChecked(
-                        False)  # Uncheck the button
+                    self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
+                    self.logger.info("Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
         except Exception as e:
             self.logger.error(f"Error in sequence execution: {e}")
             self.handle_error("Failed to execute sequence")
+            # Disable sequence mode on error
+            if self.motor_flag and self.motor_worker.running:
+                self.motor_worker.set_sequence_mode(False)
 
     def execute_step(self, step):
         """Execute a single sequence step."""

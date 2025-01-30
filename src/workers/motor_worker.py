@@ -43,6 +43,11 @@ class MockMotorController:
     def stop_motor(self) -> bool:
         return True
 
+    def set_sequence_mode(self, enabled: bool):
+        """Enable or disable sequence mode."""
+        self._in_sequence = enabled
+        self.logger.info(f"Motor sequence mode {'enabled' if enabled else 'disabled'}")
+
 
 class MotorWorker(QThread):
     """
@@ -86,6 +91,11 @@ class MotorWorker(QThread):
         self._current_position: Optional[float] = None
         self._is_calibrated = False
         self._pause_updates = False  # Add new flag for pausing position updates
+        self._in_sequence = False
+        self._retry_timer = None
+        self._retry_count = 0
+        self._pending_position = None
+        self._max_retries = 3
 
         self.logger = logging.getLogger(__name__)
 
@@ -139,6 +149,7 @@ class MotorWorker(QThread):
 
     def stop(self):
         """Stop the worker."""
+        self._cleanup_retry()  # Clean up any pending retries
         self._running = False
         self.wait()
 
@@ -152,38 +163,31 @@ class MotorWorker(QThread):
         self._paused = False
         self.status_changed.emit("Motor worker running")
 
+    def set_sequence_mode(self, enabled: bool):
+        """Enable or disable sequence mode."""
+        self._in_sequence = enabled
+        if not isinstance(self.controller, MockMotorController):
+            self.controller.set_sequence_mode(enabled)
+        self.logger.info(f"Motor sequence mode {'enabled' if enabled else 'disabled'}")
+
     def move_to(self, position: Union[int, float]) -> bool:
-        """Move motor to specified position with retries."""
-        if not self.controller.running:
+        """Move motor to specified position with non-blocking retries."""
+        if not self.running:
             self.error_occurred.emit("Motor not connected")
             return False
 
-        if self._target_position is not None:
+        if self._target_position is not None and not self._in_sequence:
             self.error_occurred.emit("Movement already in progress")
             return False
 
         try:
-            position = float(position)  # Ensure position is float
-            success = False
-            max_retries = 3
+            position = float(position)
+            self._pending_position = position
+            self._retry_count = 0
             
-            for attempt in range(max_retries):
-                try:
-                    success, actual_target = self.controller.set_position(position, wait=False)
-                    if success:
-                        self._target_position = actual_target  # Use the actual target position
-                        if actual_target != position:
-                            self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
-                        break
-                    else:
-                        self.logger.warning(f"Move attempt {attempt + 1} failed, retrying...")
-                except Exception as e:
-                    if attempt == max_retries - 1:  # Last attempt
-                        raise
-                    self.logger.warning(f"Move attempt {attempt + 1} failed: {e}, retrying...")
-                time.sleep(0.1)  # Short delay between retries
-            
-            return success
+            # Start retry attempt
+            self._try_move()
+            return True
 
         except (ValueError, TypeError):
             self.error_occurred.emit("Invalid position value")
@@ -191,6 +195,50 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
             return False
+
+    def _try_move(self):
+        """Attempt a single move command."""
+        try:
+            success, actual_target = self.controller.set_position(self._pending_position, wait=False)
+            if success:
+                self._target_position = actual_target
+                if actual_target != self._pending_position:
+                    self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
+                self._cleanup_retry()
+            else:
+                self._handle_move_failure()
+
+        except Exception as e:
+            self._handle_move_failure(str(e))
+
+    def _handle_move_failure(self, error_msg: str = None):
+        """Handle move command failure."""
+        self._retry_count += 1
+        
+        if self._in_sequence or self._retry_count >= self._max_retries:
+            # Stop retrying if in sequence mode or max retries reached
+            if error_msg:
+                self.error_occurred.emit(f"Move failed: {error_msg}")
+            self._cleanup_retry()
+        else:
+            # Schedule next retry
+            if not self._retry_timer:
+                self._retry_timer = QTimer()
+                self._retry_timer.setSingleShot(True)
+                self._retry_timer.timeout.connect(self._try_move)
+            
+            if not self._in_sequence:
+                self.logger.warning(f"Move attempt {self._retry_count} failed, retrying...")
+            
+            self._retry_timer.start(100)  # 100ms delay between retries
+
+    def _cleanup_retry(self):
+        """Clean up retry mechanism."""
+        if self._retry_timer:
+            self._retry_timer.stop()
+            self._retry_timer = None
+        self._retry_count = 0
+        self._pending_position = None
 
     def calibrate(self) -> bool:
         """Calibrate the motor."""
