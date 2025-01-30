@@ -66,7 +66,8 @@ class ArduinoController:
             self.arduino.serial.baudrate = 9600
             self.arduino.serial.timeout = 0.5  # Reduce timeout
             
-            # Test connection immediately instead of sleeping
+            time.sleep(1)
+
             try:
                 _ = self.arduino.read_registers(0, 4, 4)
                 # Set TTL mode if needed
