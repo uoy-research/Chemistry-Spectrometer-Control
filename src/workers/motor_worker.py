@@ -106,9 +106,17 @@ class MotorWorker(QThread):
         self.status_changed.emit("Motor worker running")
 
         while self._running:
-            if not self._paused and not self._pause_updates:  # Add check for pause_updates
+            if not self._paused and not self._pause_updates:
                 # Get current position
                 position = self.controller.get_position()
+                
+                # Check if controller is still running
+                if not self.controller.running:
+                    self.logger.error("Motor controller stopped due to connection issues")
+                    self._running = False
+                    self.status_changed.emit("Motor disconnected")
+                    break
+                    
                 if position is not None:
                     if position != self._current_position:
                         self._current_position = position
@@ -122,7 +130,7 @@ class MotorWorker(QThread):
                             self._target_position = None
                             self.movement_completed.emit(True)
                 else:
-                    self.error_occurred.emit("Failed to get motor position")
+                    self.logger.error("Failed to get motor position")
 
             time.sleep(self.update_interval)
 

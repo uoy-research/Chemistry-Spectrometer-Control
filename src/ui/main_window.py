@@ -2057,13 +2057,27 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def handle_status_message(self, message: str):
         """Handle status message updates."""
+        # Check for motor disconnection message
+        if message == "Motor disconnected":
+            # Reset UI elements
+            self.motor_connect_btn.setText("Connect")
+            self.motor_calibrated = False
+            self.motor_warning_label.setText("Warning: Motor not connected")
+            self.motor_warning_label.setVisible(True)
+            self.motor_calibrate_btn.setEnabled(False)
+            self.disable_motor_controls(True)
+            
         self.statusBar().showMessage(message)
         self.log_widget.add_message(message)
 
     @pyqtSlot(str)
     def handle_error(self, message: str):
         """Handle error messages."""
-        QMessageBox.critical(self, "Error", message)
+        # Only show message box for critical errors, not connection issues
+        if not any(err in message.lower() for err in ["position", "failed to get", "connection"]):
+            QMessageBox.critical(self, "Error", message)
+        # Log all errors
+        self.logger.error(message)
 
     def edit_macros(self):
         """Open macro editor dialog."""

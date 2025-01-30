@@ -29,6 +29,8 @@ class MotorController:
         self.target_position = 0
         self._is_calibrated = False
         self._setup_logging()
+        self._consecutive_errors = 0  # Add counter for consecutive errors
+        self._max_consecutive_errors = 5  # Maximum allowed consecutive errors
 
     def _setup_logging(self):
         """Setup logging for the Arduino controller."""
@@ -115,6 +117,7 @@ class MotorController:
                     # Convert to millimeters and apply offset from calibration
                     position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
                     self.motor_position = position
+                    self._consecutive_errors = 0  # Reset error counter on success
                     return float(position)
                 except Exception as e:
                     if attempt == max_retries - 1:  # Last attempt
@@ -124,6 +127,14 @@ class MotorController:
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
             self.serial_connected = False
+            self._consecutive_errors += 1
+            
+            # If too many consecutive errors, stop the controller
+            if self._consecutive_errors >= self._max_consecutive_errors:
+                self.logger.error("Too many consecutive errors, stopping motor controller")
+                self.running = False
+                self.serial_connected = False
+                
             return None
 
     def start_calibration(self) -> bool:
