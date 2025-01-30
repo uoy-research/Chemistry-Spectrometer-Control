@@ -2155,12 +2155,16 @@ class MainWindow(QMainWindow):
                             is_negative = True
                             i += 1
 
-                        # Collect digits
-                        while i < len(sequence_string) and sequence_string[i].isdigit():
+                        # Collect digits and decimal point for float values
+                        decimal_found = False
+                        while i < len(sequence_string) and (sequence_string[i].isdigit() or 
+                              (sequence_string[i] == '.' and not decimal_found)):
+                            if sequence_string[i] == '.':
+                                decimal_found = True
                             motor_position_str += sequence_string[i]
                             i += 1
                         try:
-                            motor_position = int(motor_position_str)
+                            motor_position = float(motor_position_str)
                             if is_negative:
                                 motor_position = -motor_position
                                 negative_positions_found = True
