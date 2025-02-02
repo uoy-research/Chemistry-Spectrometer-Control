@@ -77,29 +77,26 @@ class PlotWidget(QWidget):
 
     def update_plot(self, readings=None):
         """Update plot with new readings and save if recording."""
-        if readings is not None:
-            current_time = time.time() - self.start_time
-
-            # Add new data point
-            self.times = np.append(self.times, current_time)
-            for i, reading in enumerate(readings):
-                self.pressures[i] = np.append(self.pressures[i], reading)
-
-            # Save data if recording
-            if self.recording and self.csv_writer:
-                self.csv_writer.writerow([current_time] + readings)
-                self.save_file.flush()  # Ensure data is written to disk
-
-            # Remove old data points
-            if len(self.times) > self.max_points:
-                self.times = self.times[-self.max_points:]
-                for i in range(4):
-                    self.pressures[i] = self.pressures[i][-self.max_points:]
-
-        if not self.times.size:
+        if readings is None:
             return
 
         current_time = time.time() - self.start_time
+
+        # Add new data point
+        self.times = np.append(self.times, current_time)
+        for i, reading in enumerate(readings):
+            self.pressures[i] = np.append(self.pressures[i], reading)
+
+        # Save data if recording
+        if self.recording and self.csv_writer:
+            self.csv_writer.writerow([current_time] + readings)
+            self.save_file.flush()  # Ensure data is written to disk
+
+        # Remove old data points
+        if len(self.times) > self.max_points:
+            self.times = self.times[-self.max_points:]
+            for i in range(4):
+                self.pressures[i] = self.pressures[i][-self.max_points:]
 
         # Update x-axis to maintain 30-second window
         self.ax.set_xlim(current_time - 30, current_time)
@@ -108,6 +105,7 @@ class PlotWidget(QWidget):
         for i, line in enumerate(self.lines):
             line.set_data(self.times, self.pressures[i])
 
+        # Force a redraw
         self.canvas.draw()
 
     def clear_data(self):

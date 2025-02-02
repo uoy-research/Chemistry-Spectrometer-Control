@@ -885,7 +885,7 @@ class MainWindow(QMainWindow):
 
         # Now set up new connections
         # Worker signal connections
-        self.arduino_worker.readings_updated.connect(self.handle_pressure_readings)
+        self.arduino_worker.readings_updated.connect(self.plot_widget.update_plot)
         self.arduino_worker.error_occurred.connect(self.handle_error)
         self.arduino_worker.status_changed.connect(self.handle_status_message)
 
