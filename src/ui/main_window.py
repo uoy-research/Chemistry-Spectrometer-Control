@@ -1282,19 +1282,19 @@ class MainWindow(QMainWindow):
         if self.arduino_worker.running:
             # Only enable valve buttons if Arduino is connected and in manual mode
             if self.arduino_worker.controller.mode == 0:  # Manual mode
-                # Only toggle the individual valve buttons 1-5
-                for i in range(1, 6):
+                # Toggle all individual valve buttons 1-6
+                for i in range(1, 7):  # Changed from 6 to 7 to include valve 6
                     if hasattr(self, f'Valve{i}Button'):
                         getattr(self, f'Valve{i}Button').setEnabled(enabled)
             else:
                 # Force disable if not in manual mode
-                for i in range(1, 6):
+                for i in range(1, 7):  # Changed from 6 to 7 to include valve 6
                     if hasattr(self, f'Valve{i}Button'):
                         getattr(self, f'Valve{i}Button').setEnabled(False)
                 self.dev_checkbox.setChecked(False)
         else:
             # Force disable if Arduino not connected
-            for i in range(1, 6):
+            for i in range(1, 7):  # Changed from 6 to 7 to include valve 6
                 if hasattr(self, f'Valve{i}Button'):
                     getattr(self, f'Valve{i}Button').setEnabled(False)
             self.dev_checkbox.setChecked(False)

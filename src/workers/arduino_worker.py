@@ -160,7 +160,8 @@ class ArduinoWorker(QThread):
                     self.readings_updated.emit(readings)
                     if isinstance(self.controller, MockArduinoController):
                         # Debug log the mock readings
-                        self.logger.debug(f"Mock readings: {readings}")
+                        # self.logger.debug(f"Mock readings: {readings}")
+                        pass
                 else:
                     self.error_occurred.emit("Failed to get pressure readings")
 
