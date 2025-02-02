@@ -9,7 +9,7 @@ from PyQt6.QtCore import (
 )
 import time
 import logging
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 
 from controllers.motor_controller import MotorController
 
@@ -21,35 +21,97 @@ class MockMotorController:
         self._position = 0.0  # Store position as float
         self.POSITION_MAX = 100.0
         self.POSITION_MIN = 0.0
+        self._is_calibrated = False  # Add calibration state
+        self.logger = logging.getLogger(__name__)  # Add logger
+        self._ascending = False  # Track if currently ascending
 
     def start(self) -> bool:
+        """Start the mock controller."""
         self.running = True
+        self.logger.info("Mock motor controller started")
         return True
 
     def stop(self):
         self.running = False
 
     def get_position(self) -> float:
+        """Get current position, handling ascent movement."""
+        if self._ascending:
+            # Move up slowly (decrease position)
+            new_position = max(0.0, self._position - 0.1)
+            if new_position == 0.0:
+                self._ascending = False  # Stop ascending at top
+            self._position = new_position
         return self._position
 
-    def set_position(self, position: Union[int, float], wait: bool = False) -> bool:
-        """Set position with float support."""
+    def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
+        """Set position with float support and return success status and actual target.
+        
+        Args:
+            position: Target position
+            wait: Ignored in mock mode
+            
+        Returns:
+            Tuple[bool, float]: (success, actual_target_position)
+        """
         try:
-            position = float(position)  # Convert to float
-            if not (self.POSITION_MIN <= position <= self.POSITION_MAX):
-                return False
+            position = float(position)
+            # Limit position to valid range
+            if position < self.POSITION_MIN:
+                position = self.POSITION_MIN
+            elif position > self.POSITION_MAX:
+                position = self.POSITION_MAX
+                
             self._position = position
-            return True
+            self.logger.info(f"Mock motor moving to position: {position}")
+            return True, position
+            
         except (ValueError, TypeError):
-            return False
+            return False, 0.0
 
     def stop_motor(self) -> bool:
+        """Implement stop functionality."""
+        self._ascending = False  # Stop any ascent movement
+        self._position = self._position  # Stop at current position
+        self.logger.info("Mock motor stopped")
         return True
+
+    def start_calibration(self) -> bool:
+        """Implement calibration start."""
+        self._position = 0.0  # Reset position to 0
+        self._is_calibrated = True
+        self.logger.info("Mock motor calibration started")
+        return True
+
+    def check_calibrated(self) -> bool:
+        """Return calibration state."""
+        return self._is_calibrated
 
     def set_sequence_mode(self, enabled: bool):
         """Enable or disable sequence mode."""
         self._in_sequence = enabled
-        self.logger.info(f"Motor sequence mode {'enabled' if enabled else 'disabled'}")
+        self.logger.info(f"Mock motor sequence mode {'enabled' if enabled else 'disabled'}")
+
+    def to_top(self) -> bool:
+        """Move motor to top position (0.0)."""
+        try:
+            self._position = 0.0
+            self.logger.info("Mock motor moving to top position")
+            return True
+        except Exception as e:
+            self.logger.error(f"Mock motor to_top failed: {e}")
+            return False
+
+    def ascent(self) -> bool:
+        """Start slow ascent movement."""
+        try:
+            # Mark as ascending - the worker thread will handle the actual movement
+            self._ascending = True
+            self.logger.info("Mock motor starting ascent")
+            return True
+        except Exception as e:
+            self.logger.error(f"Mock motor ascent failed: {e}")
+            return False
 
 
 class MotorWorker(QThread):
@@ -84,10 +146,17 @@ class MotorWorker(QThread):
 
         self.port = port
         self.update_interval = update_interval
+        
+        # Setup logger first
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"Initializing MotorWorker with mock={mock}")
+
         if mock:
+            self.logger.info("Creating MockMotorController")
             self.controller = MockMotorController()
             self._running = False  # Don't auto-start in mock mode
         else:
+            self.logger.info("Creating real MotorController")
             self.controller = MotorController(port=port)
 
         self._running = False
@@ -95,7 +164,7 @@ class MotorWorker(QThread):
         self._target_position: Optional[float] = None
         self._current_position: Optional[float] = None
         self._is_calibrated = False
-        self._pause_updates = False  # Add new flag for pausing position updates
+        self._pause_updates = False
         self._in_sequence = False
         self._retry_timer = None
         self._retry_count = 0
@@ -106,15 +175,24 @@ class MotorWorker(QThread):
         # Connect retry signal to slot in constructor
         self.retry_requested.connect(self._schedule_retry, Qt.ConnectionType.QueuedConnection)
 
-        self.logger = logging.getLogger(__name__)
-
     def run(self):
         """Main worker loop."""
-        # Don't actually run if in mock mode
         if isinstance(self.controller, MockMotorController):
             self._running = True
+            self.logger.info("Mock motor worker thread running")
+            self.status_changed.emit("Mock motor worker running")
+            
+            # Keep the thread alive for mock mode
+            while self._running:
+                if not self._paused and not self._pause_updates:
+                    # Emit current position periodically
+                    self.position_updated.emit(-float(self.controller.get_position()))
+                time.sleep(self.update_interval)
+            
+            self.logger.info("Mock motor worker thread stopped")
             return
 
+        # Real motor code...
         self.status_changed.emit("Starting motor worker...")
 
         if not self.controller.start():
@@ -213,7 +291,20 @@ class MotorWorker(QThread):
             # Log sequence mode state
             self.logger.info(f"Move command received. Sequence mode: {self._in_sequence}")
             
-            # Start retry attempt
+            # Handle mock mode differently
+            if isinstance(self.controller, MockMotorController):
+                success, actual_target = self.controller.set_position(position)
+                if success:
+                    self._target_position = actual_target
+                    self.position_updated.emit(-actual_target)  # Update UI immediately
+                    if actual_target != position:
+                        self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
+                    return True
+                else:
+                    self.error_occurred.emit("Failed to move mock motor")
+                    return False
+            
+            # Start retry attempt for real motor
             self._try_move()
             return True
 
@@ -302,6 +393,21 @@ class MotorWorker(QThread):
             # Reset target position when starting calibration
             self._target_position = None
             self.status_changed.emit("Starting motor calibration...")
+
+            # Handle mock mode differently
+            if isinstance(self.controller, MockMotorController):
+                if self.controller.start_calibration():
+                    self._is_calibrated = True
+                    self.calibration_state_changed.emit(True)
+                    self.status_changed.emit("Motor calibration complete")
+                    self._pause_updates = False
+                    # Emit position update for UI
+                    self.position_updated.emit(0.0)
+                    self.movement_completed.emit(True)
+                    return True
+                return False
+
+            # Real motor calibration code...
             if self.controller.start_calibration():
                 # Start a timer to check calibration status
                 self._calibration_check_timer = QTimer()
@@ -341,11 +447,12 @@ class MotorWorker(QThread):
                 self._calibration_check_timer.start()
                 return True
             else:
-                self._pause_updates = False  # Resume position updates if calibration fails to start
+                self._pause_updates = False
                 self.error_occurred.emit("Failed to start calibration")
                 return False
+
         except Exception as e:
-            self._pause_updates = False  # Resume position updates on error
+            self._pause_updates = False
             self.error_occurred.emit(f"Calibration error: {str(e)}")
             return False
 
@@ -368,12 +475,25 @@ class MotorWorker(QThread):
         """Execute emergency stop with retries."""
         try:
             if self.running:
+                # Handle mock mode
+                if isinstance(self.controller, MockMotorController):
+                    if self.controller.stop_motor():
+                        self._target_position = None
+                        self.status_changed.emit("Motor emergency stopped")
+                        self.logger.info("Emergency stop executed successfully")
+                        # Reset calibration state
+                        self._is_calibrated = False
+                        self.calibration_state_changed.emit(False)
+                    else:
+                        self.error_occurred.emit("Emergency stop failed")
+                    return
+
+                # Real motor emergency stop code...
                 success = False
                 max_retries = 10
                 
                 for attempt in range(max_retries):
                     try:
-                        # Stop any current movement
                         if self.controller.stop_motor():
                             success = True
                             break
@@ -389,6 +509,9 @@ class MotorWorker(QThread):
                     self._target_position = None
                     self.status_changed.emit("Motor emergency stopped")
                     self.logger.info("Emergency stop executed successfully")
+                    # Reset calibration state
+                    self._is_calibrated = False
+                    self.calibration_state_changed.emit(False)
                 else:
                     self.error_occurred.emit(f"Emergency stop failed after {max_retries} attempts")
                     self.logger.error(f"Emergency stop failed after {max_retries} attempts")
@@ -520,11 +643,15 @@ class MotorWorker(QThread):
             bool: True if successfully started, False otherwise
         """
         try:
+            self.logger.info("Starting motor worker...")
+            
             # First try to connect the controller
             if not self.controller.start():
+                self.error_occurred.emit("Failed to connect to motor controller")
+                self.logger.error("Failed to connect to motor controller")
                 return False
             
-            # If controller connected successfully, start the thread
+            # Start the thread regardless of mock/real mode
             super().start()  # Start the QThread
             return True
         
