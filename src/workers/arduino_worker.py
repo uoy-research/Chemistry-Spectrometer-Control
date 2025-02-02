@@ -6,6 +6,8 @@ Description: Worker thread for Arduino communication
 from PyQt6.QtCore import QThread, pyqtSignal
 import time
 import logging
+import random
+import math
 from typing import List, Optional
 
 from controllers.arduino_controller import ArduinoController
@@ -13,27 +15,66 @@ from controllers.arduino_controller import ArduinoController
 
 class MockArduinoController:
     """Mock Arduino controller for testing."""
+
     def __init__(self, port: int):
         self.port = port
         self.running = False
         self.mode = 0
+        self._start_time = time.time()
+        self.logger = logging.getLogger(__name__)
+
+        # Initialize base pressure values and variation parameters
+        # Different base pressure for each sensor
+        self._base_pressures = [1.0, 2.0, 3.0, 4.0]
+        self._variation_amplitude = 0.2  # Amount of random variation
+        self._oscillation_period = 10.0  # Period of oscillation in seconds
 
     def start(self) -> bool:
         self.running = True
+        self._start_time = time.time()  # Reset start time when starting
+        self.logger.debug("Mock Arduino controller started")
         return True
 
     def stop(self):
         self.running = False
 
     def get_readings(self) -> List[float]:
-        # Return mock values that are already "converted"
-        # These values represent typical pressure readings in standard units
-        return [0.5, 1.0, 1.5, 2.0]
+        """Generate simulated pressure readings with time-varying components."""
+        if not self.running:
+            return [0.0] * 4
+
+        # Calculate time-based variation
+        elapsed_time = time.time() - self._start_time
+        oscillation = math.sin(
+            2 * math.pi * elapsed_time / self._oscillation_period)
+
+        # Generate readings for each sensor
+        readings = []
+        for base_pressure in self._base_pressures:
+            # Add time-based oscillation and random variation
+            random_variation = random.uniform(
+                -self._variation_amplitude, self._variation_amplitude)
+            pressure = base_pressure + (oscillation * 0.5) + random_variation
+            # Ensure pressure stays positive
+            pressure = max(0.0, pressure)
+            readings.append(pressure)
+
+        return readings
 
     def set_valves(self, states: List[int]) -> bool:
+        # Simulate valve state changes affecting pressures
+        if states[1]:  # If inlet valve (Valve 2) is open
+            self._base_pressures = [
+                p + 0.5 for p in self._base_pressures]  # Increase pressure
+        elif states[3]:  # If vent valve (Valve 4) is open
+            self._base_pressures = [
+                # Decrease pressure
+                max(1.0, p - 0.5) for p in self._base_pressures]
         return True
 
     def send_depressurise(self) -> bool:
+        # Reset pressures to base values
+        self._base_pressures = [1.0, 2.0, 3.0, 4.0]
         return True
 
 
@@ -80,7 +121,7 @@ class ArduinoWorker(QThread):
 
     def start(self) -> bool:
         """Start the worker thread.
-        
+
         Returns:
             bool: True if started successfully
         """
@@ -94,13 +135,6 @@ class ArduinoWorker(QThread):
         """Main worker loop."""
         self.logger.info("Arduino worker thread running")
         self.status_changed.emit("Starting Arduino worker...")
-
-        # Don't actually run if in mock mode
-        if isinstance(self.controller, MockArduinoController):
-            self._running = True
-            self.logger.info("Mock Arduino controller started")
-            self.status_changed.emit("Mock Arduino worker running")
-            return
 
         # Try to start the controller
         if not self.controller.start():
@@ -124,6 +158,9 @@ class ArduinoWorker(QThread):
                 readings = self.controller.get_readings()
                 if readings:
                     self.readings_updated.emit(readings)
+                    if isinstance(self.controller, MockArduinoController):
+                        # Debug log the mock readings
+                        self.logger.debug(f"Mock readings: {readings}")
                 else:
                     self.error_occurred.emit("Failed to get pressure readings")
 
