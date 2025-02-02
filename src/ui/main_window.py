@@ -69,6 +69,10 @@ class MainWindow(QMainWindow):
         self.config = Config()
         self.test_mode = test_mode
 
+        # Add debug logging for test mode
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
+
         # Initialize workers with mock controllers in test mode
         self.arduino_worker = ArduinoWorker(
             port=self.config.arduino_port,
@@ -76,8 +80,9 @@ class MainWindow(QMainWindow):
         )
         self.motor_worker = MotorWorker(
             port=self.config.motor_port,
-            mock=test_mode
+            mock=test_mode  # Verify this parameter is being passed correctly
         )
+        self.logger.info(f"Created motor worker with mock={test_mode}")
 
         # Setup logging
         self.logger = logging.getLogger(__name__)
@@ -935,20 +940,8 @@ class MainWindow(QMainWindow):
                 # Get the port value from the spin box
                 port = self.motor_com_port_spin.value()
                 
-                # Create new worker with current port value
-                self.motor_worker = MotorWorker(
-                    port=port,
-                    mock=self.test_mode
-                )
-                
-                # Reconnect signals for new worker instance
-                self.motor_worker.position_updated.connect(self.handle_position_update)
-                self.motor_worker.error_occurred.connect(self.handle_error)
-                self.motor_worker.status_changed.connect(self.handle_status_message)
-                self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state)
-                
-                # Start the worker - in test mode we don't need actual connection
-                if self.test_mode or self.motor_worker.start():
+                # Start the existing worker instead of creating a new one
+                if self.motor_worker.start():
                     self.motor_connect_btn.setText("Disconnect")
                     self.motor_warning_label.setText("")
                     self.motor_warning_label.setVisible(False)
