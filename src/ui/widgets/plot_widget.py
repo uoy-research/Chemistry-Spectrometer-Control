@@ -42,7 +42,7 @@ class PlotWidget(QWidget):
 
         # Initialize other plot settings
         self.ax.grid(True)
-        self.ax.set_ylabel('Pressure')
+        self.ax.set_ylabel('Pressure (bar)')
         self.ax.set_xlabel('Time (s)')
 
         # Create toolbar
@@ -60,6 +60,9 @@ class PlotWidget(QWidget):
         self.lines = [self.ax.plot([], [], label=f'Sensor {i+1}')[0]
                       for i in range(4)]
 
+        # Track sensor visibility
+        self.sensor_visibility = [True] * 4  # All sensors visible by default
+
         # Add legend
         self.ax.legend()
 
@@ -74,6 +77,26 @@ class PlotWidget(QWidget):
         self.recording = False
         self.save_file = None
         self.csv_writer = None
+
+        self.logger = logging.getLogger(__name__)
+
+    def set_sensor_visibility(self, sensor_num: int, visible: bool):
+        """Set visibility of a sensor's plot line.
+
+        Args:
+            sensor_num: Sensor number (1-4)
+            visible: True to show, False to hide
+        """
+        try:
+            idx = sensor_num - 1  # Convert to 0-based index
+            if 0 <= idx < len(self.lines):
+                self.sensor_visibility[idx] = visible
+                self.lines[idx].set_visible(visible)
+                self.canvas.draw()
+                self.logger.info(
+                    f"Sensor {sensor_num} visibility set to {visible}")
+        except Exception as e:
+            self.logger.error(f"Error setting sensor visibility: {e}")
 
     def update_plot(self, readings=None):
         """Update plot with new readings and save if recording."""
@@ -104,6 +127,8 @@ class PlotWidget(QWidget):
         # Update line data
         for i, line in enumerate(self.lines):
             line.set_data(self.times, self.pressures[i])
+            # Apply visibility setting
+            line.set_visible(self.sensor_visibility[i])
 
         # Force a redraw
         self.canvas.draw()

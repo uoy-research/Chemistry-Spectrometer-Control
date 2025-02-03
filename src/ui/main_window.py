@@ -1648,18 +1648,22 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(int)
     def on_pressureRadioButton_clicked(self, sensor_num: int):
-        """Handle pressure sensor radio button click.
-
-        Args:
-            sensor_num: Pressure sensor number (1-4)
-        """
-        radio = getattr(self, f"pressure{sensor_num}RadioButton")
-        # Adjust index since plot widget uses 0-based indexing
-        if sensor_num <= 3:  # Only first 3 sensors are plotted
-            self.plot_widget.sensor_toggles[sensor_num -
-                                            1].setChecked(radio.isChecked())
-        self.logger.info(
-            f"Pressure sensor {sensor_num} display {'enabled' if radio.isChecked() else 'disabled'}")
+        """Handle pressure sensor radio button clicks."""
+        try:
+            # Get the radio button that was clicked
+            radio = getattr(self, f'pressure{sensor_num}RadioButton')
+            
+            # Update plot visibility based on radio button state
+            self.plot_widget.set_sensor_visibility(sensor_num, radio.isChecked())
+            
+            # Log the change
+            if radio.isChecked():
+                self.logger.info(f"Pressure sensor {sensor_num} display enabled")
+            else:
+                self.logger.info(f"Pressure sensor {sensor_num} display disabled")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling pressure radio button: {e}")
 
     @pyqtSlot(int)
     def on_valveMacroButton_clicked(self, macro_num: int):
