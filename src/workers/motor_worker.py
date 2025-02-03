@@ -206,8 +206,8 @@ class MotorWorker(QThread):
             # Keep the thread alive for mock mode
             while self._running:
                 if not self._paused and not self._pause_updates:
-                    # Emit current position periodically
-                    self.position_updated.emit(-float(self.controller.get_position()))
+                    # Remove the negative sign here
+                    self.position_updated.emit(float(self.controller.get_position()))
                 time.sleep(self.update_interval)
             
             self.logger.info("Mock motor worker thread stopped")
@@ -238,12 +238,13 @@ class MotorWorker(QThread):
                 if position is not None:
                     if position != self._current_position:
                         self._current_position = position
-                        # Invert position value for UI display
-                        self.position_updated.emit(-float(position))
+                        # Remove the negative sign here
+                        self.position_updated.emit(float(position))
 
                     # Check if target reached
                     if self._target_position is not None:
-                        current_adjusted = -position
+                        # Remove position inversion here
+                        current_adjusted = position
                         if abs(current_adjusted - self._target_position) < 0.005:
                             self._target_position = None
                             self.movement_completed.emit(True)
@@ -298,7 +299,7 @@ class MotorWorker(QThread):
                 success, actual_target = self.controller.set_position(position)
                 if success:
                     self._target_position = actual_target
-                    self.position_updated.emit(-actual_target)  # Update UI immediately
+                    self.position_updated.emit(actual_target)  # Update UI immediately
                     if actual_target != position:
                         self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
                     return True

@@ -113,7 +113,7 @@ class MotorController:
                 try:
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
                     raw_steps = self.assemble(readings[0], readings[1])
-                    # Convert to millimeters and apply offset from calibration
+                    # Convert to millimeters and apply offset to show POSITION_MAX at calibration point
                     position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
                     self.motor_position = position
                     self._consecutive_errors = 0  # Reset error counter on success
@@ -171,8 +171,9 @@ class MotorController:
                         readings = self.instrument.read_registers(5, 2, functioncode=3)
                         raw_steps = self.assemble(readings[0], readings[1])
                         calibration_position = round(raw_steps / self.STEPS_PER_MM, 5)
-                        self._initial_offset = calibration_position
-                        self.logger.info(f"Calibration complete - Position offset set to: {calibration_position}")
+                        # Calculate offset to make current position show POSITION_MAX
+                        self._initial_offset = calibration_position - self.POSITION_MAX
+                        self.logger.info(f"Calibration complete - Position offset set to: {self._initial_offset}")
                         
                         # Set calibration state
                         self._is_calibrated = True
@@ -225,7 +226,7 @@ class MotorController:
                     self.logger.error("Motor not calibrated")
                     return False, position
 
-            # Convert to steps with proper rounding
+            # Convert to steps with proper rounding - remove any offset adjustments
             position_steps = int(round(position * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
             
