@@ -203,7 +203,15 @@ class MotorController:
         return self.set_position(position, wait)
         
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set motor position."""
+        """Set motor position from bottom position.
+        
+        Args:
+            position: Target position in mm from bottom (0.0 = bottom, positive = up)
+            wait: Whether to wait for movement to complete
+            
+        Returns:
+            Tuple[bool, float]: (success, actual_target_position)
+        """
         if not self.running:
             return False, position
 
@@ -226,8 +234,12 @@ class MotorController:
                     self.logger.error("Motor not calibrated")
                     return False, position
 
-            # Convert to steps with proper rounding - remove any offset adjustments
-            position_steps = int(round(position * self.STEPS_PER_MM))
+            # Convert from bottom-referenced to top-referenced position
+            # If position is 200mm from bottom, we want (364.40 - 200.00)mm from top
+            top_referenced_position = self.POSITION_MAX - position
+            
+            # Convert position to steps
+            position_steps = int(round(top_referenced_position * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
             
             # Send position commands with minimal delay
@@ -265,7 +277,9 @@ class MotorController:
                 while True:
                     current = self.get_position()
                     if current is not None:
-                        if abs(current + 2 - position) < 0.005:
+                        # Convert current position to bottom-referenced for comparison
+                        current_from_bottom = self.POSITION_MAX - current
+                        if abs(current_from_bottom - position) < 0.005:
                             break
                     time.sleep(0.1)
 
