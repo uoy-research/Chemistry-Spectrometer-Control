@@ -18,6 +18,8 @@ class MockMotorController:
         self._position = 0.0  # Store position as float
         self.POSITION_MAX = 100.0
         self.POSITION_MIN = 0.0
+        self.SPEED_MAX = 6501  # Match real controller speed limits
+        self.SPEED_MIN = 0
         self._is_calibrated = False  # Add calibration state
         self.logger = logging.getLogger(__name__)  # Add logger
         self._ascending = False  # Track if currently ascending
@@ -112,9 +114,17 @@ class MockMotorController:
             return False
 
     def set_speed(self, speed: int) -> bool:
-        """Set mock motor speed."""
+        """Set mock motor speed.
+        
+        Args:
+            speed: Speed value (0-6501)
+            
+        Returns:
+            bool: True if successful
+        """
         try:
             if speed < self.SPEED_MIN or speed > self.SPEED_MAX:
+                self.logger.error(f"Invalid speed value: {speed}")
                 return False
             self._speed = speed
             self.logger.info(f"Mock motor speed set to {speed}")
