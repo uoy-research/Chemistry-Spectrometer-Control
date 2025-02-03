@@ -21,6 +21,7 @@ class MockMotorController:
         self._is_calibrated = False  # Add calibration state
         self.logger = logging.getLogger(__name__)  # Add logger
         self._ascending = False  # Track if currently ascending
+        self._speed = 4000  # Default to medium speed
 
     def start(self) -> bool:
         """Start the mock controller."""
@@ -108,6 +109,18 @@ class MockMotorController:
             return True
         except Exception as e:
             self.logger.error(f"Mock motor ascent failed: {e}")
+            return False
+
+    def set_speed(self, speed: int) -> bool:
+        """Set mock motor speed."""
+        try:
+            if speed < self.SPEED_MIN or speed > self.SPEED_MAX:
+                return False
+            self._speed = speed
+            self.logger.info(f"Mock motor speed set to {speed}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Mock motor set_speed failed: {e}")
             return False
 
 
@@ -581,12 +594,25 @@ class MotorWorker(QThread):
             self.error_occurred.emit(f"Failed to move to top: {str(e)}")
             return False
 
-    def set_speed(self, speed: int):
-        """Set motor speed."""
-        if not self.controller.running:
-            self.error_occurred.emit("Motor not connected")
+    def set_speed(self, speed: int) -> bool:
+        """Set motor speed.
+        
+        Args:
+            speed: Speed value (0-1000)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            if not self.running:
+                self.error_occurred.emit("Motor not connected")
+                return False
+            
+            return self.controller.set_speed(speed)
+        
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to set motor speed: {str(e)}")
             return False
-        return self.controller.set_speed(speed)
 
     def home(self):
         """Move motor to home position."""

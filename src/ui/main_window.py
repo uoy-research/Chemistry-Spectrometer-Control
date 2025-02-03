@@ -356,16 +356,27 @@ class MainWindow(QMainWindow):
         self.motor_calibrate_btn.setFont(font)
         motor_layout.addWidget(self.motor_calibrate_btn)
 
-        # Create prominent STOP button
+        # Modify STOP button height
         self.motor_stop_btn = QPushButton("STOP")
-        self.motor_stop_btn.setMinimumSize(QSize(0, 90))  # Make button taller
+        self.motor_stop_btn.setMinimumSize(QSize(0, 50))  # Reduced from 90 to 50
         font = QFont()
-        font.setPointSize(20)  # Larger font
-        font.setBold(True)     # Bold text
+        font.setPointSize(20)
+        font.setBold(True)
         self.motor_stop_btn.setFont(font)
         self.motor_stop_btn.setStyleSheet(
-            "background-color: red; color: white;")  # Red background
+            "background-color: red; color: white;")
         motor_layout.addWidget(self.motor_stop_btn)
+
+        # Add speed control combo box
+        self.motor_speed_combo = QComboBox()
+        self.motor_speed_combo.addItems(['Fast', 'Medium', 'Slow'])
+        self.motor_speed_combo.setCurrentText('Medium')  # Default to medium speed
+        font = QFont()
+        font.setPointSize(11)
+        self.motor_speed_combo.setFont(font)
+        self.motor_speed_combo.currentTextChanged.connect(self.on_motor_speed_changed)
+        self.motor_speed_combo.setEnabled(False)  # Initially disabled
+        motor_layout.addWidget(self.motor_speed_combo)
 
         # Don't set initial states here - they'll be set in initialize_control_states()
         layout.addWidget(motor_group, 0, 2, 2, 1)
@@ -378,6 +389,10 @@ class MainWindow(QMainWindow):
                 not disabled and self.motor_calibrated)
             self.motor_move_to_target_button.setEnabled(
                 not disabled and self.motor_calibrated)
+
+        # Add speed combo box control
+        if hasattr(self, 'motor_speed_combo'):
+            self.motor_speed_combo.setEnabled(not disabled and self.motor_calibrated)
 
         # Motor macro buttons
         if hasattr(self, 'motor_to_top_button'):
@@ -2475,3 +2490,29 @@ class MainWindow(QMainWindow):
             self.motor_warning_label.setVisible(True)
             self.disable_motor_controls(True)  # Disable controls
             self.logger.info("Motor needs calibration")
+
+    @pyqtSlot(str)
+    def on_motor_speed_changed(self, speed_text: str):
+        """Handle motor speed changes.
+        
+        Args:
+            speed_text: Selected speed text (Fast/Medium/Slow)
+        """
+        try:
+            # Map text to speed values
+            speed_map = {
+                'Fast': 6500,    # Maximum speed
+                'Medium': 4000,   # 60% speed
+                'Slow': 2000      # 30% speed
+            }
+            
+            speed = speed_map.get(speed_text)
+            if speed is not None and self.motor_worker.running:
+                success = self.motor_worker.set_speed(speed)
+                if success:
+                    self.logger.info(f"Motor speed set to {speed_text}")
+                else:
+                    self.logger.error(f"Failed to set motor speed to {speed_text}")
+                
+        except Exception as e:
+            self.logger.error(f"Error setting motor speed: {e}")

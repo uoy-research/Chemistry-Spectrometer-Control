@@ -10,7 +10,7 @@ from typing import Optional, Union, Tuple
 
 
 class MotorController:
-    SPEED_MAX = 1000
+    SPEED_MAX = 6501
     SPEED_MIN = 0
     POSITION_MAX = 364.40  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
@@ -400,3 +400,27 @@ class MotorController:
                 self.motor_position = raw_position - offset
             except Exception as e:
                 self.logger.error(f"Failed to update position after setting offset: {e}")
+
+    def set_speed(self, speed: int) -> bool:
+        """Set motor speed via Modbus.
+        
+        Args:
+            speed: Speed value (0-1000)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Validate speed range
+            if speed < self.SPEED_MIN or speed > self.SPEED_MAX:
+                self.logger.error(f"Invalid speed value: {speed}")
+                return False
+            
+            # Write speed to register 9
+            self.instrument.write_register(9, speed)
+            #self.logger.info(f"Motor speed set to {speed}")
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Failed to set motor speed: {e}")
+            return False
