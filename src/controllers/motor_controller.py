@@ -67,7 +67,7 @@ class MotorController:
             try:
                 self.instrument.write_bit(3, 1)
                 self.serial_connected = True
-                self.logger.info(f"Connected to motor on {self.port}")
+                # self.logger.info(f"Connected to motor on {self.port}")
                 
                 result = self.instrument.read_bit(3, 1) 
                 if result:
@@ -173,15 +173,19 @@ class MotorController:
                         calibration_position = round(raw_steps / self.STEPS_PER_MM, 5)
                         self._initial_offset = calibration_position
                         self.logger.info(f"Calibration complete - Position offset set to: {calibration_position}")
+                        
+                        # Set calibration state
+                        self._is_calibrated = True
+                        # Return True to indicate successful calibration
+                        return True
+                        
                     except Exception as e:
                         self.logger.error(f"Failed to get calibration position: {e}")
                         self._initial_offset = 0
-                    
-                    self._is_calibrated = True
+                        return False
                 
             return bool(calibrated)
         except Exception as e:
-            self.logger.error(f"Couldn't read calibration status")
             self.serial_connected = False
             return False
 

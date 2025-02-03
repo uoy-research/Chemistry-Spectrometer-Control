@@ -323,9 +323,11 @@ class MainWindow(QMainWindow):
         font = QFont()
         font.setPointSize(11)
         self.motor_com_port_spin.setFont(font)
-        self.motor_com_port_spin.setValue(9)
+        self.motor_com_port_spin.setRange(1, 255)
+        self.motor_com_port_spin.setValue(self.config.motor_port)  # Use config value
         self.motor_com_port_spin.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTrailing | Qt.AlignmentFlag.AlignVCenter)
+        self.motor_com_port_spin.valueChanged.connect(self.update_motor_port)  # Add connection
         motor_layout.addWidget(self.motor_com_port_spin)
 
         # Create the motor warning label
@@ -882,7 +884,7 @@ class MainWindow(QMainWindow):
         self.motor_worker.position_updated.connect(self.handle_position_update)
         self.motor_worker.error_occurred.connect(self.handle_error)
         self.motor_worker.status_changed.connect(self.handle_status_message)
-        self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state)
+        self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state_changed)
 
         # Arduino and valve connections
         self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
@@ -2081,9 +2083,11 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle application shutdown."""
         try:
+            self.logger.info(f"Active motor workers before shutdown: {MotorWorker.get_active_count()}")
             self.arduino_worker.stop()
             self.motor_worker.stop()
             self.config.save()
+            self.logger.info(f"Active motor workers after shutdown: {MotorWorker.get_active_count()}")
             self.logger.info("Shutdown complete")
             event.accept()
         except Exception as e:
@@ -2429,3 +2433,45 @@ class MainWindow(QMainWindow):
             self.buildPressureButton.setEnabled(True)
             self.quickVentButton.setEnabled(True)
             self.slowVentButton.setEnabled(True)
+
+    def update_motor_port(self, port: int):
+        """Update motor port configuration."""
+        self.config.motor_port = port
+        self.config.save()
+
+        self.logger.info(f"Active motor workers before update: {MotorWorker.get_active_count()}")
+        
+        if self.motor_worker.running:
+            self.motor_worker.stop()
+            self.motor_connect_btn.setText("Connect")
+            self.logger.info("Disconnected from motor due to port change")
+
+            # Reset motor state
+            self.motor_calibrated = False
+            self.motor_warning_label.setText("Warning: Motor not connected")
+            self.motor_warning_label.setVisible(True)
+            self.motor_calibrate_btn.setEnabled(False)
+            self.disable_motor_controls(True)
+
+        self.motor_worker = MotorWorker(
+            port=port,
+            mock=self.test_mode
+        )
+        self.setup_connections()
+        
+        self.logger.info(f"Active motor workers after update: {MotorWorker.get_active_count()}")
+
+    @pyqtSlot(bool)
+    def handle_calibration_state_changed(self, is_calibrated: bool):
+        """Handle motor calibration state changes."""
+        self.motor_calibrated = is_calibrated
+        if is_calibrated:
+            self.motor_warning_label.setText("")
+            self.motor_warning_label.setVisible(False)
+            self.disable_motor_controls(False)  # Enable controls
+            self.logger.info("Motor calibrated successfully")
+        else:
+            self.motor_warning_label.setText("Motor needs calibration")
+            self.motor_warning_label.setVisible(True)
+            self.disable_motor_controls(True)  # Disable controls
+            self.logger.info("Motor needs calibration")

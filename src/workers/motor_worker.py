@@ -129,6 +129,9 @@ class MotorWorker(QThread):
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
 
+    # Add class variable to track instances
+    _instance_count = 0
+
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
         """Initialize worker.
         
@@ -138,20 +141,24 @@ class MotorWorker(QThread):
             mock: Use mock controller for testing
         """
         super().__init__()
+        
+        # Increment instance counter
+        MotorWorker._instance_count += 1
+        self._instance_id = MotorWorker._instance_count
 
         self.port = port
         self.update_interval = update_interval
         
         # Setup logger first
         self.logger = logging.getLogger(__name__)
-        self.logger.info(f"Initializing MotorWorker with mock={mock}")
+        #self.logger.info(f"Creating MotorWorker instance {self._instance_id} with mock={mock}")
 
         if mock:
-            self.logger.info("Creating MockMotorController")
+            #self.logger.info("Creating MockMotorController")
             self.controller = MockMotorController()
             self._running = False  # Don't auto-start in mock mode
         else:
-            self.logger.info("Creating real MotorController")
+            #self.logger.info("Creating real MotorController")
             self.controller = MotorController(port=port)
 
         self._running = False
@@ -165,6 +172,16 @@ class MotorWorker(QThread):
         self._retry_count = 0
         self._pending_position = None
         self._max_retries = 50
+
+    def __del__(self):
+        """Destructor to track worker cleanup."""
+        MotorWorker._instance_count -= 1
+        #self.logger.info(f"Destroying MotorWorker instance {self._instance_id}. Active instances: {MotorWorker._instance_count}")
+
+    @classmethod
+    def get_active_count(cls) -> int:
+        """Get number of active motor worker instances."""
+        return cls._instance_count
 
     def run(self):
         """Main worker loop."""
@@ -230,16 +247,17 @@ class MotorWorker(QThread):
         self._cleanup_retry()  # Clean up any pending retries
         self._running = False
         self.wait()
+        #self.logger.info(f"Stopped MotorWorker instance {self._instance_id}")
 
     def pause(self):
         """Pause position monitoring."""
         self._paused = True
-        self.status_changed.emit("Motor worker paused")
+        #self.status_changed.emit("Motor worker paused")
 
     def resume(self):
         """Resume position monitoring."""
         self._paused = False
-        self.status_changed.emit("Motor worker running")
+        #self.status_changed.emit("Motor worker running")
 
     def set_sequence_mode(self, enabled: bool):
         """Enable or disable sequence mode."""
@@ -415,6 +433,10 @@ class MotorWorker(QThread):
             if is_calibrated != self._is_calibrated:
                 self._is_calibrated = is_calibrated
                 self.calibration_state_changed.emit(is_calibrated)
+                if is_calibrated:
+                    self.status_changed.emit("Motor calibration complete")
+                else:
+                    self.status_changed.emit("Motor needs calibration")
             return is_calibrated
         except Exception as e:
             self.error_occurred.emit(f"Failed to check calibration: {str(e)}")
