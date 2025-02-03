@@ -16,14 +16,15 @@ class MockMotorController:
     def __init__(self):
         self.running = False
         self._position = 0.0  # Store position as float
-        self.POSITION_MAX = 100.0
-        self.POSITION_MIN = 0.0
+        self.POSITION_MAX = 364.40  # Match real motor's maximum position
+        self.POSITION_MIN = 0.0     # Home position (top)
         self.SPEED_MAX = 6501  # Match real controller speed limits
         self.SPEED_MIN = 0
-        self._is_calibrated = False  # Add calibration state
-        self.logger = logging.getLogger(__name__)  # Add logger
-        self._ascending = False  # Track if currently ascending
+        self._is_calibrated = False
+        self.logger = logging.getLogger(__name__)
+        self._ascending = False
         self._speed = 4000  # Default to medium speed
+        self._initial_offset = 0.0  # Track position offset from calibration
 
     def start(self) -> bool:
         """Start the mock controller."""
@@ -35,20 +36,20 @@ class MockMotorController:
         self.running = False
 
     def get_position(self) -> float:
-        """Get current position, handling ascent movement."""
+        """Get current position relative to bottom."""
         if self._ascending:
-            # Move up slowly (decrease position)
-            new_position = max(0.0, self._position - 0.1)
-            if new_position == 0.0:
+            # Move up slowly (increase position relative to bottom)
+            new_position = min(self.POSITION_MAX, self._position + 0.1)
+            if new_position == self.POSITION_MAX:
                 self._ascending = False  # Stop ascending at top
             self._position = new_position
         return self._position
 
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set position with float support and return success status and actual target.
+        """Set position relative to bottom.
         
         Args:
-            position: Target position
+            position: Target position from bottom (0.0 = bottom, POSITION_MAX = top)
             wait: Ignored in mock mode
             
         Returns:
@@ -56,15 +57,20 @@ class MockMotorController:
         """
         try:
             position = float(position)
+            actual_target = position
+
             # Limit position to valid range
-            if position < self.POSITION_MIN:
-                position = self.POSITION_MIN
-            elif position > self.POSITION_MAX:
+            if position > self.POSITION_MAX:
+                self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
+                actual_target = self.POSITION_MAX
                 position = self.POSITION_MAX
+            elif position < self.POSITION_MIN:
+                position = self.POSITION_MIN
+                actual_target = self.POSITION_MIN
                 
             self._position = position
-            self.logger.info(f"Mock motor moving to position: {position}")
-            return True, position
+            self.logger.info(f"Mock motor moving to position: {position}mm from bottom")
+            return True, actual_target
             
         except (ValueError, TypeError):
             return False, 0.0
@@ -77,10 +83,10 @@ class MockMotorController:
         return True
 
     def start_calibration(self) -> bool:
-        """Implement calibration start."""
-        self._position = 0.0  # Reset position to 0
+        """Implement calibration start - sets current position to POSITION_MAX."""
+        self._position = self.POSITION_MAX  # Set to maximum (calibration point)
         self._is_calibrated = True
-        self.logger.info("Mock motor calibration started")
+        self.logger.info(f"Mock motor calibrated at position {self.POSITION_MAX}mm")
         return True
 
     def check_calibrated(self) -> bool:
@@ -93,9 +99,9 @@ class MockMotorController:
         self.logger.info(f"Mock motor sequence mode {'enabled' if enabled else 'disabled'}")
 
     def to_top(self) -> bool:
-        """Move motor to top position (0.0)."""
+        """Move motor to top position (POSITION_MAX)."""
         try:
-            self._position = 0.0
+            self._position = self.POSITION_MAX
             self.logger.info("Mock motor moving to top position")
             return True
         except Exception as e:
@@ -103,9 +109,8 @@ class MockMotorController:
             return False
 
     def ascent(self) -> bool:
-        """Start slow ascent movement."""
+        """Start slow ascent movement (increasing position towards POSITION_MAX)."""
         try:
-            # Mark as ascending - the worker thread will handle the actual movement
             self._ascending = True
             self.logger.info("Mock motor starting ascent")
             return True
