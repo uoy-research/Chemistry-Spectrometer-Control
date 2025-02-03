@@ -4,5 +4,6 @@
     "macro_file": "macros.json",
     "log_level": "INFO",
     "update_interval": 250,
-    "max_data_points": 1000
+    "max_data_points": 1000,
+    "motor_update_interval": 0.1
 }

@@ -150,7 +150,7 @@ class MotorWorker(QThread):
         
         Args:
             port: COM port number
-            update_interval: Position update interval in seconds
+            update_interval: Position update interval in seconds (default 0.1)
             mock: Use mock controller for testing
         """
         super().__init__()
@@ -160,7 +160,7 @@ class MotorWorker(QThread):
         self._instance_id = MotorWorker._instance_count
 
         self.port = port
-        self.update_interval = update_interval
+        self.update_interval = max(0.01, min(1.0, update_interval))  # Limit between 10ms and 1s
         
         # Setup logger first
         self.logger = logging.getLogger(__name__)

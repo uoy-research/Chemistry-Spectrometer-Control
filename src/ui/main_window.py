@@ -80,7 +80,8 @@ class MainWindow(QMainWindow):
         )
         self.motor_worker = MotorWorker(
             port=self.config.motor_port,
-            mock=test_mode  # Verify this parameter is being passed correctly
+            update_interval=self.config.motor_update_interval,  # Use config value
+            mock=test_mode
         )
         self.logger.info(f"Created motor worker with mock={test_mode}")
 
@@ -2470,6 +2471,7 @@ class MainWindow(QMainWindow):
 
         self.motor_worker = MotorWorker(
             port=port,
+            update_interval=self.config.motor_update_interval,  # Use config value
             mock=self.test_mode
         )
         self.setup_connections()

@@ -18,6 +18,7 @@ class Config:
         self.log_level = "INFO"
         self.update_interval = 100
         self.max_data_points = 1000
+        self.motor_update_interval = 0.1  # Default 100ms update interval
         self.load()
 
     def get_app_path(self):
@@ -39,6 +40,7 @@ class Config:
                     data = json.load(f)
                     for key, value in data.items():
                         setattr(self, key, value)
+                    self.motor_update_interval = data.get('motor_update_interval', 0.1)
             else:
                 self.default_config = {
                     'arduino_port': self.arduino_port,
@@ -46,7 +48,8 @@ class Config:
                     'macro_file': self.macro_file,
                     'log_level': self.log_level,
                     'update_interval': self.update_interval,
-                    'max_data_points': self.max_data_points
+                    'max_data_points': self.max_data_points,
+                    'motor_update_interval': self.motor_update_interval
                 }
                 self.save()
         except Exception as e:
@@ -61,7 +64,8 @@ class Config:
             'macro_file': self.macro_file,
             'log_level': self.log_level,
             'update_interval': self.update_interval,
-            'max_data_points': self.max_data_points
+            'max_data_points': self.max_data_points,
+            'motor_update_interval': self.motor_update_interval
         }
         try:
             with open(CONFIG_FILE, 'w') as f:
