@@ -849,13 +849,13 @@ class MainWindow(QMainWindow):
             "Enter developer password:",
             QLineEdit.EchoMode.Password
         )
-
+        
         if ok and password == self.config.dev_password:
             dev_panel = DevPanel(self)
-            dev_panel.exec()
+            dev_panel.setWindowModality(Qt.WindowModality.NonModal)  # Make non-modal
+            dev_panel.show()  # Use show() instead of exec()
         elif ok:  # Wrong password
-            QMessageBox.warning(self, "Access Denied",
-                                "Invalid developer password")
+            QMessageBox.warning(self, "Access Denied", "Invalid developer password")
 
     def setup_status_bar(self):
         """Setup status bar."""
