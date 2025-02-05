@@ -32,6 +32,7 @@ class MotorController:
         self._consecutive_errors = 0  # Add counter for consecutive errors
         self._max_consecutive_errors = 5  # Maximum allowed consecutive errors
         self._in_sequence = False  # Add flag for sequence mode
+        self._limits_enabled = True  # Add flag for motor limits
 
     def _setup_logging(self):
         """Setup logging for the Arduino controller."""
@@ -203,15 +204,7 @@ class MotorController:
         return self.set_position(position, wait)
         
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set motor position from bottom position.
-        
-        Args:
-            position: Target position in mm from bottom (0.0 = bottom, positive = up)
-            wait: Whether to wait for movement to complete
-            
-        Returns:
-            Tuple[bool, float]: (success, actual_target_position)
-        """
+        """Set motor position with optional limit checking."""
         if not self.running:
             return False, position
 
@@ -219,10 +212,15 @@ class MotorController:
             position = float(position)
             actual_target = position
 
-            if position > self.POSITION_MAX:
-                self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
-                actual_target = self.POSITION_MAX
-                position = self.POSITION_MAX
+            # Apply limits only if enabled
+            if self._limits_enabled:
+                if position > self.POSITION_MAX:
+                    self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
+                    actual_target = self.POSITION_MAX
+                    position = self.POSITION_MAX
+                elif position < self.POSITION_MIN:
+                    position = self.POSITION_MIN
+                    actual_target = self.POSITION_MIN
 
             if self.mode == 2:  # Test mode
                 self._current_position = position
@@ -465,3 +463,14 @@ class MotorController:
             self.logger.error(f"Failed to send step command: {e}")
             self.serial_connected = False
             return False
+
+    def set_limits_enabled(self, enabled: bool):
+        """Enable or disable motor position limits."""
+        self._limits_enabled = enabled
+        self.logger.info(f"Motor limits {'enabled' if enabled else 'disabled'}")
+
+    def check_position_valid(self, position: float) -> bool:
+        """Check if position is within valid range."""
+        if not self._limits_enabled:
+            return True
+        return self.POSITION_MIN <= position <= self.POSITION_MAX

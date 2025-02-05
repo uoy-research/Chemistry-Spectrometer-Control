@@ -36,6 +36,7 @@ class MockMotorController:
         self._ascending = False
         self._speed = 4000  # Default to medium speed
         self._initial_offset = 0.0  # Track position offset from calibration
+        self._limits_enabled = True
 
     def start(self) -> bool:
         """Start the mock controller."""
@@ -57,28 +58,21 @@ class MockMotorController:
         return self._position
 
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set position relative to bottom.
-        
-        Args:
-            position: Target position from bottom (0.0 = bottom, POSITION_MAX = top)
-            wait: Ignored in mock mode
-            
-        Returns:
-            Tuple[bool, float]: (success, actual_target_position)
-        """
+        """Set mock motor position with optional limit checking."""
         try:
             position = float(position)
             actual_target = position
 
-            # Limit position to valid range
-            if position > self.POSITION_MAX:
-                self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
-                actual_target = self.POSITION_MAX
-                position = self.POSITION_MAX
-            elif position < self.POSITION_MIN:
-                position = self.POSITION_MIN
-                actual_target = self.POSITION_MIN
-                
+            # Apply limits only if enabled
+            if self._limits_enabled:
+                if position > self.POSITION_MAX:
+                    self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
+                    actual_target = self.POSITION_MAX
+                    position = self.POSITION_MAX
+                elif position < self.POSITION_MIN:
+                    position = self.POSITION_MIN
+                    actual_target = self.POSITION_MIN
+
             self._position = position
             self.logger.info(f"Mock motor moving to position: {position}mm from bottom")
             return True, actual_target
@@ -150,14 +144,7 @@ class MockMotorController:
             return False
 
     def step_motor(self, step_char: str) -> bool:
-        """Simulate stepping the motor by the specified amount.
-        
-        Args:
-            step_char: Command character (q,w,d,r,f,v)
-            
-        Returns:
-            bool: True if successful
-        """
+        """Simulate stepping with optional limit checking."""
         try:
             if not self.running:
                 return False
@@ -170,13 +157,14 @@ class MockMotorController:
             # Calculate new position
             new_position = self._position + step_size
             
-            # Limit to valid range
-            if new_position > self.POSITION_MAX:
-                new_position = self.POSITION_MAX
-                self.logger.warning("Step would exceed maximum position, limiting to maximum")
-            elif new_position < self.POSITION_MIN:
-                new_position = self.POSITION_MIN
-                self.logger.warning("Step would exceed minimum position, limiting to minimum")
+            # Limit to valid range only if enabled
+            if self._limits_enabled:
+                if new_position > self.POSITION_MAX:
+                    new_position = self.POSITION_MAX
+                    self.logger.warning("Step would exceed maximum position, limiting to maximum")
+                elif new_position < self.POSITION_MIN:
+                    new_position = self.POSITION_MIN
+                    self.logger.warning("Step would exceed minimum position, limiting to minimum")
                 
             self._position = new_position
             self.logger.info(f"Mock motor stepped by {step_size}mm to position {self._position}mm")
@@ -185,6 +173,11 @@ class MockMotorController:
         except Exception as e:
             self.logger.error(f"Mock step_motor failed: {e}")
             return False
+
+    def set_limits_enabled(self, enabled: bool):
+        """Enable or disable motor position limits."""
+        self._limits_enabled = enabled
+        self.logger.info(f"Mock motor limits {'enabled' if enabled else 'disabled'}")
 
 
 class MotorWorker(QThread):
@@ -746,3 +739,7 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Error stepping motor: {str(e)}")
             return False
+
+    def set_limits_enabled(self, enabled: bool):
+        """Enable or disable motor position limits."""
+        self.controller.set_limits_enabled(enabled)

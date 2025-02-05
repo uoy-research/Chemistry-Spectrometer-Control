@@ -133,10 +133,9 @@ class DevPanel(QDialog):
             self.parent.logger.error(f"Failed to send motor step command: {step_char}")
 
     def toggle_motor_limits(self, enabled: bool):
-        """Toggle motor limits (placeholder)."""
-        self.parent.logger.info(
-            f"Motor limits {'enabled' if enabled else 'disabled'} (not implemented)")
-        # TODO: Implement motor limits toggle
+        """Toggle motor limits."""
+        self.parent.motor_worker.set_limits_enabled(enabled)
+        self.parent.logger.info(f"Motor limits {'enabled' if enabled else 'disabled'}")
 
     def set_motor_speed(self):
         """Set the motor speed."""
@@ -151,3 +150,10 @@ class DevPanel(QDialog):
         accel = self.accel_spinbox.value()
         self.parent.logger.info(f"Set motor acceleration to {accel} (not implemented)")
         # TODO: Implement motor acceleration setting 
+
+    def closeEvent(self, event):
+        """Re-enable motor limits when panel is closed."""
+        self.limits_checkbox.setChecked(True)  # Reset checkbox
+        self.parent.motor_worker.set_limits_enabled(True)  # Force enable limits
+        self.parent.logger.info("Motor limits re-enabled on panel close")
+        super().closeEvent(event) 
