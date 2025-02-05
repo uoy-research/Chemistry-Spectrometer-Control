@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QSpinBox, QGroupBox, QMenuBar,
     QStatusBar, QMessageBox, QButtonGroup, QRadioButton, QFrame,
     QStackedWidget, QCheckBox, QLineEdit, QDoubleSpinBox, QSizePolicy,
-    QFileDialog, QFormLayout, QComboBox
+    QFileDialog, QFormLayout, QComboBox, QDialog, QInputDialog
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
 from PyQt6.QtGui import QFont
@@ -35,6 +35,19 @@ class Step:
         self.step_type = step_type
         self.time_length = time_length
         self.motor_position = motor_position
+
+
+class DevPanel(QDialog):
+    """Development panel dialog."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Developer Panel")
+        self.setFixedSize(300, 400)
+        
+        # Basic layout - we'll populate this later
+        layout = QVBoxLayout()
+        self.setLayout(layout)
 
 
 class MainWindow(QMainWindow):
@@ -822,16 +835,38 @@ class MainWindow(QMainWindow):
     def setup_menu_bar(self):
         """Setup application menu bar."""
         menubar = self.menuBar()
-
+        
+        # File menu
         file_menu = menubar.addMenu("File")
         exit_action = file_menu.addAction("Exit")
         exit_action.triggered.connect(self.close)
 
+        # Tools menu
         tools_menu = menubar.addMenu("Tools")
         valve_macro_action = tools_menu.addAction("Valve Macros")
         valve_macro_action.triggered.connect(self.edit_macros)
         motor_macro_action = tools_menu.addAction("Motor Macros")
         motor_macro_action.triggered.connect(self.edit_macros)
+
+        # Dev menu
+        dev_menu = menubar.addMenu("Dev")
+        open_dev_panel_action = dev_menu.addAction("Open Dev Panel")
+        open_dev_panel_action.triggered.connect(self.show_dev_panel)
+
+    def show_dev_panel(self):
+        """Show the developer panel if password is correct."""
+        password, ok = QInputDialog.getText(
+            self,
+            "Developer Access",
+            "Enter developer password:",
+            QLineEdit.EchoMode.Password
+        )
+        
+        if ok and password == self.config.dev_password:
+            dev_panel = DevPanel(self)
+            dev_panel.exec()
+        elif ok:  # Wrong password
+            QMessageBox.warning(self, "Access Denied", "Invalid developer password")
 
     def setup_status_bar(self):
         """Setup status bar."""
