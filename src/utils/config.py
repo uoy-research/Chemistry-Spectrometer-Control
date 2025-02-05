@@ -19,6 +19,7 @@ class Config:
         self.update_interval = 100
         self.max_data_points = 1000
         self.motor_update_interval = 0.1  # Default 100ms update interval
+        self.dev_password = "DanT"  # Add default dev password
         self.load()
 
     def get_app_path(self):
@@ -41,6 +42,7 @@ class Config:
                     for key, value in data.items():
                         setattr(self, key, value)
                     self.motor_update_interval = data.get('motor_update_interval', 0.1)
+                    self.dev_password = data.get('dev_password', 'DanT')  # Load password with default
             else:
                 self.default_config = {
                     'arduino_port': self.arduino_port,
@@ -49,7 +51,8 @@ class Config:
                     'log_level': self.log_level,
                     'update_interval': self.update_interval,
                     'max_data_points': self.max_data_points,
-                    'motor_update_interval': self.motor_update_interval
+                    'motor_update_interval': self.motor_update_interval,
+                    'dev_password': self.dev_password  # Add to defaults
                 }
                 self.save()
         except Exception as e:
@@ -65,10 +68,12 @@ class Config:
             'log_level': self.log_level,
             'update_interval': self.update_interval,
             'max_data_points': self.max_data_points,
-            'motor_update_interval': self.motor_update_interval
+            'motor_update_interval': self.motor_update_interval,
+            'dev_password': self.dev_password  # Add to save data
         }
         try:
-            with open(CONFIG_FILE, 'w') as f:
+            config_path = self.get_app_path() / CONFIG_FILE
+            with open(config_path, 'w') as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
             print(f"Error saving config: {e}")
