@@ -13,6 +13,17 @@ from controllers.motor_controller import MotorController
 
 class MockMotorController:
     """Mock motor controller for testing."""
+    
+    # Add step sizes as class constants
+    STEP_SIZES = {
+        'q': 50.0,   # +50mm
+        'w': 10.0,   # +10mm
+        'd': 1.0,    # +1mm
+        'r': -1.0,   # -1mm
+        'f': -10.0,  # -10mm
+        'v': -50.0   # -50mm
+    }
+
     def __init__(self):
         self.running = False
         self._position = 0.0  # Store position as float
@@ -136,6 +147,43 @@ class MockMotorController:
             return True
         except Exception as e:
             self.logger.error(f"Mock motor set_speed failed: {e}")
+            return False
+
+    def step_motor(self, step_char: str) -> bool:
+        """Simulate stepping the motor by the specified amount.
+        
+        Args:
+            step_char: Command character (q,w,d,r,f,v)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            if not self.running:
+                return False
+                
+            step_size = self.STEP_SIZES.get(step_char)
+            if step_size is None:
+                self.logger.error(f"Invalid step command: {step_char}")
+                return False
+                
+            # Calculate new position
+            new_position = self._position + step_size
+            
+            # Limit to valid range
+            if new_position > self.POSITION_MAX:
+                new_position = self.POSITION_MAX
+                self.logger.warning("Step would exceed maximum position, limiting to maximum")
+            elif new_position < self.POSITION_MIN:
+                new_position = self.POSITION_MIN
+                self.logger.warning("Step would exceed minimum position, limiting to minimum")
+                
+            self._position = new_position
+            self.logger.info(f"Mock motor stepped by {step_size}mm to position {self._position}mm")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Mock step_motor failed: {e}")
             return False
 
 
