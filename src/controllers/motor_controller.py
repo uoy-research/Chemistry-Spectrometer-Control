@@ -439,3 +439,29 @@ class MotorController:
         except Exception as e:
             self.logger.error(f"Failed to set motor speed: {e}")
             return False
+
+    def step_motor(self, step_char: str) -> bool:
+        """Step motor by predefined amount.
+        
+        Args:
+            step_char: Command character:
+                'q': +50mm
+                'w': +10mm
+                'd': +1mm
+                'r': -1mm
+                'f': -10mm
+                'v': -50mm
+                
+        Returns:
+            bool: True if command sent successfully
+        """
+        try:
+            # Send step command
+            self.instrument.write_register(2, ord(step_char))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to send step command: {e}")
+            self.serial_connected = False
+            return False

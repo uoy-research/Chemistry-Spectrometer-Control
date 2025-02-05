@@ -43,14 +43,14 @@ class DevPanel(QDialog):
         step_layout = QVBoxLayout()
         step_layout.setSpacing(0)
 
-        # Step button configurations
+        # Step button configurations with commands
         step_buttons = [
-            ("+50", 50),
-            ("+10", 10),
-            ("+1", 1),
-            ("-1", -1),
-            ("-10", -10),
-            ("-50", -50)
+            ("+50", "q"),
+            ("+10", "w"),
+            ("+1", "d"),
+            ("-1", "r"),
+            ("-10", "f"),
+            ("-50", "v")
         ]
 
         # Create step buttons with consistent font
@@ -58,12 +58,12 @@ class DevPanel(QDialog):
         button_font.setPointSize(10)
         
         self.step_buttons = []
-        for text, step in step_buttons:
+        for text, cmd in step_buttons:
             btn = QPushButton(text)
             btn.setFont(button_font)
             btn.setMinimumSize(0, 45)
             btn.setMaximumSize(45, 16777215)
-            btn.clicked.connect(lambda checked, s=step: self.step_motor(s))
+            btn.clicked.connect(lambda checked, c=cmd: self.step_motor(c))
             step_layout.addWidget(btn)
             self.step_buttons.append(btn)
 
@@ -125,10 +125,12 @@ class DevPanel(QDialog):
 
         self.setLayout(main_layout)
 
-    def step_motor(self, step_size: int):
-        """Step the motor by the given amount (placeholder)."""
-        self.parent.logger.info(f"Step motor by {step_size} (not implemented)")
-        # TODO: Implement motor stepping
+    def step_motor(self, step_char: str):
+        """Step the motor by sending step command."""
+        if self.parent.motor_worker.step_motor(step_char):
+            self.parent.logger.info(f"Sent motor step command: {step_char}")
+        else:
+            self.parent.logger.error(f"Failed to send motor step command: {step_char}")
 
     def toggle_motor_limits(self, enabled: bool):
         """Toggle motor limits (placeholder)."""

@@ -672,3 +672,29 @@ class MotorWorker(QThread):
             self.error_occurred.emit(f"Failed to start motor worker: {str(e)}")
             self.logger.error(f"Failed to start motor worker: {e}")
             return False
+
+    def step_motor(self, step_char: str) -> bool:
+        """Step motor by predefined amount.
+        
+        Args:
+            step_char: Step command character (q,w,e,r,f,v)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            if not self.running:
+                self.error_occurred.emit("Motor not connected")
+                return False
+                
+            success = self.controller.step_motor(step_char)
+            if success:
+                self.status_changed.emit(f"Stepping motor")
+                return True
+            else:
+                self.error_occurred.emit("Failed to step motor")
+                return False
+                
+        except Exception as e:
+            self.error_occurred.emit(f"Error stepping motor: {str(e)}")
+            return False
