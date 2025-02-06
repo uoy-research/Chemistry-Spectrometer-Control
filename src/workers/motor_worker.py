@@ -7,6 +7,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, QTimer
 import time
 import logging
 from typing import Optional, Union, Tuple
+import threading
 
 from controllers.motor_controller import MotorController
 
@@ -198,8 +199,9 @@ class MotorWorker(QThread):
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
 
-    # Add class variable to track instances
+    # Class variables
     _instance_count = 0
+    _instance_lock = threading.Lock()  # Add thread safety
 
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
         """Initialize worker.
@@ -210,10 +212,9 @@ class MotorWorker(QThread):
             mock: Use mock controller for testing
         """
         super().__init__()
-        
-        # Increment instance counter
-        MotorWorker._instance_count += 1
-        self._instance_id = MotorWorker._instance_count
+        with self._instance_lock:
+            MotorWorker._instance_count += 1
+            self._instance_id = MotorWorker._instance_count
 
         self.port = port
         self.update_interval = max(0.01, min(1.0, update_interval))  # Limit between 10ms and 1s
@@ -243,9 +244,12 @@ class MotorWorker(QThread):
         self._max_retries = 50
 
     def __del__(self):
-        """Destructor to track worker cleanup."""
-        MotorWorker._instance_count -= 1
-        #self.logger.info(f"Destroying MotorWorker instance {self._instance_id}. Active instances: {MotorWorker._instance_count}")
+        """Ensure instance count is decremented on deletion."""
+        try:
+            with self._instance_lock:
+                MotorWorker._instance_count = max(0, MotorWorker._instance_count - 1)
+        except Exception:
+            pass  # Ignore errors during deletion
 
     @classmethod
     def get_active_count(cls) -> int:
@@ -743,3 +747,25 @@ class MotorWorker(QThread):
     def set_limits_enabled(self, enabled: bool):
         """Enable or disable motor position limits."""
         self.controller.set_limits_enabled(enabled)
+
+    def cleanup(self):
+        """Clean up worker resources."""
+        try:
+            if self.running:
+                self._running = False
+                self.controller.stop()
+                self.wait()  # Wait for thread to finish
+                
+            with self._instance_lock:
+                MotorWorker._instance_count = max(0, MotorWorker._instance_count - 1)
+                
+            self.logger.info(f"Motor worker {self._instance_id} cleaned up")
+            
+        except Exception as e:
+            self.logger.error(f"Error cleaning up motor worker: {e}")
+
+    @classmethod
+    def reset_instance_count(cls):
+        """Reset the instance counter - useful for testing."""
+        with cls._instance_lock:
+            cls._instance_count = 0

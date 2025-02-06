@@ -65,23 +65,24 @@ class MainWindow(QMainWindow):
             test_mode: Use mock controllers for testing
         """
         super().__init__()
+        
+        # Reset motor worker instance count at startup
+        MotorWorker.reset_instance_count()
 
         # Load configuration
         self.config = Config()
         self.test_mode = test_mode
 
-        # Add debug logging for test mode
+        # Initialize logger
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
+        
+        # Initialize motor worker as None - will create on connect
+        self.motor_worker = None
 
         # Initialize workers with mock controllers in test mode
         self.arduino_worker = ArduinoWorker(
             port=self.config.arduino_port,
-            mock=test_mode
-        )
-        self.motor_worker = MotorWorker(
-            port=self.config.motor_port,
-            update_interval=self.config.motor_update_interval,  # Use config value
             mock=test_mode
         )
         self.logger.info(f"Created motor worker with mock={test_mode}")
@@ -866,124 +867,118 @@ class MainWindow(QMainWindow):
         if self._connections_initialized:
             return
 
-        # First disconnect any existing connections to prevent duplicates
         try:
-            # Worker signal connections
-            self.arduino_worker.readings_updated.disconnect()
-            self.arduino_worker.error_occurred.disconnect()
-            self.arduino_worker.status_changed.disconnect()
+            # First disconnect any existing connections to prevent duplicates
+            try:
+                # Worker signal connections
+                self.arduino_worker.readings_updated.disconnect()
+                self.arduino_worker.error_occurred.disconnect()
+                self.arduino_worker.status_changed.disconnect()
 
-            self.motor_worker.position_updated.disconnect()
-            self.motor_worker.error_occurred.disconnect()
-            self.motor_worker.status_changed.disconnect()
+                # Only try to disconnect motor worker signals if it exists
+                if self.motor_worker:
+                    self.motor_worker.position_updated.disconnect()
+                    self.motor_worker.error_occurred.disconnect()
+                    self.motor_worker.status_changed.disconnect()
+                    self.motor_worker.calibration_state_changed.disconnect()
+
+                # Arduino and valve connections
+                self.arduino_connect_btn.clicked.disconnect()
+
+                # Valve buttons - Add explicit disconnections
+                for i in range(1, 6):
+                    valve_button = getattr(self, f"Valve{i}Button")
+                    try:
+                        valve_button.clicked.disconnect()
+                    except TypeError:
+                        pass  # Ignore if not connected
+
+                # Quick action buttons
+                self.quickVentButton.clicked.disconnect()
+                self.slowVentButton.clicked.disconnect()
+                self.buildPressureButton.clicked.disconnect()
+                self.switchGasButton.clicked.disconnect()
+                self.quickBubbleButton.clicked.disconnect()
+
+                # Motor control buttons
+                self.motor_connect_btn.clicked.disconnect()
+                self.motor_calibrate_btn.clicked.disconnect()
+                self.motor_stop_btn.clicked.disconnect()
+                self.motor_move_to_target_button.clicked.disconnect()
+                self.motor_ascent_button.clicked.disconnect()
+                self.motor_to_top_button.clicked.disconnect()
+
+                # Motor macro buttons
+                for i in range(1, 7):
+                    btn = getattr(self, f"motor_macro{i}_button")
+                    btn.clicked.disconnect()
+
+                # Valve macro buttons
+                for i in range(1, 5):
+                    btn = getattr(self, f"valveMacro{i}Button")
+                    btn.clicked.disconnect()
+
+                # Pressure radio buttons
+                for i in range(1, 5):
+                    radio = getattr(self, f"pressure{i}RadioButton")
+                    radio.clicked.disconnect()
+
+            except Exception:
+                # Ignore disconnection errors for signals that weren't connected
+                pass
+
+            # Now set up new connections
+            # Worker signal connections for Arduino
+            self.arduino_worker.readings_updated.connect(self.plot_widget.update_plot)
+            self.arduino_worker.error_occurred.connect(self.handle_error)
+            self.arduino_worker.status_changed.connect(self.handle_status_message)
+
+            # Motor worker connections are now set up when the worker is created in handle_motor_connection
 
             # Arduino and valve connections
-            self.arduino_connect_btn.clicked.disconnect()
+            self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
 
-            # Valve buttons - Add explicit disconnections
-            for i in range(1, 6):
-                valve_button = getattr(self, f"Valve{i}Button")
-                try:
-                    valve_button.clicked.disconnect()
-                except TypeError:
-                    pass  # Ignore if not connected
+            # Valve buttons
+            self.connect_valve_buttons()
 
             # Quick action buttons
-            self.quickVentButton.clicked.disconnect()
-            self.slowVentButton.clicked.disconnect()
-            self.buildPressureButton.clicked.disconnect()
-            self.switchGasButton.clicked.disconnect()
-            self.quickBubbleButton.clicked.disconnect()
+            self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
+            self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
+            self.buildPressureButton.clicked.connect(self.on_buildPressureButton_clicked)
+            self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
+            self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
 
             # Motor control buttons
-            self.motor_connect_btn.clicked.disconnect()
-            self.motor_calibrate_btn.clicked.disconnect()
-            self.motor_stop_btn.clicked.disconnect()
-            self.motor_move_to_target_button.clicked.disconnect()
-            self.motor_ascent_button.clicked.disconnect()
-            self.motor_to_top_button.clicked.disconnect()
+            self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
+            self.motor_calibrate_btn.clicked.connect(self.on_motorCalibrateButton_clicked)
+            self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
+            self.motor_move_to_target_button.clicked.connect(self.on_motorMoveToTargetButton_clicked)
+            self.motor_ascent_button.clicked.connect(self.on_motorAscentButton_clicked)
+            self.motor_to_top_button.clicked.connect(self.on_motorToTopButton_clicked)
 
             # Motor macro buttons
             for i in range(1, 7):
                 btn = getattr(self, f"motor_macro{i}_button")
-                btn.clicked.disconnect()
+                btn.clicked.connect(lambda checked, x=i: self.on_motorMacroButton_clicked(x))
 
             # Valve macro buttons
             for i in range(1, 5):
                 btn = getattr(self, f"valveMacro{i}Button")
-                btn.clicked.disconnect()
+                btn.clicked.connect(lambda checked, x=i: self.on_valveMacroButton_clicked(x))
 
             # Pressure radio buttons
             for i in range(1, 5):
                 radio = getattr(self, f"pressure{i}RadioButton")
-                radio.clicked.disconnect()
+                radio.clicked.connect(lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
 
-        except Exception:
-            # Ignore disconnection errors for signals that weren't connected
-            pass
+            # Connect mode change signals
+            self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
 
-        # Now set up new connections
-        # Worker signal connections
-        self.arduino_worker.readings_updated.connect(
-            self.plot_widget.update_plot)
-        self.arduino_worker.error_occurred.connect(self.handle_error)
-        self.arduino_worker.status_changed.connect(self.handle_status_message)
+            self._connections_initialized = True
 
-        self.motor_worker.position_updated.connect(self.handle_position_update)
-        self.motor_worker.error_occurred.connect(self.handle_error)
-        self.motor_worker.status_changed.connect(self.handle_status_message)
-        self.motor_worker.calibration_state_changed.connect(
-            self.handle_calibration_state_changed)
-
-        # Arduino and valve connections
-        self.arduino_connect_btn.clicked.connect(
-            self.on_ardConnectButton_clicked)
-
-        # Valve buttons - Use a method instead of lambda
-        self.connect_valve_buttons()
-
-        # Quick action buttons
-        self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
-        self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
-        self.buildPressureButton.clicked.connect(
-            self.on_buildPressureButton_clicked)
-        self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
-        self.quickBubbleButton.clicked.connect(
-            self.on_quickBubbleButton_clicked)
-
-        # Motor control buttons
-        self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
-        self.motor_calibrate_btn.clicked.connect(
-            self.on_motorCalibrateButton_clicked)
-        self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
-        self.motor_move_to_target_button.clicked.connect(
-            self.on_motorMoveToTargetButton_clicked)
-        self.motor_ascent_button.clicked.connect(
-            self.on_motorAscentButton_clicked)
-        self.motor_to_top_button.clicked.connect(
-            self.on_motorToTopButton_clicked)
-
-        # Motor macro buttons
-        for i in range(1, 7):
-            btn = getattr(self, f"motor_macro{i}_button")
-            btn.clicked.connect(
-                lambda checked, x=i: self.on_motorMacroButton_clicked(x))
-
-        # Valve macro buttons
-        for i in range(1, 5):
-            btn = getattr(self, f"valveMacro{i}Button")
-            btn.clicked.connect(
-                lambda checked, x=i: self.on_valveMacroButton_clicked(x))
-
-        # Pressure radio buttons
-        for i in range(1, 5):
-            radio = getattr(self, f"pressure{i}RadioButton")
-            radio.clicked.connect(
-                lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
-
-        # Connect mode change signals
-        self.arduino_connect_button_group.buttonClicked.connect(
-            self.on_arduino_mode_changed)
+        except Exception as e:
+            self.logger.error(f"Error setting up connections: {e}")
+            raise
 
     def connect_valve_buttons(self):
         """Connect valve button signals using a dedicated method."""
@@ -999,11 +994,22 @@ class MainWindow(QMainWindow):
     def handle_motor_connection(self):
         """Handle motor connection/disconnection."""
         try:
-            if not self.motor_worker.running:
-                # Get the port value from the spin box
+            if not self.motor_worker or not self.motor_worker.running:
+                # Create new worker when connecting
                 port = self.motor_com_port_spin.value()
-
-                # Start the existing worker instead of creating a new one
+                self.motor_worker = MotorWorker(
+                    port=port,
+                    update_interval=self.config.motor_update_interval,
+                    mock=self.test_mode
+                )
+                
+                # Setup connections for new worker
+                self.motor_worker.position_updated.connect(self.handle_position_update)
+                self.motor_worker.error_occurred.connect(self.handle_error)
+                self.motor_worker.status_changed.connect(self.handle_status_message)
+                self.motor_worker.calibration_state_changed.connect(self.handle_calibration_state_changed)
+                
+                # Start the worker
                 if self.motor_worker.start():
                     self.motor_connect_btn.setText("Disconnect")
                     self.motor_warning_label.setText("")
@@ -1012,18 +1018,17 @@ class MainWindow(QMainWindow):
                     self.disable_motor_controls(True)
                     self.logger.info(f"Connected to motor on COM{port}")
                 else:
+                    self.cleanup_motor_worker()
                     self.handle_error("Failed to connect to motor")
-                    self.motor_warning_label.setText(
-                        "Warning: Motor not connected")
+                    self.motor_warning_label.setText("Warning: Motor not connected")
                     self.motor_calibrate_btn.setEnabled(False)
                     self.disable_motor_controls(True)
             else:
-                # Disconnect the motor
-                self.motor_worker.stop()  # This stops the worker thread and closes the connection
+                # Disconnect and cleanup worker
+                self.cleanup_motor_worker()
                 self.motor_connect_btn.setText("Connect")
                 self.motor_calibrated = False
-                self.motor_warning_label.setText(
-                    "Warning: Motor not connected")
+                self.motor_warning_label.setText("Warning: Motor not connected")
                 self.motor_warning_label.setVisible(True)
                 self.motor_calibrate_btn.setEnabled(False)
                 self.disable_motor_controls(True)
@@ -1032,6 +1037,16 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error in motor connection handler: {e}")
             self.handle_error(f"Motor connection error: {str(e)}")
+            self.cleanup_motor_worker()
+
+    def cleanup_motor_worker(self):
+        """Clean up motor worker resources."""
+        try:
+            if self.motor_worker:
+                self.motor_worker.cleanup()
+                self.motor_worker = None
+        except Exception as e:
+            self.logger.error(f"Error cleaning up motor worker: {e}")
 
     @pyqtSlot(bool)
     def handle_calibration_state(self, is_calibrated: bool):
@@ -2175,13 +2190,15 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle application shutdown."""
         try:
-            self.logger.info(f"Active motor workers before shutdown: {
-                             MotorWorker.get_active_count()}")
+            self.logger.info(f"Active motor workers before shutdown: {MotorWorker.get_active_count()}")
             self.arduino_worker.stop()
-            self.motor_worker.stop()
+            self.cleanup_motor_worker()
             self.config.save()
-            self.logger.info(f"Active motor workers after shutdown: {
-                             MotorWorker.get_active_count()}")
+            
+            # Reset instance count on shutdown
+            MotorWorker.reset_instance_count()
+            
+            self.logger.info(f"Active motor workers after shutdown: {MotorWorker.get_active_count()}")
             self.logger.info("Shutdown complete")
             event.accept()
         except Exception as e:
@@ -2534,15 +2551,13 @@ class MainWindow(QMainWindow):
         """Update motor port configuration."""
         self.config.motor_port = port
         self.config.save()
-
-        self.logger.info(f"Active motor workers before update: {
-                         MotorWorker.get_active_count()}")
-
-        if self.motor_worker.running:
-            self.motor_worker.stop()
+        
+        # If currently connected, disconnect and cleanup
+        if self.motor_worker and self.motor_worker.running:
+            self.cleanup_motor_worker()
             self.motor_connect_btn.setText("Connect")
             self.logger.info("Disconnected from motor due to port change")
-
+            
             # Reset motor state
             self.motor_calibrated = False
             self.motor_warning_label.setText("Warning: Motor not connected")
