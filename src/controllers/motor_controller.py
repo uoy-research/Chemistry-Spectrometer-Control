@@ -418,7 +418,7 @@ class MotorController:
         """Set motor speed via Modbus.
         
         Args:
-            speed: Speed value (0-1000)
+            speed: Speed value (0-6500)
             
         Returns:
             bool: True if successful

@@ -111,7 +111,7 @@ class DevPanel(QDialog):
         self.accel_spinbox = QSpinBox()
         self.accel_spinbox.setFont(button_font)
         self.accel_spinbox.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.accel_spinbox.setRange(0, 6500)
+        self.accel_spinbox.setRange(0, 23250)
         control_layout.addWidget(self.accel_spinbox)
 
         accel_btn = QPushButton("Set Accel")
