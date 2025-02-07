@@ -753,7 +753,20 @@ class MotorWorker(QThread):
         try:
             if self.running:
                 self._running = False
-                self.controller.stop()
+                
+                # Try to stop the motor first
+                try:
+                    self.controller.stop_motor()  # Send stop command to motor
+                    self.logger.info("Motor stop command sent during cleanup")
+                except Exception as e:
+                    self.logger.error(f"Failed to stop motor during cleanup: {e}")
+                
+                # Stop position update timer if it exists
+                if hasattr(self, '_position_timer') and self._position_timer is not None:
+                    self._position_timer.stop()
+                    self._position_timer = None
+                
+                self.controller.stop()  # Stop the controller connection
                 self.wait()  # Wait for thread to finish
                 
             with self._instance_lock:
