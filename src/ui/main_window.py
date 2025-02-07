@@ -1532,14 +1532,14 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def on_motorStopButton_clicked(self):
-        """Handle motor emergency stop button click."""
-        if self.motor_worker.running:
-            self.motor_worker.emergency_stop()
-            self.motor_calibrated = False  # Reset calibration state after emergency stop
-            # Disable controls after emergency stop
-            self.disable_motor_controls(True)
-            self.motor_calibrate_btn.setEnabled(True)  # Allow recalibration
-            self.logger.warning("Motor emergency stop activated")
+        """Handle motor stop button click."""
+        try:
+            if self.motor_worker and self.motor_worker.running:
+                self.motor_worker.stop()
+                self.logger.info("Motor stopped by user")
+        except Exception as e:
+            self.logger.error(f"Error stopping motor: {e}")
+            self.handle_error("Failed to stop motor")
 
     @pyqtSlot()
     def on_motorMoveToTargetButton_clicked(self):
@@ -2213,10 +2213,10 @@ class MainWindow(QMainWindow):
 
     def emergency_stop(self):
         """Handle emergency stop."""
-        self.motor_worker.stop()
+        if self.motor_worker:  # Check if motor worker exists
+            self.motor_worker.stop()
         self.arduino_worker.depressurize()
-        QMessageBox.warning(self, "Emergency Stop",
-                            "Emergency stop activated!")
+        QMessageBox.warning(self, "Emergency Stop", "Emergency stop activated!")
         self.logger.warning("Emergency stop activated")
 
     def closeEvent(self, event):
