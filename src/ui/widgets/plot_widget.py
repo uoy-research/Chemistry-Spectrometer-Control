@@ -102,6 +102,9 @@ class PlotWidget(QWidget):
         """Update plot with new readings and save if recording."""
         if readings is None:
             return
+        
+        # Add debug logging
+        self.logger.debug(f"Received readings: {readings}")
 
         current_time = time.time() - self.start_time
 

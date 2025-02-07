@@ -1144,6 +1144,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Failed to delete sequence file: {e}")
         """
+        pass
 
     @pyqtSlot(bool)
     def on_Valve1Button_clicked(self, checked: bool):
@@ -1423,6 +1424,9 @@ class MainWindow(QMainWindow):
                     port=self.arduino_port_spin.value(),
                     mock=self.test_mode
                 )
+
+                # Connect the readings signal to plot widget
+                self.arduino_worker.readings_updated.connect(self.plot_widget.update_plot)
 
                 # Set mode and start worker
                 if self.arduino_worker.controller:
@@ -2496,13 +2500,18 @@ class MainWindow(QMainWindow):
             elif step.step_type == 'v':  # Vent
                 valve_states[3] = 1  # Open vent valve
             elif step.step_type == 'b':  # Bubble
-                valve_states[1] = 1  # Open inlet valve
-                valve_states[2] = 1  # Open outlet valve
+                valve_states[2] = 1  # Open inlet valve
+                valve_states[3] = 1  # Open outlet valve
+                valve_states[4] = 1  # Open short valve
+                valve_states[5] = 1  # Open long valve
             elif step.step_type == 'f':  # Flow
                 valve_states[2] = 1  # Open outlet valve
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
+            elif step.step_type == 'd':  # Delay, close all valves
+                for i in range(1, 5):
+                    valve_states[i] = 0
 
             # Set valve states
             self.arduino_worker.set_valves(valve_states)
