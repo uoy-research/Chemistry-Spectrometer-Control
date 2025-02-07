@@ -77,15 +77,10 @@ class MainWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
 
-        # Initialize motor worker as None - will create on connect
+        # Initialize workers as None - will create on connect
         self.motor_worker = None
-
-        # Initialize workers with mock controllers in test mode
-        self.arduino_worker = ArduinoWorker(
-            port=self.config.arduino_port,
-            mock=test_mode
-        )
-        self.logger.info(f"Created motor worker with mock={test_mode}")
+        self.arduino_worker = None  # Changed: Initialize as None
+        self.logger.info("Workers initialized as None")
 
         # Setup logging
         self.logger = logging.getLogger(__name__)
@@ -872,11 +867,6 @@ class MainWindow(QMainWindow):
         try:
             # First disconnect any existing connections to prevent duplicates
             try:
-                # Worker signal connections
-                self.arduino_worker.readings_updated.disconnect()
-                self.arduino_worker.error_occurred.disconnect()
-                self.arduino_worker.status_changed.disconnect()
-
                 # Only try to disconnect motor worker signals if it exists
                 if self.motor_worker:
                     self.motor_worker.position_updated.disconnect()
@@ -896,11 +886,11 @@ class MainWindow(QMainWindow):
                         pass  # Ignore if not connected
 
                 # Quick action buttons
+                self.quickBubbleButton.clicked.disconnect()
+                self.switchGasButton.clicked.disconnect()
+                self.buildPressureButton.clicked.disconnect()
                 self.quickVentButton.clicked.disconnect()
                 self.slowVentButton.clicked.disconnect()
-                self.buildPressureButton.clicked.disconnect()
-                self.switchGasButton.clicked.disconnect()
-                self.quickBubbleButton.clicked.disconnect()
 
                 # Motor control buttons
                 self.motor_connect_btn.clicked.disconnect()
@@ -930,68 +920,48 @@ class MainWindow(QMainWindow):
                 pass
 
             # Now set up new connections
-            # Worker signal connections for Arduino
-            self.arduino_worker.readings_updated.connect(
-                self.plot_widget.update_plot)
-            self.arduino_worker.error_occurred.connect(self.handle_error)
-            self.arduino_worker.status_changed.connect(
-                self.handle_status_message)
+            # Worker signal connections for Arduino are now handled in ArduinoWorker.__init__
 
-            # Motor worker connections are now set up when the worker is created in handle_motor_connection
+            # Motor worker connections are set up when the worker is created
 
             # Arduino and valve connections
-            self.arduino_connect_btn.clicked.connect(
-                self.on_ardConnectButton_clicked)
+            self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
 
             # Valve buttons
             self.connect_valve_buttons()
 
             # Quick action buttons
-            self.quickVentButton.clicked.connect(
-                self.on_quickVentButton_clicked)
+            self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
             self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
-            self.buildPressureButton.clicked.connect(
-                self.on_buildPressureButton_clicked)
-            self.switchGasButton.clicked.connect(
-                self.on_switchGasButton_clicked)
-            self.quickBubbleButton.clicked.connect(
-                self.on_quickBubbleButton_clicked)
+            self.buildPressureButton.clicked.connect(self.on_buildPressureButton_clicked)
+            self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
+            self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
 
             # Motor control buttons
-            self.motor_connect_btn.clicked.connect(
-                self.handle_motor_connection)
-            self.motor_calibrate_btn.clicked.connect(
-                self.on_motorCalibrateButton_clicked)
-            self.motor_stop_btn.clicked.connect(
-                self.on_motorStopButton_clicked)
-            self.motor_move_to_target_button.clicked.connect(
-                self.on_motorMoveToTargetButton_clicked)
-            self.motor_ascent_button.clicked.connect(
-                self.on_motorAscentButton_clicked)
-            self.motor_to_top_button.clicked.connect(
-                self.on_motorToTopButton_clicked)
+            self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
+            self.motor_calibrate_btn.clicked.connect(self.on_motorCalibrateButton_clicked)
+            self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
+            self.motor_move_to_target_button.clicked.connect(self.on_motorMoveToTargetButton_clicked)
+            self.motor_ascent_button.clicked.connect(self.on_motorAscentButton_clicked)
+            self.motor_to_top_button.clicked.connect(self.on_motorToTopButton_clicked)
 
             # Motor macro buttons
             for i in range(1, 7):
                 btn = getattr(self, f"motor_macro{i}_button")
-                btn.clicked.connect(
-                    lambda checked, x=i: self.on_motorMacroButton_clicked(x))
+                btn.clicked.connect(lambda checked, x=i: self.on_motorMacroButton_clicked(x))
 
             # Valve macro buttons
             for i in range(1, 5):
                 btn = getattr(self, f"valveMacro{i}Button")
-                btn.clicked.connect(
-                    lambda checked, x=i: self.on_valveMacroButton_clicked(x))
+                btn.clicked.connect(lambda checked, x=i: self.on_valveMacroButton_clicked(x))
 
             # Pressure radio buttons
             for i in range(1, 5):
                 radio = getattr(self, f"pressure{i}RadioButton")
-                radio.clicked.connect(
-                    lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
+                radio.clicked.connect(lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
 
             # Connect mode change signals
-            self.arduino_connect_button_group.buttonClicked.connect(
-                self.on_arduino_mode_changed)
+            self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
 
             self._connections_initialized = True
 
@@ -1168,10 +1138,12 @@ class MainWindow(QMainWindow):
 
     def delete_sequence_file(self):
         """Delete the sequence file."""
+        """
         try:
             Path(r"C:\ssbubble\sequence.txt").unlink(missing_ok=True)
         except Exception as e:
             self.logger.error(f"Failed to delete sequence file: {e}")
+        """
 
     @pyqtSlot(bool)
     def on_Valve1Button_clicked(self, checked: bool):
@@ -1338,6 +1310,7 @@ class MainWindow(QMainWindow):
         """Enable/disable valve controls."""
         # Only enable if in manual mode and Arduino is connected
         enabled = (not disabled and
+                   self.arduino_worker and  # Check if worker exists
                    self.arduino_worker.running and
                    self.arduino_manual_radio.isChecked())
 
@@ -1388,7 +1361,7 @@ class MainWindow(QMainWindow):
         Args:
             enabled (bool): True to enable buttons, False to disable
         """
-        if self.arduino_worker.running:
+        if self.arduino_worker and self.arduino_worker.running:  # Check if worker exists
             # Only enable valve buttons if Arduino is connected and in manual mode
             if self.arduino_worker.controller.mode == 0:  # Manual mode
                 # Toggle all individual valve buttons 1-6
@@ -1412,72 +1385,14 @@ class MainWindow(QMainWindow):
     def on_ardConnectButton_clicked(self):
         """Handle Arduino connect button click."""
         try:
-            if not self.arduino_worker.running:
-                # Determine connection mode
-                if self.arduino_auto_connect_radio.isChecked():
-                    mode = 1  # Auto mode
-                elif self.arduino_ttl_radio.isChecked():
-                    mode = 2  # TTL mode
-                else:
-                    mode = 0  # Manual mode
-
-                try:
-                    # Set mode before starting the worker
-                    self.arduino_worker.controller.mode = mode
-                    success = self.arduino_worker.start()
-                    if success or self.test_mode:
-                        self.arduino_connect_btn.setText("Disconnect")
-                        self.arduino_warning_label.setText("")
-                        self.arduino_warning_label.setVisible(False)
-
-                        # Enable/disable controls based on mode
-                        if mode == 0:  # Manual mode
-                            # Enable checkbox for valve buttons
-                            self.dev_checkbox.setEnabled(True)
-                            self.disable_quick_controls(
-                                False)  # Enable other controls
-                        else:
-                            self.dev_checkbox.setEnabled(False)
-                            self.disable_valve_controls(True)
-                            self.disable_quick_controls(True)
-
-                        # Set valve mode
-                        self.set_valve_mode(mode == 1)
-
-                        # If in automatic mode, start looking for sequence file after a delay
-                        if mode == 1:
-                            # Set motor to sequence mode if connected
-                            if self.motor_worker.running:
-                                self.motor_worker.set_sequence_mode(True)
-                                self.logger.info("Motor set to sequence mode")
-                            # Wait 2 seconds before starting sequence file monitoring
-                            QTimer.singleShot(2000, self.find_sequence_file)
-                            self.logger.info(
-                                "Will start sequence file monitoring in 2 seconds")
-
-                        self.logger.info(
-                            f"Connected to Arduino in mode {mode}")
-                    else:
-                        self.handle_error("Failed to connect to Arduino")
-                        if not self.test_mode:
-                            self.arduino_warning_label.setText(
-                                "Warning: Arduino not connected")
-                            self.arduino_warning_label.setVisible(True)
-                except Exception as e:
-                    self.handle_error(
-                        f"Failed to connect to Arduino: {str(e)}")
-                    self.arduino_connect_btn.setText("Connect")
-                    if not self.test_mode:
-                        self.arduino_warning_label.setText(
-                            "Warning: Arduino not connected")
-                        self.arduino_warning_label.setVisible(True)
-            else:
+            # Check if we're disconnecting
+            if self.arduino_worker and self.arduino_worker.running:
                 try:
                     self.arduino_worker.stop()
+                    self.arduino_worker = None  # Clear the worker
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
-                        self.arduino_warning_label.setText(
-                            "Warning: Arduino not connected")
+                        self.arduino_warning_label.setText("Warning: Arduino not connected")
                         self.arduino_warning_label.setVisible(True)
 
                     # Disable all valve controls on disconnect
@@ -1488,18 +1403,85 @@ class MainWindow(QMainWindow):
                     # Reset to manual mode when disconnecting
                     self.set_valve_mode(False)
                     self.logger.info("Disconnected from Arduino")
+                    return
                 except Exception as e:
-                    self.handle_error(f"Error disconnecting Arduino: {str(e)}")
+                    self.logger.error(f"Error disconnecting Arduino: {str(e)}")
+                    return
+
+            # Create new Arduino worker when connecting
+            try:
+                # Determine connection mode
+                if self.arduino_auto_connect_radio.isChecked():
+                    mode = 1  # Auto mode
+                elif self.arduino_ttl_radio.isChecked():
+                    mode = 2  # TTL mode
+                else:
+                    mode = 0  # Manual mode
+
+                # Create new worker instance
+                self.arduino_worker = ArduinoWorker(
+                    port=self.arduino_port_spin.value(),
+                    mock=self.test_mode
+                )
+
+                # Set mode and start worker
+                if self.arduino_worker.controller:
+                    self.arduino_worker.controller.mode = mode
+                    success = self.arduino_worker.start()
+                    
+                    if success or self.test_mode:
+                        self.arduino_connect_btn.setText("Disconnect")
+                        self.arduino_warning_label.setText("")
+                        self.arduino_warning_label.setVisible(False)
+
+                        # Enable/disable controls based on mode
+                        if mode == 0:  # Manual mode
+                            self.dev_checkbox.setEnabled(True)
+                            self.disable_quick_controls(False)
+                        else:
+                            self.dev_checkbox.setEnabled(False)
+                            self.disable_valve_controls(True)
+                            self.disable_quick_controls(True)
+
+                        # Set valve mode
+                        self.set_valve_mode(mode == 1)
+
+                        # If in automatic mode, start looking for sequence file after a delay
+                        if mode == 1:
+                            if self.motor_worker and self.motor_worker.running:
+                                self.motor_worker.set_sequence_mode(True)
+                                self.logger.info("Motor set to sequence mode")
+                            QTimer.singleShot(2000, self.find_sequence_file)
+                            self.logger.info("Will start sequence file monitoring in 2 seconds")
+
+                        self.logger.info(f"Connected to Arduino in mode {mode}")
+                    else:
+                        self.arduino_worker = None  # Clear failed worker
+                        self.handle_error("Failed to connect to Arduino")
+                        if not self.test_mode:
+                            self.arduino_warning_label.setText("Warning: Arduino not connected")
+                            self.arduino_warning_label.setVisible(True)
+                else:
+                    self.handle_error("Failed to initialize Arduino controller")
+                    self.arduino_worker = None
+
+            except Exception as e:
+                self.arduino_worker = None  # Clear failed worker
+                self.handle_error(f"Failed to connect to Arduino: {str(e)}")
+                self.arduino_connect_btn.setText("Connect")
+                if not self.test_mode:
+                    self.arduino_warning_label.setText("Warning: Arduino not connected")
+                    self.arduino_warning_label.setVisible(True)
 
         except Exception as e:
-            self.logger.error(
-                f"Uncaught exception in Arduino connection: {str(e)}")
-            self.handle_error(
-                "An unexpected error occurred while connecting to Arduino")
+            self.logger.error(f"Uncaught exception in Arduino connection: {str(e)}")
+            if self.arduino_worker:
+                self.arduino_worker.stop()
+                self.arduino_worker = None
+            self.handle_error("An unexpected error occurred while connecting to Arduino")
             self.arduino_connect_btn.setText("Connect")
             if not self.test_mode:
-                self.arduino_warning_label.setText(
-                    "Warning: Arduino not connected")
+                self.arduino_warning_label.setText("Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
 
     @pyqtSlot()

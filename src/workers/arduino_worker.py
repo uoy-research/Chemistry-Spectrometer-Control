@@ -89,6 +89,7 @@ class ArduinoWorker(QThread):
         status_changed(str): Emitted when worker status changes
     """
 
+    # Define signals as class attributes
     readings_updated = pyqtSignal(list)
     valve_updated = pyqtSignal(bool)
     error_occurred = pyqtSignal(str)
@@ -108,7 +109,6 @@ class ArduinoWorker(QThread):
         self.update_interval = update_interval
         if mock:
             self.controller = MockArduinoController(port=port)
-            self._running = False
         else:
             self.controller = ArduinoController(port=port, verbose=True)
 
