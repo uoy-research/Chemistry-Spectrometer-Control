@@ -925,43 +925,58 @@ class MainWindow(QMainWindow):
             # Motor worker connections are set up when the worker is created
 
             # Arduino and valve connections
-            self.arduino_connect_btn.clicked.connect(self.on_ardConnectButton_clicked)
+            self.arduino_connect_btn.clicked.connect(
+                self.on_ardConnectButton_clicked)
 
             # Valve buttons
             self.connect_valve_buttons()
 
             # Quick action buttons
-            self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
+            self.quickBubbleButton.clicked.connect(
+                self.on_quickBubbleButton_clicked)
             self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
-            self.buildPressureButton.clicked.connect(self.on_buildPressureButton_clicked)
-            self.switchGasButton.clicked.connect(self.on_switchGasButton_clicked)
-            self.quickBubbleButton.clicked.connect(self.on_quickBubbleButton_clicked)
+            self.buildPressureButton.clicked.connect(
+                self.on_buildPressureButton_clicked)
+            self.switchGasButton.clicked.connect(
+                self.on_switchGasButton_clicked)
+            self.quickBubbleButton.clicked.connect(
+                self.on_quickBubbleButton_clicked)
 
             # Motor control buttons
-            self.motor_connect_btn.clicked.connect(self.handle_motor_connection)
-            self.motor_calibrate_btn.clicked.connect(self.on_motorCalibrateButton_clicked)
-            self.motor_stop_btn.clicked.connect(self.on_motorStopButton_clicked)
-            self.motor_move_to_target_button.clicked.connect(self.on_motorMoveToTargetButton_clicked)
-            self.motor_ascent_button.clicked.connect(self.on_motorAscentButton_clicked)
-            self.motor_to_top_button.clicked.connect(self.on_motorToTopButton_clicked)
+            self.motor_connect_btn.clicked.connect(
+                self.handle_motor_connection)
+            self.motor_calibrate_btn.clicked.connect(
+                self.on_motorCalibrateButton_clicked)
+            self.motor_stop_btn.clicked.connect(
+                self.on_motorStopButton_clicked)
+            self.motor_move_to_target_button.clicked.connect(
+                self.on_motorMoveToTargetButton_clicked)
+            self.motor_ascent_button.clicked.connect(
+                self.on_motorAscentButton_clicked)
+            self.motor_to_top_button.clicked.connect(
+                self.on_motorToTopButton_clicked)
 
             # Motor macro buttons
             for i in range(1, 7):
                 btn = getattr(self, f"motor_macro{i}_button")
-                btn.clicked.connect(lambda checked, x=i: self.on_motorMacroButton_clicked(x))
+                btn.clicked.connect(
+                    lambda checked, x=i: self.on_motorMacroButton_clicked(x))
 
             # Valve macro buttons
             for i in range(1, 5):
                 btn = getattr(self, f"valveMacro{i}Button")
-                btn.clicked.connect(lambda checked, x=i: self.on_valveMacroButton_clicked(x))
+                btn.clicked.connect(
+                    lambda checked, x=i: self.on_valveMacroButton_clicked(x))
 
             # Pressure radio buttons
             for i in range(1, 5):
                 radio = getattr(self, f"pressure{i}RadioButton")
-                radio.clicked.connect(lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
+                radio.clicked.connect(
+                    lambda checked, x=i: self.on_pressureRadioButton_clicked(x))
 
             # Connect mode change signals
-            self.arduino_connect_button_group.buttonClicked.connect(self.on_arduino_mode_changed)
+            self.arduino_connect_button_group.buttonClicked.connect(
+                self.on_arduino_mode_changed)
 
             self._connections_initialized = True
 
@@ -1307,30 +1322,34 @@ class MainWindow(QMainWindow):
             self.quickBubbleButton.setChecked(False)
             self.logger.info("Quick bubble complete")
 
-    def disable_valve_controls(self, disabled: bool):
-        """Enable/disable valve controls."""
+    def disable_valve_controls(self, disabled: bool = True):
+        """Enable/disable valve controls.
+
+        Args:
+            disabled (bool): True to disable controls, False to enable
+        """
         # Only enable if in manual mode and Arduino is connected
         enabled = (not disabled and
                    self.arduino_worker and  # Check if worker exists
                    self.arduino_worker.running and
                    self.arduino_manual_radio.isChecked())
 
-        # Disable individual valve buttons
-        for i in range(1, 7):  # Changed from 6 to 7 to include Valve6
+        # Set enabled state for all valve buttons
+        for i in range(1, 6):
             valve_button = getattr(self, f"Valve{i}Button")
             valve_button.setEnabled(enabled)
 
-        # Quick action buttons
+        # Set enabled state for macro buttons
+        for i in range(1, 5):
+            macro_button = getattr(self, f"valveMacro{i}Button")
+            macro_button.setEnabled(enabled)
+
+        # Set enabled state for quick action buttons
         self.quickBubbleButton.setEnabled(enabled)
         self.switchGasButton.setEnabled(enabled)
         self.buildPressureButton.setEnabled(enabled)
         self.quickVentButton.setEnabled(enabled)
         self.slowVentButton.setEnabled(enabled)
-
-        # Valve macro buttons
-        for i in range(1, 5):
-            if hasattr(self, f'valveMacro{i}Button'):
-                getattr(self, f'valveMacro{i}Button').setEnabled(enabled)
 
     def disable_quick_controls(self, disabled: bool):
         """Enable/disable quick action and macro controls."""
@@ -1389,6 +1408,9 @@ class MainWindow(QMainWindow):
             # Check if we're disconnecting
             if self.arduino_worker and self.arduino_worker.running:
                 try:
+                    # Stop all timers first
+                    self.cleanup_file_timer()
+                    
                     self.arduino_worker.stop()
                     self.arduino_worker = None  # Clear the worker
                     self.arduino_connect_btn.setText("Connect")
@@ -1426,13 +1448,14 @@ class MainWindow(QMainWindow):
                 )
 
                 # Connect the readings signal to plot widget
-                self.arduino_worker.readings_updated.connect(self.plot_widget.update_plot)
+                self.arduino_worker.readings_updated.connect(
+                    self.plot_widget.update_plot)
 
                 # Set mode and start worker
                 if self.arduino_worker.controller:
                     self.arduino_worker.controller.mode = mode
                     success = self.arduino_worker.start()
-                    
+
                     if success or self.test_mode:
                         self.arduino_connect_btn.setText("Disconnect")
                         self.arduino_warning_label.setText("")
@@ -1455,18 +1478,20 @@ class MainWindow(QMainWindow):
                             if self.motor_worker and self.motor_worker.running:
                                 self.motor_worker.set_sequence_mode(True)
                                 self.logger.info("Motor set to sequence mode")
-                            QTimer.singleShot(2000, self.find_sequence_file)
-                            self.logger.info("Will start sequence file monitoring in 2 seconds")
+                            self.start_sequence_monitoring()  # Use new method instead of QTimer.singleShot
 
-                        self.logger.info(f"Connected to Arduino in mode {mode}")
+                        self.logger.info(
+                            f"Connected to Arduino in mode {mode}")
                     else:
                         self.arduino_worker = None  # Clear failed worker
                         self.handle_error("Failed to connect to Arduino")
                         if not self.test_mode:
-                            self.arduino_warning_label.setText("Warning: Arduino not connected")
+                            self.arduino_warning_label.setText(
+                                "Warning: Arduino not connected")
                             self.arduino_warning_label.setVisible(True)
                 else:
-                    self.handle_error("Failed to initialize Arduino controller")
+                    self.handle_error(
+                        "Failed to initialize Arduino controller")
                     self.arduino_worker = None
 
             except Exception as e:
@@ -1474,18 +1499,22 @@ class MainWindow(QMainWindow):
                 self.handle_error(f"Failed to connect to Arduino: {str(e)}")
                 self.arduino_connect_btn.setText("Connect")
                 if not self.test_mode:
-                    self.arduino_warning_label.setText("Warning: Arduino not connected")
+                    self.arduino_warning_label.setText(
+                        "Warning: Arduino not connected")
                     self.arduino_warning_label.setVisible(True)
 
         except Exception as e:
-            self.logger.error(f"Uncaught exception in Arduino connection: {str(e)}")
+            self.logger.error(
+                f"Uncaught exception in Arduino connection: {str(e)}")
             if self.arduino_worker:
                 self.arduino_worker.stop()
                 self.arduino_worker = None
-            self.handle_error("An unexpected error occurred while connecting to Arduino")
+            self.handle_error(
+                "An unexpected error occurred while connecting to Arduino")
             self.arduino_connect_btn.setText("Connect")
             if not self.test_mode:
-                self.arduino_warning_label.setText("Warning: Arduino not connected")
+                self.arduino_warning_label.setText(
+                    "Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
 
     @pyqtSlot()
@@ -1959,6 +1988,10 @@ class MainWindow(QMainWindow):
     def next_step(self):
         """Execute the next step in the sequence."""
         try:
+            # Check if Arduino worker exists and is running
+            if not self.arduino_worker or not self.arduino_worker.running:
+                raise RuntimeError("Arduino not connected")
+
             # Remove completed step
             self.steps.pop(0)
 
@@ -2000,6 +2033,10 @@ class MainWindow(QMainWindow):
     def execute_step(self, step):
         """Execute a single sequence step."""
         try:
+            # Check if Arduino worker exists and is running
+            if not self.arduino_worker or not self.arduino_worker.running:
+                raise RuntimeError("Arduino not connected")
+
             # Set valve states based on step type
             valve_states = [0] * 8  # Initialize all valves closed
 
@@ -2008,19 +2045,24 @@ class MainWindow(QMainWindow):
             elif step.step_type == 'v':  # Vent
                 valve_states[3] = 1  # Open vent valve
             elif step.step_type == 'b':  # Bubble
-                valve_states[1] = 1  # Open inlet valve
-                valve_states[2] = 1  # Open outlet valve
+                valve_states[2] = 1  # Open inlet valve
+                valve_states[3] = 1  # Open outlet valve
+                valve_states[4] = 1  # Open short valve
+                valve_states[5] = 1  # Open long valve
             elif step.step_type == 'f':  # Flow
                 valve_states[2] = 1  # Open outlet valve
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
+            elif step.step_type == 'd':  # Delay, close all valves
+                for i in range(1, 5):
+                    valve_states[i] = 0
 
             # Set valve states
             self.arduino_worker.set_valves(valve_states)
 
             # Move motor if required
-            if self.motor_flag and step.motor_position is not None:
+            if self.motor_flag and self.motor_worker and step.motor_position is not None:
                 self.motor_worker.move_to(step.motor_position)
 
             self.logger.info(f"Executing step: {
@@ -2118,26 +2160,27 @@ class MainWindow(QMainWindow):
         return None
 
     def update_arduino_port(self, port: int):
-        """
-        Update Arduino port configuration.
-
-        Args:
-            port: New port number
-        """
+        """Update Arduino port configuration."""
         self.config.arduino_port = port
         self.config.save()
 
-        if self.arduino_worker.running:
-            self.arduino_worker.stop()
+        # If currently connected, disconnect first
+        if self.arduino_worker and self.arduino_worker.running:
+            self.cleanup_arduino_worker()
             self.arduino_connect_btn.setText("Connect")
             self.logger.info("Disconnected from Arduino due to port change")
 
-        self.arduino_worker = ArduinoWorker(
-            port=port,
-            mock=self.test_mode
-        )
-        self.setup_connections()
-        # self.logger.debug(f"Arduino port updated to COM{port}")
+            # Reset UI state
+            if not self.test_mode:
+                self.arduino_warning_label.setText("Warning: Arduino not connected")
+                self.arduino_warning_label.setVisible(True)
+            
+            # Disable controls
+            self.dev_checkbox.setEnabled(False)
+            self.dev_checkbox.setChecked(False)
+            self.disable_valve_controls(True)
+
+        self.logger.info(f"Arduino port updated to COM{port}")
 
     @pyqtSlot(list)
     def handle_pressure_readings(self, readings: List[float]):
@@ -2202,7 +2245,8 @@ class MainWindow(QMainWindow):
         if self.motor_worker:  # Check if motor worker exists
             self.motor_worker.stop()
         self.arduino_worker.depressurize()
-        QMessageBox.warning(self, "Emergency Stop", "Emergency stop activated!")
+        QMessageBox.warning(self, "Emergency Stop",
+                            "Emergency stop activated!")
         self.logger.warning("Emergency stop activated")
 
     def closeEvent(self, event):
@@ -2210,8 +2254,12 @@ class MainWindow(QMainWindow):
         try:
             self.logger.info(f"Active motor workers before shutdown: {
                              MotorWorker.get_active_count()}")
-            self.arduino_worker.stop()
+
+            # Clean up workers
+            if self.arduino_worker:
+                self.arduino_worker.stop()
             self.cleanup_motor_worker()
+
             self.config.save()
 
             # Reset instance count on shutdown
@@ -2226,7 +2274,17 @@ class MainWindow(QMainWindow):
             event.accept()
 
     def load_sequence(self):
-        """Load a sequence from a file."""
+        """Load sequence from file.
+
+        Format: <step_type><time_length>[<motor_position>]
+        Where:
+            step_type: Single character (p,v,b,f,e)
+            time_length: Integer in milliseconds
+            motor_position: Optional float for motor position 
+
+        Example: p1000v2000b1000
+        Motor Example: Mp1000m200.24v2000m23.20b1000m100.10
+        """
         try:
             negative_positions_found = False  # Track if any negative positions are found
             self.steps = []  # initialise steps
@@ -2448,157 +2506,28 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error updating step time: {e}")
 
-    def next_step(self):
-        """Execute the next step in the sequence."""
+    def cleanup_file_timer(self):
+        """Clean up file check timer."""
         try:
-            # Remove completed step
-            self.steps.pop(0)
-
-            if self.steps:
-                # Execute next step
-                self.execute_step(self.steps[0])
-                # Reset step timer and schedule next step
-                self.step_start_time = time.time()
-                QTimer.singleShot(self.steps[0].time_length, self.next_step)
-            else:
-                # Sequence complete
-                self.step_timer.stop()
-                # Disable sequence mode when complete
-                if self.motor_flag and self.motor_worker.running:
-                    self.motor_worker.set_sequence_mode(False)
-
-                # Update UI and handle completion
-                self.update_sequence_info("Complete", 0, 0, 0)
-                self.update_sequence_status("Complete")
-
-                # Stop data recording if active
-                if self.saving:
-                    self.plot_widget.stop_recording()
-                    self.beginSaveButton.setText("Begin Saving")
-                    self.beginSaveButton.setChecked(False)
-                    self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
-
-                self.logger.info("Sequence execution completed")
-
+            if hasattr(self, 'file_timer') and self.file_timer is not None:
+                self.file_timer.stop()
+                self.file_timer = None
+                self.logger.info("File check timer cleaned up")
         except Exception as e:
-            self.logger.error(f"Error in sequence execution: {e}")
-            self.handle_error("Failed to execute sequence")
-            # Disable sequence mode on error
-            if self.motor_flag and self.motor_worker.running:
-                self.motor_worker.set_sequence_mode(False)
+            self.logger.error(f"Error cleaning up file timer: {e}")
 
-    def execute_step(self, step):
-        """Execute a single sequence step."""
+    def cleanup_arduino_worker(self):
+        """Clean up Arduino worker resources."""
         try:
-            # Set valve states based on step type
-            valve_states = [0] * 8  # Initialize all valves closed
-
-            if step.step_type == 'p':  # Pressurize
-                valve_states[1] = 1  # Open inlet valve
-            elif step.step_type == 'v':  # Vent
-                valve_states[3] = 1  # Open vent valve
-            elif step.step_type == 'b':  # Bubble
-                valve_states[2] = 1  # Open inlet valve
-                valve_states[3] = 1  # Open outlet valve
-                valve_states[4] = 1  # Open short valve
-                valve_states[5] = 1  # Open long valve
-            elif step.step_type == 'f':  # Flow
-                valve_states[2] = 1  # Open outlet valve
-            elif step.step_type == 'e':  # Evacuate
-                valve_states[3] = 1  # Open vent valve
-                valve_states[4] = 1  # Open short valve
-            elif step.step_type == 'd':  # Delay, close all valves
-                for i in range(1, 5):
-                    valve_states[i] = 0
-
-            # Set valve states
-            self.arduino_worker.set_valves(valve_states)
-
-            # Move motor if required
-            if self.motor_flag and step.motor_position is not None:
-                self.motor_worker.move_to(step.motor_position)
-
-            self.logger.info(f"Executing step: {
-                             self.step_types[step.step_type]}")
-
+            if self.arduino_worker:
+                # Stop file check timer if it exists
+                self.cleanup_file_timer()
+                
+                self.arduino_worker.stop()
+                self.arduino_worker = None
+                self.logger.info("Arduino worker cleaned up")
         except Exception as e:
-            self.logger.error(f"Error executing step: {e}")
-            self.handle_error("Failed to execute sequence step")
-
-    def disable_other_valve_controls(self, active_macro_num: int):
-        """Disable all valve controls except the active macro button.
-
-        Args:
-            active_macro_num: Number of the active macro button (1-4)
-        """
-        # Disable individual valve buttons
-        for i in range(1, 6):
-            valve_button = getattr(self, f"Valve{i}Button")
-            valve_button.setEnabled(False)
-
-        # Disable other macro buttons
-        for i in range(1, 5):
-            if i != active_macro_num:
-                macro_button = getattr(self, f"valveMacro{i}Button")
-                macro_button.setEnabled(False)
-
-        # Disable quick action buttons
-        self.quickBubbleButton.setEnabled(False)
-        self.switchGasButton.setEnabled(False)
-        self.buildPressureButton.setEnabled(False)
-        self.quickVentButton.setEnabled(False)
-        self.slowVentButton.setEnabled(False)
-
-    def enable_all_valve_controls(self):
-        """Re-enable all valve controls."""
-        # Only enable if in manual mode and Arduino is connected
-        if self.arduino_worker.running and self.arduino_manual_radio.isChecked():
-            # Enable individual valve buttons
-            for i in range(1, 6):
-                valve_button = getattr(self, f"Valve{i}Button")
-                valve_button.setEnabled(True)
-
-            # Enable macro buttons
-            for i in range(1, 5):
-                macro_button = getattr(self, f"valveMacro{i}Button")
-                macro_button.setEnabled(True)
-
-            # Enable quick action buttons
-            self.quickBubbleButton.setEnabled(True)
-            self.switchGasButton.setEnabled(True)
-            self.buildPressureButton.setEnabled(True)
-            self.quickVentButton.setEnabled(True)
-            self.slowVentButton.setEnabled(True)
-
-    def update_motor_port(self, port: int):
-        """Update motor port configuration."""
-        self.config.motor_port = port
-        self.config.save()
-
-        # If currently connected, disconnect and cleanup
-        if self.motor_worker and self.motor_worker.running:
-            self.cleanup_motor_worker()
-            self.motor_connect_btn.setText("Connect")
-            self.logger.info("Disconnected from motor due to port change")
-
-            # Reset motor state
-            self.motor_calibrated = False
-            self.motor_warning_label.setText("Warning: Motor not connected")
-            self.motor_warning_label.setVisible(True)
-            self.motor_calibrate_btn.setEnabled(False)
-            self.disable_motor_controls(True)
-
-        self.motor_worker = MotorWorker(
-            port=port,
-            update_interval=self.config.motor_update_interval,  # Use config value
-            mock=self.test_mode
-        )
-        self.setup_connections()
-
-        self.logger.info(f"Active motor workers after update: {
-                         MotorWorker.get_active_count()}")
+            self.logger.error(f"Error cleaning up Arduino worker: {e}")
 
     @pyqtSlot(bool)
     def handle_calibration_state_changed(self, is_calibrated: bool):
@@ -2641,3 +2570,64 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.logger.error(f"Error setting motor speed: {e}")
+
+    def update_motor_port(self, port: int):
+        """Update motor port configuration."""
+        self.config.motor_port = port
+        self.config.save()
+
+        # If currently connected, disconnect and cleanup
+        if self.motor_worker and self.motor_worker.running:
+            self.cleanup_motor_worker()
+            self.motor_connect_btn.setText("Connect")
+            self.logger.info("Disconnected from motor due to port change")
+
+            # Reset motor state
+            self.motor_calibrated = False
+            self.motor_warning_label.setText("Warning: Motor not connected")
+            self.motor_warning_label.setVisible(True)
+            self.motor_calibrate_btn.setEnabled(False)
+            self.disable_motor_controls(True)
+
+        # Create new worker with updated port
+        self.motor_worker = MotorWorker(
+            port=port,
+            update_interval=self.config.motor_update_interval,
+            mock=self.test_mode
+        )
+        self.setup_connections()
+        self.logger.info(f"Motor port updated to COM{port}")
+
+    def start_sequence_monitoring(self):
+        """Start sequence file monitoring after delay."""
+        try:
+            # Create and store the delay timer
+            self.delay_timer = QTimer()
+            self.delay_timer.setSingleShot(True)
+            self.delay_timer.timeout.connect(self.find_sequence_file)
+            self.delay_timer.start(2000)  # 2 second delay
+            self.logger.info("Will start sequence file monitoring in 2 seconds")
+        except Exception as e:
+            self.logger.error(f"Error setting up sequence monitoring: {e}")
+
+    def cleanup_file_timer(self):
+        """Clean up file check timer."""
+        try:
+            # Clean up the delay timer if it exists
+            if hasattr(self, 'delay_timer') and self.delay_timer is not None:
+                self.delay_timer.stop()
+                self.delay_timer = None
+                self.logger.info("Sequence monitoring delay timer cleaned up")
+                
+            # Clean up the file check timer
+            if hasattr(self, 'file_timer') and self.file_timer is not None:
+                self.file_timer.stop()
+                self.file_timer = None
+                self.logger.info("File check timer cleaned up")
+                
+            # Reset sequence-related UI elements
+            if hasattr(self, 'sequence_status_label'):
+                self.sequence_status_label.setText("Status: Waiting for file")
+                
+        except Exception as e:
+            self.logger.error(f"Error cleaning up file timer: {e}")
