@@ -2004,8 +2004,14 @@ class MainWindow(QMainWindow):
             else:
                 # Sequence complete
                 self.step_timer.stop()
+                
+                # Reset all valves to closed state
+                if self.arduino_worker and self.arduino_worker.running:
+                    self.arduino_worker.set_valves([0] * 8)
+                    self.logger.info("Reset all valves after sequence completion")
+                
                 # Disable sequence mode when complete
-                if self.motor_flag and self.motor_worker.running:
+                if self.motor_flag and self.motor_worker and self.motor_worker.running:
                     self.motor_worker.set_sequence_mode(False)
 
                 # Update UI and handle completion
@@ -2018,16 +2024,19 @@ class MainWindow(QMainWindow):
                     self.beginSaveButton.setText("Begin Saving")
                     self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
+                    self.logger.info("Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
         except Exception as e:
             self.logger.error(f"Error in sequence execution: {e}")
             self.handle_error("Failed to execute sequence")
+            # Reset valves on error too
+            if self.arduino_worker and self.arduino_worker.running:
+                self.arduino_worker.set_valves([0] * 8)
+                self.logger.info("Reset all valves after sequence error")
             # Disable sequence mode on error
-            if self.motor_flag and self.motor_worker.running:
+            if self.motor_flag and self.motor_worker and self.motor_worker.running:
                 self.motor_worker.set_sequence_mode(False)
 
     def execute_step(self, step):
