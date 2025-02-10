@@ -1081,46 +1081,36 @@ class MainWindow(QMainWindow):
     def check_sequence_file(self):
         """Check for and process sequence file."""
         try:
-            if not self.arduino_worker.running:
-                self.logger.error("Arduino worker not running")
-                self.file_timer.stop()
-                return
-
             sequence_path = Path(r"C:\ssbubble\sequence.txt")
-            if not sequence_path.exists():
-                return
+            if sequence_path.exists():
+                # Process in chunks to avoid blocking
+                def process_sequence():
+                    try:
+                        success = self.load_sequence()
+                        if success:
+                            self.handle_sequence_file(True)
+                            self.calculate_sequence_time()
 
-            # Process in chunks to avoid blocking
-            def process_sequence():
-                try:
-                    success = self.load_sequence()
-                    if success:
-                        self.handle_sequence_file(True)
-                        self.calculate_sequence_time()
+                            # Update UI with first step
+                            if self.steps:
+                                QMetaObject.invokeMethod(self, "update_sequence_info",
+                                                       Qt.ConnectionType.QueuedConnection,
+                                                       Q_ARG(str, self.step_types[self.steps[0].step_type]),
+                                                       Q_ARG(float, self.steps[0].time_length),
+                                                       Q_ARG(int, len(self.steps)),
+                                                       Q_ARG(float, self.total_sequence_time))
 
-                        # Update UI with first step using invokeMethod
-                        if self.steps:
-                            QMetaObject.invokeMethod(self, "update_sequence_info",
-                                                     Qt.ConnectionType.QueuedConnection,
-                                                     Q_ARG(
-                                                         str, self.step_types[self.steps[0].step_type]),
-                                                     Q_ARG(
-                                                         float, self.steps[0].time_length),
-                                                     Q_ARG(
-                                                         int, len(self.steps)),
-                                                     Q_ARG(float, self.total_sequence_time))
+                                # Call start_sequence directly
+                                self.start_sequence()
 
-                            QMetaObject.invokeMethod(self, "start_sequence",
-                                                     Qt.ConnectionType.QueuedConnection)
+                            self.file_timer.stop()
+                        else:
+                            self.handle_sequence_file(False)
+                    except Exception as e:
+                        self.logger.error(f"Error processing sequence: {e}")
 
-                        self.file_timer.stop()
-                    else:
-                        self.handle_sequence_file(False)
-                except Exception as e:
-                    self.logger.error(f"Error processing sequence: {e}")
-
-            # Process sequence in a separate thread to avoid blocking
-            QTimer.singleShot(0, process_sequence)
+                # Process sequence in a separate thread to avoid blocking
+                QTimer.singleShot(0, process_sequence)
 
         except Exception as e:
             self.logger.error(f"Error in sequence file check: {e}")
@@ -1942,48 +1932,37 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def start_sequence(self):
-        """Start executing the loaded sequence."""
+        """Start sequence execution."""
         try:
-            if not self.steps:
-                self.logger.error("No sequence loaded")
-                return
-
-            # Enable sequence mode for motor if motor movements are part of sequence
-            if self.motor_flag and self.motor_worker.running:
-                # Check calibration once at sequence start
-                if not self.motor_worker.controller.check_calibrated():
-                    self.logger.error(
-                        "Motor not calibrated - cannot start sequence")
-                    self.handle_error(
-                        "Motor must be calibrated before starting sequence")
-                    return
-
-                # Explicitly set sequence mode
-                self.motor_worker.set_sequence_mode(True)
-                self.logger.info(
-                    "Motor set to sequence mode for sequence execution")
-
-            # Execute first step
-            self.execute_step(self.steps[0])
-
-            # Start step timer
-            self.step_start_time = time.time()
-            self.step_timer = QTimer()
-            self.step_timer.timeout.connect(self.update_step_time)
-            self.step_timer.start(100)  # Update every 100ms
-
-            # Schedule next step
-            if len(self.steps) > 1:
+            if self.steps:
+                # Clear plot before starting new sequence
+                self.plot_widget.clear_plot()
+                
+                # Start data recording if enabled
+                if self.saving:
+                    timestamp = time.strftime("%Y%m%d-%H%M%S")
+                    filepath = os.path.join(self.default_save_path, f"sequence_{timestamp}.csv")
+                    if not self.plot_widget.start_recording(filepath):
+                        self.handle_error("Failed to start data recording")
+                        return
+                
+                # Execute first step
+                self.execute_step(self.steps[0])
+                
+                # Start step timer
+                self.step_start_time = time.time()
+                self.step_timer = QTimer()
+                self.step_timer.timeout.connect(self.update_step_time)
+                self.step_timer.start(100)  # Update every 100ms
+                
+                # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
-
-            self.logger.info("Sequence execution started")
-
+                
+                self.logger.info("Sequence execution started")
+                
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
-            # Disable sequence mode on error
-            if self.motor_flag and self.motor_worker.running:
-                self.motor_worker.set_sequence_mode(False)
 
     def next_step(self):
         """Execute the next step in the sequence."""

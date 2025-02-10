@@ -223,3 +223,24 @@ class PlotWidget(QWidget):
                 self.save_file.close()
                 self.save_file = None
                 self.csv_writer = None
+
+    def clear_plot(self):
+        """Clear all plot data and reset."""
+        try:
+            # Clear data arrays
+            self.times = np.array([])
+            self.pressures = [np.array([]) for _ in range(4)]
+            
+            # Reset start time
+            self.start_time = time.time()
+            
+            # Clear line data
+            for line in self.lines:
+                line.set_data([], [])
+            
+            # Force redraw
+            self.canvas.draw()
+            self.logger.info("Plot data cleared")
+            
+        except Exception as e:
+            self.logger.error(f"Error clearing plot: {e}")
