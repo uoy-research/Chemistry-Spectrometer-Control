@@ -554,7 +554,8 @@ class MainWindow(QMainWindow):
                     if hasattr(self.arduino_worker, 'get_valve_states'):
                         current_valve_states = self.arduino_worker.get_valve_states()
                 except Exception as e:
-                    self.logger.warning(f"Could not get current valve states: {e}")
+                    self.logger.warning(
+                        f"Could not get current valve states: {e}")
 
                 # Create new valve states, preserving first two valves
                 valve_states = current_valve_states.copy()
@@ -564,7 +565,7 @@ class MainWindow(QMainWindow):
 
                 # Send valve states to Arduino
                 self.arduino_worker.set_valves(valve_states)
-                self.logger.info(f"Reset valves (preserving inlet/outlet): {valve_states}")
+                self.logger.info(f"Reset valves: {valve_states}")
 
                 # Update valve button states
                 for i in range(2, 6):  # Only update buttons for valves 3-6
@@ -1856,10 +1857,13 @@ class MainWindow(QMainWindow):
                             current_states = self.arduino_worker.get_valve_states()
                             # Update first 6 valve buttons based on actual states
                             for i in range(6):  # Update all 6 valve buttons
-                                valve_button = getattr(self, f"Valve{i+1}Button")
-                                valve_button.setChecked(bool(current_states[i]))
+                                valve_button = getattr(
+                                    self, f"Valve{i+1}Button")
+                                valve_button.setChecked(
+                                    bool(current_states[i]))
                     except Exception as e:
-                        self.logger.warning(f"Could not get current valve states for button update: {e}")
+                        self.logger.warning(
+                            f"Could not get current valve states for button update: {e}")
                         # Fallback to using the sent states if we can't get current states
                         for i, state in enumerate(valve_states[:6]):
                             valve_button = getattr(self, f"Valve{i+1}Button")
@@ -2009,12 +2013,12 @@ class MainWindow(QMainWindow):
             else:
                 # Sequence complete
                 self.step_timer.stop()
-                
+
                 # Reset valves while preserving inlet/outlet
                 if self.arduino_worker and self.arduino_worker.running:
                     self.reset_valves()
                     self.logger.info("Reset valves after sequence completion")
-                
+
                 # Disable sequence mode when complete
                 if self.motor_flag and self.motor_worker and self.motor_worker.running:
                     self.motor_worker.set_sequence_mode(False)
@@ -2029,7 +2033,8 @@ class MainWindow(QMainWindow):
                     self.beginSaveButton.setText("Begin Saving")
                     self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info("Data recording stopped with sequence completion")
+                    self.logger.info(
+                        "Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
