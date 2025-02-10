@@ -1850,11 +1850,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(int)
     def on_valveMacroButton_clicked(self, macro_num: int):
-        """Handle valve macro button click.
-
-        Args:
-            macro_num: Macro number (1-4)
-        """
+        """Handle valve macro button click."""
         if self.arduino_worker.running:
             try:
                 # Get the macro button that was clicked
@@ -1866,7 +1862,7 @@ class MainWindow(QMainWindow):
                     if self.active_macro_timer is not None:
                         self.active_macro_timer.stop()
                         self.active_macro_timer = None
-                    self.reset_valves()
+                    self.reset_valves()  # This will also update button states
                     self.active_valve_macro = None
                     return
 
@@ -1881,14 +1877,13 @@ class MainWindow(QMainWindow):
                     self.active_valve_macro = macro_num
                     self.disable_other_valve_controls(macro_num)
 
-                    # Get current valve states
-                    current_valve_states = [0] * 8  # Default to all closed
+                    # Get current valve states before applying macro
+                    current_valve_states = [0] * 8
                     try:
                         if hasattr(self.arduino_worker, 'get_valve_states'):
                             current_valve_states = self.arduino_worker.get_valve_states()
                     except Exception as e:
-                        self.logger.warning(
-                            f"Could not get current valve states: {e}")
+                        self.logger.warning(f"Could not get current valve states: {e}")
 
                     # Initialize new states with current states
                     valve_states = current_valve_states.copy()
@@ -1901,53 +1896,52 @@ class MainWindow(QMainWindow):
                             valve_states[i] = 0
                         # "Ignore" states keep their current value
 
-                    # Ensure we have 8 valve states (pad with zeros if needed)
-                    while len(valve_states) < 8:
-                        valve_states.append(0)
-
                     # Send valve states to Arduino
                     self.arduino_worker.set_valves(valve_states)
-                    self.logger.info(f"Sent valve states for macro {
-                                     macro_num}: {valve_states}")
+                    self.logger.info(f"Sent valve states for macro {macro_num}: {valve_states}")
 
-                    # Update valve button states based on current valve states
-                    try:
-                        if hasattr(self.arduino_worker, 'get_valve_states'):
-                            current_states = self.arduino_worker.get_valve_states()
-                            # Update first 6 valve buttons based on actual states
-                            for i in range(6):  # Update all 6 valve buttons
-                                valve_button = getattr(
-                                    self, f"Valve{i+1}Button")
-                                valve_button.setChecked(
-                                    bool(current_states[i]))
-                    except Exception as e:
-                        self.logger.warning(
-                            f"Could not get current valve states for button update: {e}")
-                        # Fallback to using the sent states if we can't get current states
-                        for i, state in enumerate(valve_states[:6]):
-                            valve_button = getattr(self, f"Valve{i+1}Button")
-                            valve_button.setChecked(bool(state))
+                    # Update valve button states to reflect macro settings
+                    for i in range(6):  # Update all 6 valve buttons
+                        valve_button = getattr(self, f"Valve{i+1}Button")
+                        if macro["Valves"][i] == "Open":
+                            valve_button.setChecked(True)
+                        elif macro["Valves"][i] == "Closed":
+                            valve_button.setChecked(False)
+                        # "Ignore" states keep their current check state
 
                     # Check the macro button
                     macro_button.setChecked(True)
-
-                    # Rest of the timer handling code...
 
                     # If macro has a timer, schedule valve reset
                     timer = macro.get("Timer", 0)
                     if timer > 0:
                         def reset_valves():
-                            # Use the reset_valves method to preserve inlet/outlet valves
-                            self.reset_valves()
-                            self.logger.info("Reset valves after macro timer")
-
-                            # Reset macro state
-                            self.active_valve_macro = None
-                            self.active_macro_timer = None
-                            macro_button.setChecked(False)
-
-                            # Re-enable controls
-                            self.enable_all_valve_controls()
+                            try:
+                                # Get the final valve states after reset
+                                final_states = [0] * 8
+                                if hasattr(self.arduino_worker, 'get_valve_states'):
+                                    final_states = self.arduino_worker.get_valve_states()
+                                
+                                # Reset valves (preserving inlet/outlet)
+                                self.reset_valves()
+                                
+                                # Update button states to match final valve states
+                                for i in range(6):
+                                    valve_button = getattr(self, f"Valve{i+1}Button")
+                                    valve_button.setChecked(bool(final_states[i]))
+                                
+                                # Reset macro state
+                                self.active_valve_macro = None
+                                self.active_macro_timer = None
+                                macro_button.setChecked(False)
+                                
+                                # Re-enable controls
+                                self.enable_all_valve_controls()
+                                
+                                self.logger.info("Reset valves after macro timer")
+                                
+                            except Exception as e:
+                                self.logger.error(f"Error in macro reset: {e}")
 
                         # Create and store the timer
                         self.active_macro_timer = QTimer()
@@ -1955,22 +1949,19 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer.timeout.connect(reset_valves)
                         self.active_macro_timer.start(int(timer * 1000))
 
-                    self.logger.info(f"Executed valve macro {
-                                     macro_num}: {macro['Label']}")
+                    self.logger.info(f"Executed valve macro {macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
                     macro_button.setChecked(False)
+
             except Exception as e:
-                self.handle_error(
-                    f"Failed to execute valve macro {macro_num}: {e}")
-                # Ensure macro button is unchecked on error
-                macro_button = getattr(self, f"valveMacro{macro_num}Button")
-                macro_button.setChecked(False)
-                # Clean up timer and state on error
+                self.handle_error(f"Failed to execute valve macro {macro_num}: {e}")
+                # Clean up on error
                 if self.active_macro_timer is not None:
                     self.active_macro_timer.stop()
                     self.active_macro_timer = None
                 self.active_valve_macro = None
+                macro_button.setChecked(False)
                 self.enable_all_valve_controls()
 
     @pyqtSlot()
