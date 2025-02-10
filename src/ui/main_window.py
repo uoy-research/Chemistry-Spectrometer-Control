@@ -1167,13 +1167,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 1
                 current_states[0] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 1 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 1 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 1: {e}")
 
@@ -1186,13 +1187,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 2
                 current_states[1] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 2 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 2 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 2: {e}")
 
@@ -1205,13 +1207,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 3
                 current_states[2] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 3 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 3 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 3: {e}")
 
@@ -1224,13 +1227,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 4
                 current_states[3] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 4 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 4 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 4: {e}")
 
@@ -1243,13 +1247,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 5
                 current_states[4] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 5 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 5 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 5: {e}")
 
@@ -1262,13 +1267,14 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
-                
+
                 # Only update the state of valve 6
                 current_states[5] = 1 if checked else 0
-                
+
                 # Send updated states to Arduino
                 self.arduino_worker.set_valves(current_states)
-                self.logger.info(f"Valve 6 {'opened' if checked else 'closed'}")
+                self.logger.info(
+                    f"Valve 6 {'opened' if checked else 'closed'}")
             except Exception as e:
                 self.logger.error(f"Error controlling Valve 6: {e}")
 
@@ -1336,7 +1342,8 @@ class MainWindow(QMainWindow):
             valve_states = [0] * 8
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
             self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Pressure build {'started' if checked else 'stopped'}")
+            self.logger.info(f"Pressure build {
+                             'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
     def on_switchGasButton_clicked(self, checked: bool):
@@ -1464,15 +1471,16 @@ class MainWindow(QMainWindow):
                 try:
                     # Stop all timers first
                     self.cleanup_file_timer()
-                    
+
                     # Uncheck all valve controls before disconnecting
                     self.uncheck_all_valve_controls()
-                    
+
                     self.arduino_worker.stop()
                     self.arduino_worker = None  # Clear the worker
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
-                        self.arduino_warning_label.setText("Warning: Arduino not connected")
+                        self.arduino_warning_label.setText(
+                            "Warning: Arduino not connected")
                         self.arduino_warning_label.setVisible(True)
 
                     # Disable all valve controls on disconnect
@@ -1862,7 +1870,7 @@ class MainWindow(QMainWindow):
                     if self.active_macro_timer is not None:
                         self.active_macro_timer.stop()
                         self.active_macro_timer = None
-                    self.reset_valves()  # This will also update button states
+                    self.reset_valves()
                     self.active_valve_macro = None
                     return
 
@@ -1877,37 +1885,33 @@ class MainWindow(QMainWindow):
                     self.active_valve_macro = macro_num
                     self.disable_other_valve_controls(macro_num)
 
-                    # Get current valve states before applying macro
-                    current_valve_states = [0] * 8
-                    try:
-                        if hasattr(self.arduino_worker, 'get_valve_states'):
-                            current_valve_states = self.arduino_worker.get_valve_states()
-                    except Exception as e:
-                        self.logger.warning(f"Could not get current valve states: {e}")
+                    # Record current valve states before applying macro
+                    self.pre_macro_states = [0] * 8
+                    if hasattr(self.arduino_worker, 'get_valve_states'):
+                        self.pre_macro_states = self.arduino_worker.get_valve_states()
 
-                    # Initialize new states with current states
-                    valve_states = current_valve_states.copy()
+                    self.logger.info(
+                        f"Pre-macro valve states: {self.pre_macro_states}")
 
-                    # Update states based on macro settings
+                    # Create new valve states based on macro settings
+                    valve_states = [0] * 8
                     for i, state in enumerate(macro["Valves"]):
                         if state == "Open":
                             valve_states[i] = 1
                         elif state == "Closed":
                             valve_states[i] = 0
-                        # "Ignore" states keep their current value
+                        elif state == "Ignore":
+                            valve_states[i] = self.pre_macro_states[i]
 
                     # Send valve states to Arduino
                     self.arduino_worker.set_valves(valve_states)
-                    self.logger.info(f"Sent valve states for macro {macro_num}: {valve_states}")
+                    self.logger.info(f"Sent valve states for macro {
+                                     macro_num}: {valve_states}")
 
                     # Update valve button states to reflect macro settings
-                    for i in range(6):  # Update all 6 valve buttons
+                    for i in range(6):
                         valve_button = getattr(self, f"Valve{i+1}Button")
-                        if macro["Valves"][i] == "Open":
-                            valve_button.setChecked(True)
-                        elif macro["Valves"][i] == "Closed":
-                            valve_button.setChecked(False)
-                        # "Ignore" states keep their current check state
+                        valve_button.setChecked(bool(valve_states[i]))
 
                     # Check the macro button
                     macro_button.setChecked(True)
@@ -1917,29 +1921,35 @@ class MainWindow(QMainWindow):
                     if timer > 0:
                         def reset_valves():
                             try:
-                                # Get the final valve states after reset
+                                # Create new states: restore valves 1-2, close 3-8
                                 final_states = [0] * 8
-                                if hasattr(self.arduino_worker, 'get_valve_states'):
-                                    final_states = self.arduino_worker.get_valve_states()
-                                
-                                # Reset valves (preserving inlet/outlet)
-                                self.reset_valves()
-                                
-                                # Update button states to match final valve states
+                                # Restore valve 1
+                                final_states[0] = self.pre_macro_states[0]
+                                # Restore valve 2
+                                final_states[1] = self.pre_macro_states[1]
+                                # Valves 3-8 remain 0 (closed)
+
+                                # Send valve states to Arduino
+                                self.arduino_worker.set_valves(final_states)
+
+                                # Update valve button states
                                 for i in range(6):
-                                    valve_button = getattr(self, f"Valve{i+1}Button")
-                                    valve_button.setChecked(bool(final_states[i]))
-                                
+                                    valve_button = getattr(
+                                        self, f"Valve{i+1}Button")
+                                    valve_button.setChecked(
+                                        bool(final_states[i]))
+
                                 # Reset macro state
                                 self.active_valve_macro = None
                                 self.active_macro_timer = None
                                 macro_button.setChecked(False)
-                                
+
                                 # Re-enable controls
                                 self.enable_all_valve_controls()
-                                
-                                self.logger.info("Reset valves after macro timer")
-                                
+
+                                self.logger.info(
+                                    f"Reset valves after macro: {final_states}")
+
                             except Exception as e:
                                 self.logger.error(f"Error in macro reset: {e}")
 
@@ -1949,13 +1959,15 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer.timeout.connect(reset_valves)
                         self.active_macro_timer.start(int(timer * 1000))
 
-                    self.logger.info(f"Executed valve macro {macro_num}: {macro['Label']}")
+                    self.logger.info(f"Executed valve macro {
+                                     macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
                     macro_button.setChecked(False)
 
             except Exception as e:
-                self.handle_error(f"Failed to execute valve macro {macro_num}: {e}")
+                self.handle_error(
+                    f"Failed to execute valve macro {macro_num}: {e}")
                 # Clean up on error
                 if self.active_macro_timer is not None:
                     self.active_macro_timer.stop()
