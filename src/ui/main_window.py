@@ -1336,8 +1336,7 @@ class MainWindow(QMainWindow):
             valve_states = [0] * 8
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
             self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Pressure build {
-                             'started' if checked else 'stopped'}")
+            self.logger.info(f"Pressure build {'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
     def on_switchGasButton_clicked(self, checked: bool):
@@ -1465,13 +1464,15 @@ class MainWindow(QMainWindow):
                 try:
                     # Stop all timers first
                     self.cleanup_file_timer()
-
+                    
+                    # Uncheck all valve controls before disconnecting
+                    self.uncheck_all_valve_controls()
+                    
                     self.arduino_worker.stop()
                     self.arduino_worker = None  # Clear the worker
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
-                        self.arduino_warning_label.setText(
-                            "Warning: Arduino not connected")
+                        self.arduino_warning_label.setText("Warning: Arduino not connected")
                         self.arduino_warning_label.setVisible(True)
 
                     # Disable all valve controls on disconnect
@@ -2721,3 +2722,27 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.logger.error(f"Error cleaning up file timer: {e}")
+
+    def uncheck_all_valve_controls(self):
+        """Uncheck all valve buttons and macros."""
+        try:
+            # Uncheck all valve buttons
+            for i in range(1, 7):  # For all 6 valve buttons
+                valve_button = getattr(self, f"Valve{i}Button")
+                valve_button.setChecked(False)
+
+            # Uncheck all valve macro buttons
+            for i in range(1, 5):  # For all 4 macro buttons
+                macro_button = getattr(self, f"valveMacro{i}Button")
+                macro_button.setChecked(False)
+
+            # Uncheck quick action buttons
+            self.quickBubbleButton.setChecked(False)
+            self.switchGasButton.setChecked(False)
+            self.buildPressureButton.setChecked(False)
+            self.quickVentButton.setChecked(False)
+            self.slowVentButton.setChecked(False)
+
+            self.logger.info("All valve controls unchecked")
+        except Exception as e:
+            self.logger.error(f"Error unchecking valve controls: {e}")
