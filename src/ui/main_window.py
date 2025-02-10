@@ -1094,11 +1094,14 @@ class MainWindow(QMainWindow):
                             # Update UI with first step
                             if self.steps:
                                 QMetaObject.invokeMethod(self, "update_sequence_info",
-                                                       Qt.ConnectionType.QueuedConnection,
-                                                       Q_ARG(str, self.step_types[self.steps[0].step_type]),
-                                                       Q_ARG(float, self.steps[0].time_length),
-                                                       Q_ARG(int, len(self.steps)),
-                                                       Q_ARG(float, self.total_sequence_time))
+                                                         Qt.ConnectionType.QueuedConnection,
+                                                         Q_ARG(
+                                                             str, self.step_types[self.steps[0].step_type]),
+                                                         Q_ARG(
+                                                             float, self.steps[0].time_length),
+                                                         Q_ARG(
+                                                             int, len(self.steps)),
+                                                         Q_ARG(float, self.total_sequence_time))
 
                                 # Call start_sequence directly
                                 self.start_sequence()
@@ -1400,12 +1403,13 @@ class MainWindow(QMainWindow):
                 try:
                     # Stop all timers first
                     self.cleanup_file_timer()
-                    
+
                     self.arduino_worker.stop()
                     self.arduino_worker = None  # Clear the worker
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
-                        self.arduino_warning_label.setText("Warning: Arduino not connected")
+                        self.arduino_warning_label.setText(
+                            "Warning: Arduino not connected")
                         self.arduino_warning_label.setVisible(True)
 
                     # Disable all valve controls on disconnect
@@ -1814,13 +1818,25 @@ class MainWindow(QMainWindow):
                     self.active_valve_macro = macro_num
                     self.disable_other_valve_controls(macro_num)
 
-                    # Convert valve states to binary (0/1)
-                    valve_states = []
-                    for state in macro["Valves"]:
+                    # Get current valve states
+                    current_valve_states = [0] * 8  # Default to all closed
+                    try:
+                        if hasattr(self.arduino_worker, 'get_valve_states'):
+                            current_valve_states = self.arduino_worker.get_valve_states()
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Could not get current valve states: {e}")
+
+                    # Initialize new states with current states
+                    valve_states = current_valve_states.copy()
+
+                    # Update states based on macro settings
+                    for i, state in enumerate(macro["Valves"]):
                         if state == "Open":
-                            valve_states.append(1)
-                        else:  # "Closed" or "Ignore"
-                            valve_states.append(0)
+                            valve_states[i] = 1
+                        elif state == "Closed":
+                            valve_states[i] = 0
+                        # "Ignore" states keep their current value
 
                     # Ensure we have 8 valve states (pad with zeros if needed)
                     while len(valve_states) < 8:
@@ -1831,14 +1847,15 @@ class MainWindow(QMainWindow):
                     self.logger.info(f"Sent valve states for macro {
                                      macro_num}: {valve_states}")
 
-                    # Update valve button states
-                    # Only first 5 valves have buttons
-                    for i, state in enumerate(valve_states[:5]):
+                    # Update valve button states (only first 6 valves have buttons)
+                    for i, state in enumerate(valve_states[:6]):
                         valve_button = getattr(self, f"Valve{i+1}Button")
                         valve_button.setChecked(bool(state))
 
                     # Check the macro button
                     macro_button.setChecked(True)
+
+                    # Rest of the timer handling code...
 
                     # If macro has a timer, schedule valve reset
                     timer = macro.get("Timer", 0)
@@ -1937,29 +1954,30 @@ class MainWindow(QMainWindow):
             if self.steps:
                 # Clear plot before starting new sequence
                 self.plot_widget.clear_plot()
-                
+
                 # Start data recording if enabled
                 if self.saving:
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    filepath = os.path.join(self.default_save_path, f"sequence_{timestamp}.csv")
+                    filepath = os.path.join(
+                        self.default_save_path, f"sequence_{timestamp}.csv")
                     if not self.plot_widget.start_recording(filepath):
                         self.handle_error("Failed to start data recording")
                         return
-                
+
                 # Execute first step
                 self.execute_step(self.steps[0])
-                
+
                 # Start step timer
                 self.step_start_time = time.time()
                 self.step_timer = QTimer()
                 self.step_timer.timeout.connect(self.update_step_time)
                 self.step_timer.start(100)  # Update every 100ms
-                
+
                 # Schedule next step
                 QTimer.singleShot(self.steps[0].time_length, self.next_step)
-                
+
                 self.logger.info("Sequence execution started")
-                
+
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
@@ -1983,12 +2001,13 @@ class MainWindow(QMainWindow):
             else:
                 # Sequence complete
                 self.step_timer.stop()
-                
+
                 # Reset all valves to closed state
                 if self.arduino_worker and self.arduino_worker.running:
                     self.arduino_worker.set_valves([0] * 8)
-                    self.logger.info("Reset all valves after sequence completion")
-                
+                    self.logger.info(
+                        "Reset all valves after sequence completion")
+
                 # Disable sequence mode when complete
                 if self.motor_flag and self.motor_worker and self.motor_worker.running:
                     self.motor_worker.set_sequence_mode(False)
@@ -2003,7 +2022,8 @@ class MainWindow(QMainWindow):
                     self.beginSaveButton.setText("Begin Saving")
                     self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info("Data recording stopped with sequence completion")
+                    self.logger.info(
+                        "Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
@@ -2025,9 +2045,20 @@ class MainWindow(QMainWindow):
             if not self.arduino_worker or not self.arduino_worker.running:
                 raise RuntimeError("Arduino not connected")
 
-            # Set valve states based on step type
-            valve_states = [0] * 8  # Initialize all valves closed
+            # Get current valve states first
+            current_valve_states = [0] * 8  # Default to all closed
+            try:
+                # Get current states from Arduino if possible
+                # If not available, use default closed states
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_valve_states = self.arduino_worker.get_valve_states()
+            except Exception as e:
+                self.logger.warning(f"Could not get current valve states: {e}")
 
+            # Initialize new valve states with current states
+            valve_states = current_valve_states.copy()
+
+            # Update only the valves that are explicitly set in the step
             if step.step_type == 'p':  # Pressurize
                 valve_states[1] = 1  # Open inlet valve
             elif step.step_type == 'v':  # Vent
@@ -2042,9 +2073,9 @@ class MainWindow(QMainWindow):
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
-            elif step.step_type == 'd':  # Delay, close all valves
-                for i in range(1, 5):
-                    valve_states[i] = 0
+            elif step.step_type == 'd':  # Delay
+                # For delay, don't change any valve states
+                pass
 
             # Set valve states
             self.arduino_worker.set_valves(valve_states)
@@ -2067,7 +2098,7 @@ class MainWindow(QMainWindow):
             active_macro_num: Number of the active macro button (1-4)
         """
         # Disable individual valve buttons
-        for i in range(1, 6):
+        for i in range(1, 7):
             valve_button = getattr(self, f"Valve{i}Button")
             valve_button.setEnabled(False)
 
@@ -2089,7 +2120,7 @@ class MainWindow(QMainWindow):
         # Only enable if in manual mode and Arduino is connected
         if self.arduino_worker.running and self.arduino_manual_radio.isChecked():
             # Enable individual valve buttons
-            for i in range(1, 6):
+            for i in range(1, 7):
                 valve_button = getattr(self, f"Valve{i}Button")
                 valve_button.setEnabled(True)
 
@@ -2160,9 +2191,10 @@ class MainWindow(QMainWindow):
 
             # Reset UI state
             if not self.test_mode:
-                self.arduino_warning_label.setText("Warning: Arduino not connected")
+                self.arduino_warning_label.setText(
+                    "Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
-            
+
             # Disable controls
             self.dev_checkbox.setEnabled(False)
             self.dev_checkbox.setChecked(False)
@@ -2510,7 +2542,7 @@ class MainWindow(QMainWindow):
             if self.arduino_worker:
                 # Stop file check timer if it exists
                 self.cleanup_file_timer()
-                
+
                 self.arduino_worker.stop()
                 self.arduino_worker = None
                 self.logger.info("Arduino worker cleaned up")
@@ -2594,7 +2626,8 @@ class MainWindow(QMainWindow):
             self.delay_timer.setSingleShot(True)
             self.delay_timer.timeout.connect(self.find_sequence_file)
             self.delay_timer.start(2000)  # 2 second delay
-            self.logger.info("Will start sequence file monitoring in 2 seconds")
+            self.logger.info(
+                "Will start sequence file monitoring in 2 seconds")
         except Exception as e:
             self.logger.error(f"Error setting up sequence monitoring: {e}")
 
@@ -2606,16 +2639,16 @@ class MainWindow(QMainWindow):
                 self.delay_timer.stop()
                 self.delay_timer = None
                 self.logger.info("Sequence monitoring delay timer cleaned up")
-                
+
             # Clean up the file check timer
             if hasattr(self, 'file_timer') and self.file_timer is not None:
                 self.file_timer.stop()
                 self.file_timer = None
                 self.logger.info("File check timer cleaned up")
-                
+
             # Reset sequence-related UI elements
             if hasattr(self, 'sequence_status_label'):
                 self.sequence_status_label.setText("Status: Waiting for file")
-                
+
         except Exception as e:
             self.logger.error(f"Error cleaning up file timer: {e}")
