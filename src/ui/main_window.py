@@ -1161,58 +1161,116 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def on_Valve1Button_clicked(self, checked: bool):
         """Handle Valve 1 (Switch valve) button click."""
-        if self.arduino_worker.running:
-            # Create valve states list with all valves off except the target valve
-            valve_states = [0] * 8  # 8 valve states
-            valve_states[0] = 1 if checked else 0  # Valve 1 is index 0
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 1 {'opened' if checked else 'closed'}")
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 1
+                current_states[0] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 1 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 1: {e}")
 
     @pyqtSlot(bool)
     def on_Valve2Button_clicked(self, checked: bool):
         """Handle Valve 2 (Inlet valve) button click."""
-        if self.arduino_worker.running:
-            valve_states = [0] * 8
-            valve_states[1] = 1 if checked else 0  # Valve 2 is index 1
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 2 {'opened' if checked else 'closed'}")
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 2
+                current_states[1] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 2 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 2: {e}")
 
     @pyqtSlot(bool)
     def on_Valve3Button_clicked(self, checked: bool):
         """Handle Valve 3 (Outlet valve) button click."""
-        if self.arduino_worker.running:
-            valve_states = [0] * 8
-            valve_states[2] = 1 if checked else 0  # Valve 3 is index 2
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 3 {'opened' if checked else 'closed'}")
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 3
+                current_states[2] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 3 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 3: {e}")
 
     @pyqtSlot(bool)
     def on_Valve4Button_clicked(self, checked: bool):
         """Handle Valve 4 (Vent valve) button click."""
-        if self.arduino_worker.running:
-            valve_states = [0] * 8
-            valve_states[3] = 1 if checked else 0  # Valve 4 is index 3
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 4 {'opened' if checked else 'closed'}")
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 4
+                current_states[3] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 4 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 4: {e}")
 
     @pyqtSlot(bool)
     def on_Valve5Button_clicked(self, checked: bool):
         """Handle Valve 5 (Short valve) button click."""
-        if self.arduino_worker.running:
-            valve_states = [0] * 8
-            valve_states[4] = 1 if checked else 0  # Valve 5 is index 4
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 5 {'opened' if checked else 'closed'}")
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 5
+                current_states[4] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 5 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 5: {e}")
 
     @pyqtSlot(bool)
     def on_Valve6Button_clicked(self, checked: bool):
-        """Handle Valve 6 button click."""
-        if self.arduino_worker.running:
-            # Create valve states list with all valves off except the target valve
-            valve_states = [0] * 8  # 8 valve states
-            valve_states[5] = 1 if checked else 0  # Valve 6 is index 5
-            self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Valve 6 {'opened' if checked else 'closed'}")
+        """Handle Valve 6 (Long valve) button click."""
+        if self.arduino_worker and self.arduino_worker.running:
+            try:
+                # Get current valve states
+                current_states = [0] * 8
+                if hasattr(self.arduino_worker, 'get_valve_states'):
+                    current_states = self.arduino_worker.get_valve_states()
+                
+                # Only update the state of valve 6
+                current_states[5] = 1 if checked else 0
+                
+                # Send updated states to Arduino
+                self.arduino_worker.set_valves(current_states)
+                self.logger.info(f"Valve 6 {'opened' if checked else 'closed'}")
+            except Exception as e:
+                self.logger.error(f"Error controlling Valve 6: {e}")
 
     @pyqtSlot(bool)
     def on_quickVentButton_clicked(self, checked: bool):
