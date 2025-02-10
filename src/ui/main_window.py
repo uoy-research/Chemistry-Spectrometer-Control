@@ -545,36 +545,41 @@ class MainWindow(QMainWindow):
         self.valve_stack.setCurrentIndex(0)
 
     def reset_valves(self):
-        """Reset all valves to their default state."""
-        # Cancel any active timer
-        if self.active_macro_timer is not None:
-            self.active_macro_timer.stop()
-            self.active_macro_timer = None
+        """Reset valves to default state, preserving inlet/outlet valves."""
+        try:
+            if self.arduino_worker and self.arduino_worker.running:
+                # Get current valve states
+                current_valve_states = [0] * 8
+                try:
+                    if hasattr(self.arduino_worker, 'get_valve_states'):
+                        current_valve_states = self.arduino_worker.get_valve_states()
+                except Exception as e:
+                    self.logger.warning(f"Could not get current valve states: {e}")
 
-        # Reset valve buttons
-        for button in self.valve_buttons:
-            button.setChecked(False)
+                # Create new valve states, preserving first two valves
+                valve_states = current_valve_states.copy()
+                # Reset valves 3-8 to closed
+                for i in range(2, 8):
+                    valve_states[i] = 0
 
-        # Reset sequence info displays
-        self.currentStepTypeEdit.clear()
-        self.currentStepTimeEdit.clear()
-        self.stepsRemainingEdit.clear()
-        self.totalTimeEdit.clear()
+                # Send valve states to Arduino
+                self.arduino_worker.set_valves(valve_states)
+                self.logger.info(f"Reset valves (preserving inlet/outlet): {valve_states}")
 
-        # Reset valve states
-        if self.arduino_worker.running:
-            self.arduino_worker.set_valves([0] * 8)  # Close all valves
+                # Update valve button states
+                for i in range(2, 6):  # Only update buttons for valves 3-6
+                    valve_button = getattr(self, f"Valve{i+1}Button")
+                    valve_button.setChecked(False)
 
-        # Clear active macro state and re-enable controls
-        self.active_valve_macro = None
-        self.enable_all_valve_controls()
+                # Reset macro buttons
+                for i in range(1, 5):
+                    macro_button = getattr(self, f"valveMacro{i}Button")
+                    macro_button.setChecked(False)
 
-        # Uncheck all macro buttons
-        for i in range(1, 5):
-            macro_button = getattr(self, f"valveMacro{i}Button")
-            macro_button.setChecked(False)
+                self.active_valve_macro = None
 
-        self.logger.info("Valves reset to default state")
+        except Exception as e:
+            self.logger.error(f"Error resetting valves: {e}")
 
     def set_valve_mode(self, is_auto: bool):
         """Switch between manual and automated valve control.
@@ -2001,13 +2006,12 @@ class MainWindow(QMainWindow):
             else:
                 # Sequence complete
                 self.step_timer.stop()
-
-                # Reset all valves to closed state
+                
+                # Reset valves while preserving inlet/outlet
                 if self.arduino_worker and self.arduino_worker.running:
-                    self.arduino_worker.set_valves([0] * 8)
-                    self.logger.info(
-                        "Reset all valves after sequence completion")
-
+                    self.reset_valves()
+                    self.logger.info("Reset valves after sequence completion")
+                
                 # Disable sequence mode when complete
                 if self.motor_flag and self.motor_worker and self.motor_worker.running:
                     self.motor_worker.set_sequence_mode(False)
@@ -2022,8 +2026,7 @@ class MainWindow(QMainWindow):
                     self.beginSaveButton.setText("Begin Saving")
                     self.beginSaveButton.setChecked(False)
                     self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
+                    self.logger.info("Data recording stopped with sequence completion")
 
                 self.logger.info("Sequence execution completed")
 
@@ -2032,8 +2035,8 @@ class MainWindow(QMainWindow):
             self.handle_error("Failed to execute sequence")
             # Reset valves on error too
             if self.arduino_worker and self.arduino_worker.running:
-                self.arduino_worker.set_valves([0] * 8)
-                self.logger.info("Reset all valves after sequence error")
+                self.reset_valves()
+                self.logger.info("Reset valves after sequence error")
             # Disable sequence mode on error
             if self.motor_flag and self.motor_worker and self.motor_worker.running:
                 self.motor_worker.set_sequence_mode(False)
