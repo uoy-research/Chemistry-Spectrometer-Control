@@ -944,8 +944,6 @@ class MainWindow(QMainWindow):
                 self.on_buildPressureButton_clicked)
             self.switchGasButton.clicked.connect(
                 self.on_switchGasButton_clicked)
-            self.quickBubbleButton.clicked.connect(
-                self.on_quickBubbleButton_clicked)
 
             # Motor control buttons
             self.motor_connect_btn.clicked.connect(
@@ -1314,9 +1312,9 @@ class MainWindow(QMainWindow):
 
     def stop_bubble(self):
         """Stop bubbling sequence."""
-        if self.arduino_worker.running:
-            # Close all valves
-            self.arduino_worker.set_valves([0] * 8)
+        if self.arduino_worker and self.arduino_worker.running:
+            # Use the reset_valves method to preserve inlet/outlet valves
+            self.reset_valves()
             self.quickBubbleButton.setChecked(False)
             self.logger.info("Quick bubble complete")
 
@@ -1852,10 +1850,20 @@ class MainWindow(QMainWindow):
                     self.logger.info(f"Sent valve states for macro {
                                      macro_num}: {valve_states}")
 
-                    # Update valve button states (only first 6 valves have buttons)
-                    for i, state in enumerate(valve_states[:6]):
-                        valve_button = getattr(self, f"Valve{i+1}Button")
-                        valve_button.setChecked(bool(state))
+                    # Update valve button states based on current valve states
+                    try:
+                        if hasattr(self.arduino_worker, 'get_valve_states'):
+                            current_states = self.arduino_worker.get_valve_states()
+                            # Update first 6 valve buttons based on actual states
+                            for i in range(6):  # Update all 6 valve buttons
+                                valve_button = getattr(self, f"Valve{i+1}Button")
+                                valve_button.setChecked(bool(current_states[i]))
+                    except Exception as e:
+                        self.logger.warning(f"Could not get current valve states for button update: {e}")
+                        # Fallback to using the sent states if we can't get current states
+                        for i, state in enumerate(valve_states[:6]):
+                            valve_button = getattr(self, f"Valve{i+1}Button")
+                            valve_button.setChecked(bool(state))
 
                     # Check the macro button
                     macro_button.setChecked(True)
@@ -1866,14 +1874,9 @@ class MainWindow(QMainWindow):
                     timer = macro.get("Timer", 0)
                     if timer > 0:
                         def reset_valves():
-                            # Reset all valves to closed
-                            self.arduino_worker.set_valves([0] * 8)
+                            # Use the reset_valves method to preserve inlet/outlet valves
+                            self.reset_valves()
                             self.logger.info("Reset valves after macro timer")
-
-                            # Reset button states
-                            for i in range(1, 6):
-                                valve_button = getattr(self, f"Valve{i}Button")
-                                valve_button.setChecked(False)
 
                             # Reset macro state
                             self.active_valve_macro = None
