@@ -28,6 +28,9 @@ class MockArduinoController:
         self._base_pressures = [1.0, 2.0, 3.0, 4.0]
         self._variation_amplitude = 0.2  # Amount of random variation
         self._oscillation_period = 10.0  # Period of oscillation in seconds
+        
+        # Add valve state tracking
+        self._valve_states = [0] * 8  # Track states of all 8 valves
 
     def start(self) -> bool:
         self.running = True
@@ -62,15 +65,23 @@ class MockArduinoController:
         return readings
 
     def set_valves(self, states: List[int]) -> bool:
+        """Set valve states and store them."""
+        if len(states) != 8 or not all(x in [0, 1] for x in states):
+            return False
+            
+        # Store the valve states
+        self._valve_states = states.copy()
+        
         # Simulate valve state changes affecting pressures
         if states[1]:  # If inlet valve (Valve 2) is open
-            self._base_pressures = [
-                p + 0.5 for p in self._base_pressures]  # Increase pressure
+            self._base_pressures = [p + 0.5 for p in self._base_pressures]  # Increase pressure
         elif states[3]:  # If vent valve (Valve 4) is open
-            self._base_pressures = [
-                # Decrease pressure
-                max(1.0, p - 0.5) for p in self._base_pressures]
+            self._base_pressures = [max(1.0, p - 0.5) for p in self._base_pressures]  # Decrease pressure
         return True
+
+    def get_valve_states(self) -> List[int]:
+        """Get current valve states."""
+        return self._valve_states.copy()
 
     def send_depressurise(self) -> bool:
         # Reset pressures to base values
