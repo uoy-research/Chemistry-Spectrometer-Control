@@ -55,7 +55,8 @@ class MainWindow(QMainWindow):
         'v': 'Vent',
         'b': 'Bubble',
         'f': 'Flow',
-        'e': 'Evacuate'
+        'e': 'Evacuate',
+        'c': 'Close'
     }
 
     def __init__(self, test_mode: bool = False):
@@ -2149,6 +2150,11 @@ class MainWindow(QMainWindow):
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
+            elif step.step_type == 'c':  # Close valves 3 to 6
+                valve_states[2] = 0
+                valve_states[3] = 0
+                valve_states[4] = 0
+                valve_states[5] = 0
             elif step.step_type == 'd':  # Delay
                 # For delay, don't change any valve states
                 pass
