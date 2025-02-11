@@ -176,18 +176,7 @@ class PlotWidget(QWidget):
         """Export plot data to CSV file."""
         try:
             from PyQt6.QtWidgets import QFileDialog
-            import pandas as pd
-
-            # Create DataFrame
-            data = {
-                'Time': list(self.timestamps),
-                'Sensor1': list(self.pressure_data[0]),
-                'Sensor2': list(self.pressure_data[1]),
-                'Sensor3': list(self.pressure_data[2]),
-                'Sensor4': list(self.pressure_data[3])
-            }
-            df = pd.DataFrame(data)
-
+            
             # Get save location
             filename, _ = QFileDialog.getSaveFileName(
                 self,
@@ -195,9 +184,18 @@ class PlotWidget(QWidget):
                 "",
                 "CSV Files (*.csv)"
             )
-
+            
             if filename:
-                df.to_csv(filename, index=False)
+                with open(filename, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    # Write header
+                    writer.writerow(['Time', 'Sensor1', 'Sensor2', 'Sensor3', 'Sensor4'])
+                    
+                    # Write data rows
+                    for i in range(len(self.times)):
+                        row = [self.times[i]] + [self.pressures[j][i] for j in range(4)]
+                        writer.writerow(row)
+                        
                 self.logger.info(f"Data exported to {filename}")
 
         except Exception as e:
