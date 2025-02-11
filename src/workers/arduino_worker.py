@@ -215,3 +215,7 @@ class ArduinoWorker(QThread):
     def running(self) -> bool:
         """Get the running state of the worker."""
         return self._running
+    
+    def get_valve_states(self) -> List[int]:
+        """Get current valve states."""
+        return self.controller.get_valve_states()

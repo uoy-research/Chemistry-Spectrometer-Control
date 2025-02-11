@@ -1164,7 +1164,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker and self.arduino_worker.running:
             try:
                 # Get current valve states
-                current_states = [0] * 8
+                current_states = [2] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
 
@@ -1184,7 +1184,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker and self.arduino_worker.running:
             try:
                 # Get current valve states
-                current_states = [0] * 8
+                current_states = [2] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
 
@@ -1204,7 +1204,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker and self.arduino_worker.running:
             try:
                 # Get current valve states
-                current_states = [0] * 8
+                current_states = [2] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
 
@@ -1224,7 +1224,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker and self.arduino_worker.running:
             try:
                 # Get current valve states
-                current_states = [0] * 8
+                current_states = [2] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
 
@@ -1244,7 +1244,7 @@ class MainWindow(QMainWindow):
         if self.arduino_worker and self.arduino_worker.running:
             try:
                 # Get current valve states
-                current_states = [0] * 8
+                current_states = [2] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
 
@@ -1267,6 +1267,7 @@ class MainWindow(QMainWindow):
                 current_states = [0] * 8
                 if hasattr(self.arduino_worker, 'get_valve_states'):
                     current_states = self.arduino_worker.get_valve_states()
+                logging.info(f"Current states: {current_states}")
 
                 # Only update the state of valve 6
                 current_states[5] = 1 if checked else 0
@@ -1288,13 +1289,15 @@ class MainWindow(QMainWindow):
             # Configure valves for quick venting
             valve_states = [0] * 8  # Initialize all valves closed
             valve_states[1] = 0     # Close inlet (Valve 2)
-            valve_states[3] = 1     # Open vent (Valve 4)
+            valve_states[2] = 1     # Open outlet (Valve 3)
+            valve_states[3] = 0     # Open vent (Valve 4)
             valve_states[4] = 1     # Open short (Valve 5)
             self.arduino_worker.set_valves(valve_states)
 
             # Update valve button states
             self.Valve2Button.setChecked(False)  # Inlet
-            self.Valve4Button.setChecked(True)   # Vent
+            self.Valve3Button.setChecked(True)  # Outlet
+            self.Valve4Button.setChecked(False)   # Vent
             self.Valve5Button.setChecked(True)   # Short
 
             self.logger.info("Quick vent started")

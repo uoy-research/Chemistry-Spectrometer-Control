@@ -7,6 +7,7 @@ import minimalmodbus
 import logging
 import time
 from typing import List, Optional
+from PyQt6.QtCore import QTimer
 
 class ArduinoController:
     """Arduino controller class using minimalmodbus."""
@@ -31,6 +32,14 @@ class ArduinoController:
         self.mode = mode
         self.running = False
         self.arduino = None
+        
+        # Initialize valve state tracking
+        self._valve_states = [0] * 8
+        
+        # Setup valve state verification timer
+        self.valve_check_timer = QTimer()
+        self.valve_check_timer.timeout.connect(self._verify_valve_states)
+        self.valve_check_timer.setInterval(1000)  # Check every 1 second
         
         # Setup logging
         self._setup_logging()
@@ -78,6 +87,12 @@ class ArduinoController:
                 
                 self.running = True
                 self.logger.info(f"Connected to Arduino on COM{self.port}")
+                
+                # Start valve state verification timer
+                if self.running:
+                    self.valve_check_timer.start()
+                    self.logger.debug("Started valve state verification timer")
+                
                 return True
             except Exception as e:
                 self.logger.error(f"Connection test failed: {e}")
@@ -134,6 +149,9 @@ class ArduinoController:
         try:
             # Write all valve states at once
             self.arduino.write_bits(0, states)
+            # Update tracked valve states
+            self._valve_states = states.copy()
+            self.logger.debug(f"Set valve states to: {states}")
             return True
 
         except Exception as e:
@@ -143,6 +161,11 @@ class ArduinoController:
 
     def stop(self):
         """Stop the Arduino connection."""
+        # Stop valve check timer
+        if self.valve_check_timer.isActive():
+            self.valve_check_timer.stop()
+            self.logger.debug("Stopped valve state verification timer")
+
         if self.arduino and hasattr(self.arduino, 'serial'):
             try:
                 # Disable TTL if enabled
@@ -165,6 +188,8 @@ class ArduinoController:
             
         try:
             self.arduino.write_bit(self.RESET_ADDRESS, 1)
+            # Update tracked valve states to all closed
+            self._valve_states = [0] * 8
             return True
         except Exception as e:
             self.logger.error(f"Error resetting system: {e}")
@@ -180,8 +205,40 @@ class ArduinoController:
             return False
             
         try:
+            # Set depressurize signal
             self.arduino.write_bit(self.DEPRESSURIZE_ADDRESS, 1)
+            # Update tracked valve states to all closed
+            self._valve_states = [0] * 8
             return True
         except Exception as e:
             self.logger.error(f"Error depressurizing system: {e}")
             return False
+        
+    def get_valve_states(self) -> List[int]:
+        """Get current valve states.
+        
+        Returns:
+            List[int]: Current valve states (0 or 1) for all 8 valves
+        """
+        # Always return the local copy
+        return self._valve_states.copy()
+
+    def _verify_valve_states(self):
+        """Verify that local valve states match hardware states."""
+        if not self.running:
+            return
+            
+        try:
+            # Read current states from Arduino
+            actual_states = self.arduino.read_bits(0, 8, 1)
+            
+            # Compare with local states
+            if actual_states != self._valve_states:
+                self.logger.warning(f"Valve state mismatch detected! Local: {self._valve_states}, Actual: {actual_states}")
+                # Update local states to match actual states
+                self._valve_states = actual_states
+            else:
+                self.logger.info("Valve states: %s", actual_states)
+                
+        except Exception as e:
+            self.logger.error(f"Error verifying valve states: {e}")
