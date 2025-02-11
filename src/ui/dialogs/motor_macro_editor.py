@@ -10,8 +10,8 @@ class MotorMacroEditor(QtWidgets.QDialog):
         self.parent = parent
 
         self.setWindowTitle("Motor Macro Editor")
-        self.setGeometry(100, 100, 300, 230)
-        self.setFixedSize(300, 230)
+        self.setGeometry(100, 100, 390, 230)
+        self.setFixedSize(390, 230)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
@@ -30,7 +30,8 @@ class MotorMacroEditor(QtWidgets.QDialog):
 
         # Resize all columns to fit
         self.table.resizeColumnsToContents()
-        self.table.setColumnWidth(1, 130)  # Label column
+        self.table.setColumnWidth(1, 180)  # Label column
+        self.table.setColumnWidth(2, 100)  # Position column
 
     def load_data(self):
         json_path = Path("C:/ssbubble/motor_macro_data.json")
@@ -50,7 +51,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
                     self.table.setItem(i, 1, label_item)
                     # Position SpinBox
                     position_spinbox = QtWidgets.QSpinBox()
-                    position_spinbox.setRange(0, 2500000)
+                    position_spinbox.setRange(0, 400)
                     position_val = macro.get("Position", 0)
                     position_spinbox.setValue(position_val)
                     self.table.setCellWidget(i, 2, position_spinbox)
