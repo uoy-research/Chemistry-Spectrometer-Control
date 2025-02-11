@@ -45,15 +45,6 @@ class PlotWidget(QWidget):
         self.ax.set_ylabel('Pressure (bar)')
         self.ax.set_xlabel('Time (s)')
 
-        # Create toolbar
-        self.toolbar = NavigationToolbar(self.canvas, self)
-
-        # Setup layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.toolbar)
-        layout.addWidget(self.canvas)
-        self.setLayout(layout)
-
         # Initialize data
         self.times = np.array([])
         self.pressures = [np.array([]) for _ in range(4)]
@@ -63,8 +54,24 @@ class PlotWidget(QWidget):
         # Track sensor visibility
         self.sensor_visibility = [True] * 4  # All sensors visible by default
 
-        # Add legend
-        self.ax.legend()
+        # Add legend with fixed position in top left
+        self.ax.legend(
+            loc='upper left',  # Position in upper left
+            bbox_to_anchor=(0.02, 0.98),  # Fine-tune the position (x=0.02, y=0.98)
+            ncol=2,  # Arrange in 2 columns
+            fontsize='small',  # Smaller font size
+            framealpha=0.8,  # Slight transparency
+            edgecolor='none'  # No edge color
+        )
+
+        # Create toolbar
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        # Setup layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        self.setLayout(layout)
 
         # Set up update timer
         self.timer = QTimer()
