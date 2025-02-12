@@ -146,10 +146,12 @@ class DevPanel(QDialog):
             self.parent.logger.error("Failed to set motor speed")
 
     def set_motor_accel(self):
-        """Set the motor acceleration (placeholder)."""
+        """Set the motor acceleration."""
         accel = self.accel_spinbox.value()
-        self.parent.logger.info(f"Set motor acceleration to {accel} (not implemented)")
-        # TODO: Implement motor acceleration setting 
+        if self.parent.motor_worker.set_acceleration(accel):
+            self.parent.logger.info(f"Motor acceleration set to {accel}")
+        else:
+            self.parent.logger.error("Failed to set motor acceleration")
 
     def closeEvent(self, event):
         """Re-enable motor limits when panel is closed."""

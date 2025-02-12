@@ -38,6 +38,9 @@ class MockMotorController:
         self._speed = 4000  # Default to medium speed
         self._initial_offset = 0.0  # Track position offset from calibration
         self._limits_enabled = True
+        self.ACCEL_MAX = 23250  # Match real controller acceleration limits
+        self.ACCEL_MIN = 0
+        self._acceleration = 4000  # Default acceleration
 
     def start(self) -> bool:
         """Start the mock controller."""
@@ -179,6 +182,26 @@ class MockMotorController:
         """Enable or disable motor position limits."""
         self._limits_enabled = enabled
         self.logger.info(f"Mock motor limits {'enabled' if enabled else 'disabled'}")
+
+    def set_acceleration(self, accel: int) -> bool:
+        """Set mock motor acceleration.
+        
+        Args:
+            accel: Acceleration value (0-23250)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            if accel < self.ACCEL_MIN or accel > self.ACCEL_MAX:
+                self.logger.error(f"Invalid acceleration value: {accel}")
+                return False
+            self._acceleration = accel
+            self.logger.info(f"Mock motor acceleration set to {accel}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Mock motor set_acceleration failed: {e}")
+            return False
 
 
 class MotorWorker(QThread):
@@ -807,4 +830,35 @@ class MotorWorker(QThread):
 
         except Exception as e:
             self.error_occurred.emit(f"Failed to move to bottom: {str(e)}")
+            return False
+
+    def set_acceleration(self, accel: int) -> bool:
+        """Set motor acceleration.
+        
+        Args:
+            accel: Acceleration value (0-23250)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            if not self.running:
+                self.error_occurred.emit("Motor not connected")
+                return False
+                
+            # Validate acceleration range
+            if accel < self.controller.ACCEL_MIN or accel > self.controller.ACCEL_MAX:
+                self.logger.error(f"Invalid acceleration value: {accel}")
+                return False
+            
+            success = self.controller.set_acceleration(accel)
+            if success:
+                self.logger.info(f"Motor acceleration set to {accel}")
+                return True
+            else:
+                self.error_occurred.emit("Failed to set motor acceleration")
+                return False
+        
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to set motor acceleration: {e}")
             return False

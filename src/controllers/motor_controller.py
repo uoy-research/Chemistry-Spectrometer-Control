@@ -12,6 +12,8 @@ from typing import Optional, Union, Tuple
 class MotorController:
     SPEED_MAX = 6501
     SPEED_MIN = 0
+    ACCEL_MAX = 23250  # Add acceleration limits
+    ACCEL_MIN = 0
     POSITION_MAX = 364.40  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
     STEPS_PER_MM = 6400.0
@@ -462,3 +464,26 @@ class MotorController:
         if not self._limits_enabled:
             return True
         return self.POSITION_MIN <= position <= self.POSITION_MAX
+
+    def set_acceleration(self, accel: int) -> bool:
+        """Set motor acceleration via Modbus.
+        
+        Args:
+            accel: Acceleration value (0-23250)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Validate acceleration range
+            if accel < self.ACCEL_MIN or accel > self.ACCEL_MAX:
+                self.logger.error(f"Invalid acceleration value: {accel}")
+                return False
+            
+            # Write acceleration to register 10
+            self.instrument.write_register(10, accel)
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Failed to set motor acceleration: {e}")
+            return False
