@@ -120,6 +120,10 @@ class MotorController:
                     position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
                     self.motor_position = position
                     self._consecutive_errors = 0  # Reset error counter on success
+                    
+                    # Add debug log for raw step data
+                    # self.logger.debug(f"Raw step data - High: {readings[0]}, Low: {readings[1]}, Combined: {raw_steps} steps")
+                    
                     return float(position)
                 except Exception as e:
                     if attempt == max_retries - 1:  # Last attempt
@@ -323,6 +327,19 @@ class MotorController:
             self.logger.error(f"Couldn't move to bottom: {e}")
             self.serial_connected = False
             return False
+        
+    def to_top(self) -> bool:
+        """Move motor to bottom position."""
+        try:
+            self.instrument.write_register(2, ord('t'))
+            self.instrument.write_bit(1, 1)
+            self.serial_connected = True
+            return True
+        except Exception as e:
+            self.logger.error(f"Couldn't move to top: {e}")
+            self.serial_connected = False
+            return False
+
 
     def get_top_position(self) -> Optional[float]:
         """Get the top position of the motor."""

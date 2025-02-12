@@ -1633,8 +1633,8 @@ class MainWindow(QMainWindow):
 
                 # Special case: if target is 0, use to_bottom command instead
                 if target == 0:
-                    if self.motor_worker.to_bottom():
-                        self.logger.info("Moving motor to bottom position (364.40)")
+                    if self.motor_worker.to_top():
+                        self.logger.info("Moving motor to top position (364.40)")
                         return
                     else:
                         self.handle_error("Failed to move motor to bottom")
