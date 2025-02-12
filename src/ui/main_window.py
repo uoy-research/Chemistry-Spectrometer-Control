@@ -1637,7 +1637,7 @@ class MainWindow(QMainWindow):
                         self.logger.info("Moving motor to top position (364.40)")
                         return
                     else:
-                        self.handle_error("Failed to move motor to bottom")
+                        self.handle_error("Failed to move motor to top")
                         return
 
                 if target < 0:
