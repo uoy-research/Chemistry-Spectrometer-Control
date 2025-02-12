@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+import time
 
 
 class DevPanel(QDialog):
@@ -144,6 +145,13 @@ class DevPanel(QDialog):
             self.parent.logger.info(f"Motor speed set to {speed}")
         else:
             self.parent.logger.error("Failed to set motor speed")
+            # Disconnect motor on failure
+            self.parent.cleanup_motor_worker()
+            self.parent.motor_connect_btn.setText("Connect")
+            self.parent.motor_warning_label.setText("Warning: Motor not connected")
+            self.parent.motor_warning_label.setVisible(True)
+            self.parent.disable_motor_controls(True)
+            self.close()  # Close dev panel
 
     def set_motor_accel(self):
         """Set the motor acceleration."""
@@ -152,10 +160,72 @@ class DevPanel(QDialog):
             self.parent.logger.info(f"Motor acceleration set to {accel}")
         else:
             self.parent.logger.error("Failed to set motor acceleration")
+            # Disconnect motor on failure
+            self.parent.cleanup_motor_worker()
+            self.parent.motor_connect_btn.setText("Connect")
+            self.parent.motor_warning_label.setText("Warning: Motor not connected")
+            self.parent.motor_warning_label.setVisible(True)
+            self.parent.disable_motor_controls(True)
+            self.close()  # Close dev panel
 
     def closeEvent(self, event):
-        """Re-enable motor limits when panel is closed."""
-        self.limits_checkbox.setChecked(True)  # Reset checkbox
-        self.parent.motor_worker.set_limits_enabled(True)  # Force enable limits
-        self.parent.logger.info("Motor limits re-enabled on panel close")
-        super().closeEvent(event) 
+        """Re-enable motor limits and reset speed/acceleration when panel is closed."""
+        try:
+            # Reset motor limits
+            self.limits_checkbox.setChecked(True)  # Reset checkbox
+            self.parent.motor_worker.set_limits_enabled(True)  # Force enable limits
+            self.parent.logger.info("Motor limits re-enabled")
+            
+            # Add delay before speed reset
+            time.sleep(0.2)  # 200ms delay
+            
+            # Reset speed based on main window combo box
+            speed_map = {
+                'Fast': 6500,    # Maximum speed
+                'Medium': 4000,  # 60% speed
+                'Slow': 2000     # 30% speed
+            }
+            selected_speed = self.parent.motor_speed_combo.currentText()
+            speed = speed_map.get(selected_speed, 4000)  # Default to Medium if not found
+            if self.parent.motor_worker.set_speed(speed):
+                self.parent.logger.info(f"Motor speed reset to {selected_speed} ({speed})")
+            else:
+                self.parent.logger.error("Failed to reset motor speed")
+                # Disconnect motor on failure
+                self.parent.cleanup_motor_worker()
+                self.parent.motor_connect_btn.setText("Connect")
+                self.parent.motor_warning_label.setText("Warning: Motor not connected")
+                self.parent.motor_warning_label.setVisible(True)
+                self.parent.disable_motor_controls(True)
+                super().closeEvent(event)
+                return
+            
+            # Add delay before acceleration reset
+            time.sleep(0.2)  # 200ms delay
+            
+            # Reset acceleration to maximum
+            if self.parent.motor_worker.set_acceleration(self.parent.motor_worker.controller.ACCEL_MAX):
+                self.parent.logger.info(f"Motor acceleration reset to maximum ({self.parent.motor_worker.controller.ACCEL_MAX})")
+            else:
+                self.parent.logger.error("Failed to reset motor acceleration")
+                # Disconnect motor on failure
+                self.parent.cleanup_motor_worker()
+                self.parent.motor_connect_btn.setText("Connect")
+                self.parent.motor_warning_label.setText("Warning: Motor not connected")
+                self.parent.motor_warning_label.setVisible(True)
+                self.parent.disable_motor_controls(True)
+                super().closeEvent(event)
+                return
+            
+            self.parent.logger.info("Motor limits, speed, and acceleration reset on panel close")
+            super().closeEvent(event)
+            
+        except Exception as e:
+            self.parent.logger.error(f"Error resetting motor parameters on panel close: {e}")
+            # Disconnect motor on any error
+            self.parent.cleanup_motor_worker()
+            self.parent.motor_connect_btn.setText("Connect")
+            self.parent.motor_warning_label.setText("Warning: Motor not connected")
+            self.parent.motor_warning_label.setVisible(True)
+            self.parent.disable_motor_controls(True)
+            super().closeEvent(event) 

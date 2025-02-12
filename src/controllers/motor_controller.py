@@ -35,6 +35,7 @@ class MotorController:
         self._max_consecutive_errors = 5  # Maximum allowed consecutive errors
         self._in_sequence = False  # Add flag for sequence mode
         self._limits_enabled = True  # Add flag for motor limits
+        self._error_state = False  # Add flag to track error state
 
     def _setup_logging(self):
         """Setup logging for the Arduino controller."""
@@ -50,6 +51,7 @@ class MotorController:
         Returns:
             bool: True if successfully started and initialized, False otherwise
         """
+        self._error_state = False  # Reset error state on start
         try:
             if self.mode == 2:  # Test mode
                 self.running = True
@@ -103,7 +105,7 @@ class MotorController:
 
     def get_position(self) -> Optional[float]:
         """Get current motor position."""
-        if not self.running:
+        if not self.running or self._error_state:
             return None
 
         try:
@@ -116,7 +118,6 @@ class MotorController:
                 try:
                     readings = self.instrument.read_registers(5, 2, functioncode=3)
                     raw_steps = self.assemble(readings[0], readings[1])
-                    # Convert to millimeters and apply offset to show POSITION_MAX at calibration point
                     position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
                     self.motor_position = position
                     self._consecutive_errors = 0  # Reset error counter on success
@@ -140,6 +141,7 @@ class MotorController:
                 self.logger.error("Too many consecutive errors, stopping motor controller")
                 self.running = False
                 self.serial_connected = False
+                self._error_state = True  # Set error state flag
                 
             return None
 
@@ -211,7 +213,8 @@ class MotorController:
         
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
         """Set motor position with optional limit checking."""
-        if not self.running:
+        if not self.running or self._error_state:  # Check error state
+            self.logger.error("Motor controller is in error state or not running")
             return False, position
 
         try:
@@ -318,6 +321,10 @@ class MotorController:
 
     def to_bottom(self) -> bool:
         """Move motor to bottom position."""
+        if not self.running or self._error_state:  # Check error state
+            self.logger.error("Motor controller is in error state or not running")
+            return False
+
         try:
             self.instrument.write_register(2, ord('b'))
             self.instrument.write_bit(1, 1)
@@ -329,7 +336,11 @@ class MotorController:
             return False
         
     def to_top(self) -> bool:
-        """Move motor to bottom position."""
+        """Move motor to top position."""
+        if not self.running or self._error_state:  # Check error state
+            self.logger.error("Motor controller is in error state or not running")
+            return False
+
         try:
             self.instrument.write_register(2, ord('t'))
             self.instrument.write_bit(1, 1)
@@ -370,6 +381,7 @@ class MotorController:
 
     def stop(self):
         """Stop the motor controller and clean up."""
+        self._error_state = True  # Set error state when stopping
         try:
             if self.serial_connected:
                 self.stop_motor()
