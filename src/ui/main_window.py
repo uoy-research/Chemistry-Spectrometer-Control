@@ -403,8 +403,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'motor_to_top_button'):
             self.motor_to_top_button.setEnabled(
                 not disabled and self.motor_calibrated)
-            self.motor_ascent_button.setEnabled(
-                not disabled and self.motor_calibrated)
+            self.motor_to_bottom_button.setEnabled(not disabled and self.motor_calibrated)
 
             # Macro buttons 1-6
             for i in range(1, 7):
@@ -800,12 +799,13 @@ class MainWindow(QMainWindow):
         self.motor_to_top_button.setFont(font)
         motor_macro_layout.addWidget(self.motor_to_top_button, 0, 0, 1, 1)
 
-        self.motor_ascent_button = QPushButton("Ascent")
-        self.motor_ascent_button.setMinimumSize(QSize(0, 35))
+        # Replace ascent button with to bottom button
+        self.motor_to_bottom_button = QPushButton("To Bottom")
+        self.motor_to_bottom_button.setMinimumSize(QSize(0, 35))
         font = QFont()
         font.setPointSize(10)
-        self.motor_ascent_button.setFont(font)
-        motor_macro_layout.addWidget(self.motor_ascent_button, 0, 1, 1, 1)
+        self.motor_to_bottom_button.setFont(font)
+        motor_macro_layout.addWidget(self.motor_to_bottom_button, 0, 1, 1, 1)
 
         # Create macro buttons 1-6
         for i in range(1, 7):
@@ -904,7 +904,7 @@ class MainWindow(QMainWindow):
                 self.motor_calibrate_btn.clicked.disconnect()
                 self.motor_stop_btn.clicked.disconnect()
                 self.motor_move_to_target_button.clicked.disconnect()
-                self.motor_ascent_button.clicked.disconnect()
+                self.motor_to_bottom_button.clicked.disconnect()
                 self.motor_to_top_button.clicked.disconnect()
 
                 # Motor macro buttons
@@ -956,8 +956,7 @@ class MainWindow(QMainWindow):
                 self.on_motorStopButton_clicked)
             self.motor_move_to_target_button.clicked.connect(
                 self.on_motorMoveToTargetButton_clicked)
-            self.motor_ascent_button.clicked.connect(
-                self.on_motorAscentButton_clicked)
+            self.motor_to_bottom_button.clicked.connect(self.on_motorToBottomButton_clicked)
             self.motor_to_top_button.clicked.connect(
                 self.on_motorToTopButton_clicked)
 
@@ -1663,13 +1662,13 @@ class MainWindow(QMainWindow):
                 self.handle_error("Invalid target position")
 
     @pyqtSlot()
-    def on_motorAscentButton_clicked(self):
-        """Handle motor ascent button click."""
+    def on_motorToBottomButton_clicked(self):
+        """Handle motor to bottom button click."""
         if self.motor_worker.running:
-            if self.motor_worker.ascent():
-                self.logger.info("Starting motor ascent")
+            if self.motor_worker.to_bottom():
+                self.logger.info("Moving motor to bottom position")
             else:
-                self.handle_error("Failed to start motor ascent")
+                self.handle_error("Failed to move motor to bottom")
 
     @pyqtSlot()
     def on_motorToTopButton_clicked(self):

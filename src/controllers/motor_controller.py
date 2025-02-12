@@ -310,27 +310,15 @@ class MotorController:
                 self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
                 time.sleep(0.1)  # Short delay between retries
 
-    def ascent(self) -> bool:
-        """Move motor up."""
+    def to_bottom(self) -> bool:
+        """Move motor to bottom position."""
         try:
-            self.instrument.write_register(2, ord('u'))
+            self.instrument.write_register(2, ord('b'))
             self.instrument.write_bit(1, 1)
             self.serial_connected = True
             return True
         except Exception as e:
-            self.logger.error(f"Couldn't move up: {e}")
-            self.serial_connected = False
-            return False
-
-    def to_top(self) -> bool:
-        """Move motor to top position."""
-        try:
-            self.instrument.write_register(2, ord('t'))
-            self.instrument.write_bit(1, 1)
-            self.serial_connected = True
-            return True
-        except Exception as e:
-            self.logger.error(f"Couldn't move to top: {e}")
+            self.logger.error(f"Couldn't move to bottom: {e}")
             self.serial_connected = False
             return False
 

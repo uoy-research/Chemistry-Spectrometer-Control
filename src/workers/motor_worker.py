@@ -782,3 +782,29 @@ class MotorWorker(QThread):
         """Reset the instance counter - useful for testing."""
         with cls._instance_lock:
             cls._instance_count = 0
+
+    def to_bottom(self) -> bool:
+        """Move motor to bottom position."""
+        if not self.running:
+            self.error_occurred.emit("Motor not connected")
+            return False
+        
+        try:
+            if isinstance(self.controller, MockMotorController):
+                success = self.controller.set_position(self.controller.POSITION_MAX)
+                if success:
+                    self.logger.info("Moving mock motor to bottom position")
+                    return True
+                return False
+
+            success = self.controller.to_bottom()
+            if success:
+                self.logger.info("Moving motor to bottom position")
+                return True
+            else:
+                self.error_occurred.emit("Failed to move motor to bottom")
+                return False
+
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to move to bottom: {str(e)}")
+            return False
