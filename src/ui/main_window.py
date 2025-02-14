@@ -2371,6 +2371,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Emergency Stop",
                             "Emergency stop activated!")
         self.logger.warning("Emergency stop activated")
+        self.update_device_status()  # Update device status after emergency stop
 
     def closeEvent(self, event):
         """Handle application shutdown."""
