@@ -28,7 +28,7 @@ class MockArduinoController:
         self._base_pressures = [1.0, 2.0, 3.0, 4.0]
         self._variation_amplitude = 0.2  # Amount of random variation
         self._oscillation_period = 10.0  # Period of oscillation in seconds
-        
+
         # Add valve state tracking
         self._valve_states = [0] * 8  # Track states of all 8 valves
 
@@ -68,15 +68,18 @@ class MockArduinoController:
         """Set valve states and store them."""
         if len(states) != 8 or not all(x in [0, 1] for x in states):
             return False
-            
+
         # Store the valve states
         self._valve_states = states.copy()
-        
+
         # Simulate valve state changes affecting pressures
         if states[1]:  # If inlet valve (Valve 2) is open
-            self._base_pressures = [p + 0.5 for p in self._base_pressures]  # Increase pressure
+            self._base_pressures = [
+                p + 0.5 for p in self._base_pressures]  # Increase pressure
         elif states[3]:  # If vent valve (Valve 4) is open
-            self._base_pressures = [max(1.0, p - 0.5) for p in self._base_pressures]  # Decrease pressure
+            self._base_pressures = [
+                # Decrease pressure
+                max(1.0, p - 0.5) for p in self._base_pressures]
         return True
 
     def get_valve_states(self) -> List[int]:
@@ -118,6 +121,7 @@ class ArduinoWorker(QThread):
 
         self.port = port
         self.update_interval = update_interval
+        self.mode = 0  # Add mode tracking to worker
         if mock:
             self.controller = MockArduinoController(port=port)
         else:
@@ -138,6 +142,9 @@ class ArduinoWorker(QThread):
         """
         self.logger.info("Starting Arduino worker thread...")
         if not self._running:
+            # Set worker mode to match controller mode
+            if self.controller:
+                self.mode = self.controller.mode  # Sync mode with controller
             super().start()
             return True
         return False
@@ -215,7 +222,7 @@ class ArduinoWorker(QThread):
     def running(self) -> bool:
         """Get the running state of the worker."""
         return self._running
-    
+
     def get_valve_states(self) -> List[int]:
         """Get current valve states."""
         return self.controller.get_valve_states()

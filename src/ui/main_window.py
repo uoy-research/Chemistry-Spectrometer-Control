@@ -1536,8 +1536,10 @@ class MainWindow(QMainWindow):
                 # Set mode and start worker
                 if self.arduino_worker.controller:
                     self.arduino_worker.controller.mode = mode
+                    self.arduino_worker.mode = mode  # Also set mode on worker
                     success = self.arduino_worker.start()
 
+                    # Modified success check to handle test mode
                     if success or self.test_mode:
                         self.arduino_connect_btn.setText("Disconnect")
                         self.arduino_warning_label.setText("")
@@ -1564,7 +1566,8 @@ class MainWindow(QMainWindow):
 
                         self.logger.info(
                             f"Connected to Arduino in mode {mode}")
-                        self.update_device_status()  # Update after successful connection
+                        # Always update status after connection attempt in both real and test modes
+                        self.update_device_status()
                     else:
                         self.arduino_worker = None  # Clear failed worker
                         self.handle_error("Failed to connect to Arduino")
@@ -2783,10 +2786,22 @@ class MainWindow(QMainWindow):
         Y: Motor status (0=disconnected/uncalibrated, 1=connected and calibrated)
         """
         try:
+            self.logger.info("Updating device status file...")  # Add debug log
+
             # Get Arduino status (1 if connected and in auto mode)
-            arduino_status = '1' if (self.arduino_worker and
-                                     self.arduino_worker.running and
-                                     self.arduino_worker.mode == 1) else '0'
+            if self.test_mode:
+                # In test mode, check both worker and controller mode
+                arduino_status = '1' if (self.arduino_worker and
+                                         self.arduino_worker.running and
+                                         (self.arduino_worker.mode == 1 or
+                                          self.arduino_worker.controller.mode == 1)) else '0'
+                self.logger.debug(f"Test mode - Arduino worker mode: {self.arduino_worker.mode if self.arduino_worker else 'None'}, "
+                                  f"Controller mode: {self.arduino_worker.controller.mode if self.arduino_worker and self.arduino_worker.controller else 'None'}")
+            else:
+                # Normal mode - check worker mode
+                arduino_status = '1' if (self.arduino_worker and
+                                         self.arduino_worker.running and
+                                         self.arduino_worker.mode == 1) else '0'
 
             # Get Motor status (1 if connected and calibrated)
             motor_status = '1' if (self.motor_worker and
