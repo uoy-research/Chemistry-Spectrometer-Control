@@ -78,10 +78,19 @@ class MainWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
 
-        # Initialize workers as None - will create on connect
+        # Initialize workers as None
         self.motor_worker = None
-        self.arduino_worker = None  # Changed: Initialize as None
+        self.arduino_worker = None
         self.logger.info("Workers initialized as None")
+
+        # Initialize device status file
+        try:
+            status_path = Path("C:/ssbubble/device_status.txt")
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(status_path, 'w') as f:
+                f.write("00")  # Both devices initially disconnected
+        except Exception as e:
+            self.logger.error(f"Failed to initialize device status file: {e}")
 
         # Setup logging
         self.logger = logging.getLogger(__name__)
@@ -403,7 +412,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'motor_to_top_button'):
             self.motor_to_top_button.setEnabled(
                 not disabled and self.motor_calibrated)
-            self.motor_to_bottom_button.setEnabled(not disabled and self.motor_calibrated)
+            self.motor_to_bottom_button.setEnabled(
+                not disabled and self.motor_calibrated)
 
             # Macro buttons 1-6
             for i in range(1, 7):
@@ -956,7 +966,8 @@ class MainWindow(QMainWindow):
                 self.on_motorStopButton_clicked)
             self.motor_move_to_target_button.clicked.connect(
                 self.on_motorMoveToTargetButton_clicked)
-            self.motor_to_bottom_button.clicked.connect(self.on_motorToBottomButton_clicked)
+            self.motor_to_bottom_button.clicked.connect(
+                self.on_motorToBottomButton_clicked)
             self.motor_to_top_button.clicked.connect(
                 self.on_motorToTopButton_clicked)
 
@@ -1028,6 +1039,7 @@ class MainWindow(QMainWindow):
                     self.motor_calibrate_btn.setEnabled(True)
                     self.disable_motor_controls(True)
                     self.logger.info(f"Connected to motor on COM{port}")
+                    self.update_device_status()
                 else:
                     self.cleanup_motor_worker()
                     self.handle_error("Failed to connect to motor")
@@ -1046,6 +1058,7 @@ class MainWindow(QMainWindow):
                 self.motor_calibrate_btn.setEnabled(False)
                 self.disable_motor_controls(True)
                 self.logger.info("Disconnected from motor")
+                self.update_device_status()
 
         except Exception as e:
             self.logger.error(f"Error in motor connection handler: {e}")
@@ -1494,6 +1507,7 @@ class MainWindow(QMainWindow):
                     # Reset to manual mode when disconnecting
                     self.set_valve_mode(False)
                     self.logger.info("Disconnected from Arduino")
+                    self.update_device_status()  # Update after disconnect
                     return
                 except Exception as e:
                     self.logger.error(f"Error disconnecting Arduino: {str(e)}")
@@ -1550,6 +1564,7 @@ class MainWindow(QMainWindow):
 
                         self.logger.info(
                             f"Connected to Arduino in mode {mode}")
+                        self.update_device_status()  # Update after successful connection
                     else:
                         self.arduino_worker = None  # Clear failed worker
                         self.handle_error("Failed to connect to Arduino")
@@ -1634,7 +1649,8 @@ class MainWindow(QMainWindow):
                 # Special case: if target is 0, use to_bottom command instead
                 if target == 0:
                     if self.motor_worker.to_top():
-                        self.logger.info("Moving motor to top position (364.40)")
+                        self.logger.info(
+                            "Moving motor to top position (364.40)")
                         return
                     else:
                         self.handle_error("Failed to move motor to top")
@@ -2320,6 +2336,12 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def handle_error(self, message: str):
         """Handle error messages."""
+        # Existing error handling...
+
+        # Update status file if error affects device connections
+        if any(term in message.lower() for term in ["connection", "disconnected", "calibration"]):
+            self.update_device_status()
+
         # Only show message box for critical errors, not connection issues
         if not any(err in message.lower() for err in ["position", "failed to get", "connection"]):
             QMessageBox.critical(self, "Error", message)
@@ -2353,22 +2375,14 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle application shutdown."""
         try:
-            self.logger.info(f"Active motor workers before shutdown: {
-                             MotorWorker.get_active_count()}")
+            # Write disconnected status before cleanup
+            try:
+                with open(Path("C:/ssbubble/device_status.txt"), 'w') as f:
+                    f.write("00")
+            except Exception as e:
+                self.logger.error(f"Failed to reset device status file: {e}")
 
-            # Clean up workers
-            if self.arduino_worker:
-                self.arduino_worker.stop()
-            self.cleanup_motor_worker()
-
-            self.config.save()
-
-            # Reset instance count on shutdown
-            MotorWorker.reset_instance_count()
-
-            self.logger.info(f"Active motor workers after shutdown: {
-                             MotorWorker.get_active_count()}")
-            self.logger.info("Shutdown complete")
+            # Existing cleanup code...
             event.accept()
         except Exception as e:
             self.logger.error(f"Error during shutdown: {e}")
@@ -2639,11 +2653,13 @@ class MainWindow(QMainWindow):
             self.motor_warning_label.setVisible(False)
             self.disable_motor_controls(False)  # Enable controls
             self.logger.info("Motor calibrated successfully")
+            self.update_device_status()  # Update after successful calibration
         else:
             self.motor_warning_label.setText("Motor needs calibration")
             self.motor_warning_label.setVisible(True)
             self.disable_motor_controls(True)  # Disable controls
             self.logger.info("Motor needs calibration")
+            self.update_device_status()  # Update after failed calibration
 
     @pyqtSlot(str)
     def on_motor_speed_changed(self, speed_text: str):
@@ -2757,3 +2773,34 @@ class MainWindow(QMainWindow):
             self.logger.info("All valve controls unchecked")
         except Exception as e:
             self.logger.error(f"Error unchecking valve controls: {e}")
+
+    def update_device_status(self):
+        """Update device status file with current connection states.
+
+        Format: XY where:
+        X: Arduino status (0=disconnected, 1=connected in auto mode)
+        Y: Motor status (0=disconnected/uncalibrated, 1=connected and calibrated)
+        """
+        try:
+            # Get Arduino status (1 if connected and in auto mode)
+            arduino_status = '1' if (self.arduino_worker and
+                                     self.arduino_worker.running and
+                                     self.arduino_auto_connect_radio.isChecked()) else '0'
+
+            # Get Motor status (1 if connected and calibrated)
+            motor_status = '1' if (self.motor_worker and
+                                   self.motor_worker.running and
+                                   self.motor_calibrated) else '0'
+
+            # Write status to file
+            status_path = Path("C:/ssbubble/device_status.txt")
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(status_path, 'w') as f:
+                f.write(f"{arduino_status}{motor_status}")
+
+            self.logger.debug(
+                f"Device status updated: Arduino={arduino_status}, Motor={motor_status}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to update device status file: {e}")
