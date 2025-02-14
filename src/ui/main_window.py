@@ -2786,7 +2786,7 @@ class MainWindow(QMainWindow):
             # Get Arduino status (1 if connected and in auto mode)
             arduino_status = '1' if (self.arduino_worker and
                                      self.arduino_worker.running and
-                                     self.arduino_auto_connect_radio.isChecked()) else '0'
+                                     self.arduino_worker.mode == 1) else '0'
 
             # Get Motor status (1 if connected and calibrated)
             motor_status = '1' if (self.motor_worker and
