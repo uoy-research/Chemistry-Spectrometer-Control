@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
         'c': 'Close'
     }
 
-    def __init__(self, test_mode: bool = False):
+    def __init__(self, test_mode: bool = False, keep_sequence: bool = False):
         """Initialize main window.
 
         Args:
@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         # Load configuration
         self.config = Config()
         self.test_mode = test_mode
+        self.keep_sequence = keep_sequence
 
         # Initialize logger
         self.logger = logging.getLogger(__name__)
@@ -1088,9 +1089,13 @@ class MainWindow(QMainWindow):
     def find_sequence_file(self):
         """Look for sequence file in the specified location."""
         try:
+            if not hasattr(self, 'attempt'):
+                self.attempt = 0
+            if not hasattr(self, 'sequence_start_time'):
+                self.sequence_start_time = 0
             self.file_timer = QTimer()
             self.file_timer.timeout.connect(self.check_sequence_file)
-            self.file_timer.start(500)  # Check every 500ms
+            self.file_timer.start(100)  # Check every 100ms
         except Exception as e:
             self.logger.error(f"Error setting up sequence file timer: {e}")
             self.handle_error("Failed to start sequence file monitoring")
@@ -1105,7 +1110,29 @@ class MainWindow(QMainWindow):
                     try:
                         success = self.load_sequence()
                         if success:
-                            self.handle_sequence_file(True)
+                            # Check if devices are connected
+                            if not self.arduino_worker:
+                                self.logger.error(
+                                    "Arduino not connected, sequence cancelled")
+                                return
+                            if (not self.motor_worker and self.motor_flag):
+                                self.logger.error(
+                                    "Motor not connected, sequence cancelled")
+                                return
+
+                            # Set sequence start time
+                            self.sequence_start_time = time.time()
+
+                            # Call start_sequence directly
+                            self.start_sequence()
+
+                            # Stop sequence file timer
+                            self.file_timer.stop()
+
+                            # Delete sequence file after processing
+                            self.handle_sequence_file(self.keep_sequence)
+
+                            # Calculate sequence time
                             self.calculate_sequence_time()
 
                             # Update UI with first step
@@ -1120,10 +1147,11 @@ class MainWindow(QMainWindow):
                                                              int, len(self.steps)),
                                                          Q_ARG(float, self.total_sequence_time))
 
-                                # Call start_sequence directly
-                                self.start_sequence()
+                            if not self.write_sequence_finish_time(
+                                    self.total_sequence_time):
+                                self.logger.error(
+                                    "Failed to write sequence finish time")
 
-                            self.file_timer.stop()
                         else:
                             self.handle_sequence_file(False)
                     except Exception as e:
@@ -1132,9 +1160,27 @@ class MainWindow(QMainWindow):
                 # Process sequence in a separate thread to avoid blocking
                 QTimer.singleShot(0, process_sequence)
 
+            else:
+                if self.attempt % 10 == 0:
+                    self.attempt = 0
+                    self.logger.info("Sequence file not found")
+                self.attempt += 1
+
         except Exception as e:
             self.logger.error(f"Error in sequence file check: {e}")
             self.handle_error(f"Sequence file check failed: {str(e)}")
+
+    def write_sequence_finish_time(self, sequence_time: float):
+        """Write sequence finish time to file."""
+        try:
+            end_time = self.sequence_start_time + sequence_time
+            with open(r"C:\ssbubble\sequence_finish_time.txt", "w") as f:
+                f.write(f"{end_time}")
+            self.logger.info(f"Sequence finish time: {end_time}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error writing sequence finish time: {e}")
+            return False
 
     @pyqtSlot()
     def _update_arduino_disconnect_state(self):
@@ -2395,141 +2441,258 @@ class MainWindow(QMainWindow):
     def load_sequence(self):
         """Load sequence from file.
 
-        Format: <step_type><time_length>[<motor_position>]
-        Where:
-            step_type: Single character (p,v,b,f,e)
-            time_length: Integer in milliseconds
-            motor_position: Optional float for motor position 
+        Format:
+        list[<step_type>]
+        list[<motor_position>] or None
+        list[<time_length>]
+        <data_save_path> or None
 
-        Example: p1000v2000b1000
-        Motor Example: Mp1000m200.24v2000m23.20b1000m100.10
+        Example:
+        ['p', 'v', 'b', 'f', 'e']
+        [None, None, None, 1000, 2000]
+        [1000, 2000, 1000, 2000, 1000]
+        C:\ssbubble\data\sequence_1.csv
+
         """
         try:
-            negative_positions_found = False  # Track if any negative positions are found
-            self.steps = []  # initialise steps
-            with open(r"C:\ssbubble\sequence.txt", "r") as f:
-                raw_sequence = f.readlines()
+            # Init steps
+            self.steps = []
 
-                # Check if the sequence file is empty
-                if not raw_sequence:
-                    self.logger.error("Sequence file is empty")
+            # Init motor flag
+            self.motor_flag = False
+
+            # Check if sequence file exists
+            with open(Path("C:/ssbubble/sequence.txt"), 'r') as f:
+                sequence = f.readlines()
+
+            # Check if sequence file is empty
+            if not sequence:
+                self.logger.error("Sequence file is empty")
+                return False
+
+            # Get the save path from the fourth line of the sequence file
+            seq_save_path = sequence[3].strip()
+
+            # Check if save path is valid
+            if not seq_save_path or not os.path.isdir(seq_save_path):
+                self.logger.error("Invalid save path in sequence file")
+                return False
+
+            # Convert lists into steps
+            step_types = sequence[0].strip().split(',')
+            motor_positions = sequence[1].strip().split(',')
+            time_lengths = sequence[2].strip().split(',')
+
+            # Check if step types are valid
+            if not all(step in self.step_types for step in step_types):
+                self.logger.error("Invalid step types in sequence file")
+                return False
+
+            # Check if step times are valid
+            try:
+                if not all(time.isdigit() for time in time_lengths) and not all(int(time) > 0 for time in time_lengths):
+                    self.logger.error("Invalid step times in sequence file")
                     return False
+            except ValueError:
+                self.logger.error("Invalid step times in sequence file")
+                return False
 
-                # Get the save path from the second line of the sequence file
-                seq_save_path = raw_sequence[1].strip()
-                sequence_string = raw_sequence[0].strip()
-                i = 0
-
-                # Check for capital 'M' in the sequence string
-                self.motor_flag = False
-                if 'M' in sequence_string:
+            # Check if motor positions are valid
+            if motor_positions and not all(position is None or isinstance(position, (int, float)) and position >= 0 for position in motor_positions):
+                self.logger.error("Invalid motor positions in sequence file")
+                return False
+            else:
+                if any(position is not None for position in motor_positions):
                     self.motor_flag = True
-                    sequence_string = sequence_string.replace(
-                        'M', '')  # Remove 'M' from the sequence string
 
-                if self.motor_flag:
-                    try:
-                        if not self.motor_worker.running or not self.motor_calibrated:
-                            self.logger.error(
-                                "Sequence requires motor, but motor is not ready")
-                            return False
-                    except Exception as e:
-                        self.logger.error(
-                            "Sequence requires motor, but motor is not ready")
-                        return False
+            # Parse steps
+            for i in range(len(step_types)):
+                step_type = step_types[i]
+                motor_position = min(
+                    motor_positions[i], self.motor_worker.max_position)
+                time_length = time_lengths[i]
 
-                # Parse the sequence string
-                while i < len(sequence_string):
-                    # Check for valid step types
-                    if sequence_string[i] in self.step_types.keys():
-                        step_type = sequence_string[i]
+                # Create step object
+                step = Step(step_type, time_length, motor_position)
+                self.steps.append(step)
+
+            # Check if saving already
+            if not self.saving:
+                # Get the save path from the sequence file
+                if len(seq_save_path) > 1:
+                    if seq_save_path.endswith('.csv'):
+                        self.savePathEdit.setText(seq_save_path)
+                        self.saving = True
+                        self.on_beginSaveButton_clicked(True)
                     else:
-                        self.logger.error("Invalid step type in sequence file")
-                        return False
-
-                    # Get the time length of the step
-                    i += 1
-                    time_length = ""
-                    while i < len(sequence_string) and sequence_string[i].isdigit():
-                        time_length += sequence_string[i]
-                        i += 1
-                    try:
-                        time_length = int(time_length)
-                    except ValueError:
-                        self.logger.error(
-                            "Invalid time length in sequence file")
-                        return False
-                    if time_length <= 0:
-                        self.logger.error(
-                            "Invalid time length in sequence file")
-                        return False
-
-                    # Get motor position if motor_flag is True
-                    motor_position = 0
-                    if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
-                        i += 1
-                        motor_position_str = ""
-                        # Check for negative sign
-                        is_negative = False
-                        if i < len(sequence_string) and sequence_string[i] == '-':
-                            is_negative = True
-                            i += 1
-
-                        # Collect digits and decimal point for float values
-                        decimal_found = False
-                        while i < len(sequence_string) and (sequence_string[i].isdigit() or
-                                                            (sequence_string[i] == '.' and not decimal_found)):
-                            if sequence_string[i] == '.':
-                                decimal_found = True
-                            motor_position_str += sequence_string[i]
-                            i += 1
-                        try:
-                            motor_position = float(motor_position_str)
-                            if is_negative:
-                                motor_position = -motor_position
-                                negative_positions_found = True
-                                motor_position = 0  # Default to home position
-                        except ValueError:
-                            self.logger.error(
-                                "Invalid motor position in sequence file")
-                            return False
-
-                    # Create a step object and add it to the list
-                    step = Step(step_type, time_length, motor_position)
-                    self.steps.append(step)
-
-                # Log warning if negative positions were found
-                if negative_positions_found:
-                    self.logger.warning(
-                        "Negative motor positions found in sequence. These have been defaulted to 0 (home position)")
-
-                # Automatically start saving at sequence start
-                if not self.saving:
-                    # Get the save path from the sequence file
-                    if len(seq_save_path) > 1:    # Look for save path in second line of sequence file
-                        if seq_save_path.endswith('.csv'):
-                            self.savePathEdit.setText(seq_save_path)
-                        else:   # Add timestamped csv to the file path if no file specified
-                            self.savePathEdit.setText(os.path.join(
-                                seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-                    else:
-                        # If no save path is specified, use the default path
-                        self.savePathEdit.setText(
-                            os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-
-                    # Simulate save button click
-                    # This will trigger the slot with the correct checked state
-                    # Actually start the recording
+                        self.savePathEdit.setText(os.path.join(
+                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                        self.saving = True
+                        self.on_beginSaveButton_clicked(True)
+                elif seq_save_path == "None":   # No save path means stop saving
+                    self.savePathEdit.setText("")
+                    self.saving = False
+            else:
+                if seq_save_path != self.savePathEdit.text():
+                    # New save path given, stop saving and restart with new path
+                    self.on_beginSaveButton_clicked(False)
+                    self.savePathEdit.setText(seq_save_path)
+                    self.saving = True
                     self.on_beginSaveButton_clicked(True)
+                elif seq_save_path == "None":
+                    self.on_beginSaveButton_clicked(False)
+                    self.savePathEdit.setText("")
+                    self.saving = False
 
             return True
-
         except FileNotFoundError:
             self.logger.error("Sequence file not found")
             return False
         except IOError as e:
             self.logger.error(f"Error reading sequence file: {e}")
             return False
+        except Exception as e:
+            self.logger.error(f"Error loading sequence: {e}")
+            return False
+
+    # def load_sequence(self):
+    #     """Load sequence from file.
+
+    #     Format: <step_type><time_length>[<motor_position>]
+    #     Where:
+    #         step_type: Single character (p,v,b,f,e)
+    #         time_length: Integer in milliseconds
+    #         motor_position: Optional float for motor position
+
+    #     Example: p1000v2000b1000
+    #     Motor Example: Mp1000m200.24v2000m23.20b1000m100.10
+    #     """
+    #     try:
+    #         negative_positions_found = False  # Track if any negative positions are found
+    #         self.steps = []  # initialise steps
+    #         with open(r"C:\ssbubble\sequence.txt", "r") as f:
+    #             raw_sequence = f.readlines()
+
+    #             # Check if the sequence file is empty
+    #             if not raw_sequence:
+    #                 self.logger.error("Sequence file is empty")
+    #                 return False
+
+    #             # Get the save path from the second line of the sequence file
+    #             seq_save_path = raw_sequence[1].strip()
+    #             sequence_string = raw_sequence[0].strip()
+    #             i = 0
+
+    #             # Check for capital 'M' in the sequence string
+    #             self.motor_flag = False
+    #             if 'M' in sequence_string:
+    #                 self.motor_flag = True
+    #                 sequence_string = sequence_string.replace(
+    #                     'M', '')  # Remove 'M' from the sequence string
+
+    #             if self.motor_flag:
+    #                 try:
+    #                     if not self.motor_worker.running or not self.motor_calibrated:
+    #                         self.logger.error(
+    #                             "Sequence requires motor, but motor is not ready")
+    #                         return False
+    #                 except Exception as e:
+    #                     self.logger.error(
+    #                         "Sequence requires motor, but motor is not ready")
+    #                     return False
+
+    #             # Parse the sequence string
+    #             while i < len(sequence_string):
+    #                 # Check for valid step types
+    #                 if sequence_string[i] in self.step_types.keys():
+    #                     step_type = sequence_string[i]
+    #                 else:
+    #                     self.logger.error("Invalid step type in sequence file")
+    #                     return False
+
+    #                 # Get the time length of the step
+    #                 i += 1
+    #                 time_length = ""
+    #                 while i < len(sequence_string) and sequence_string[i].isdigit():
+    #                     time_length += sequence_string[i]
+    #                     i += 1
+    #                 try:
+    #                     time_length = int(time_length)
+    #                 except ValueError:
+    #                     self.logger.error(
+    #                         "Invalid time length in sequence file")
+    #                     return False
+    #                 if time_length <= 0:
+    #                     self.logger.error(
+    #                         "Invalid time length in sequence file")
+    #                     return False
+
+    #                 # Get motor position if motor_flag is True
+    #                 motor_position = 0
+    #                 if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
+    #                     i += 1
+    #                     motor_position_str = ""
+    #                     # Check for negative sign
+    #                     is_negative = False
+    #                     if i < len(sequence_string) and sequence_string[i] == '-':
+    #                         is_negative = True
+    #                         i += 1
+
+    #                     # Collect digits and decimal point for float values
+    #                     decimal_found = False
+    #                     while i < len(sequence_string) and (sequence_string[i].isdigit() or
+    #                                                         (sequence_string[i] == '.' and not decimal_found)):
+    #                         if sequence_string[i] == '.':
+    #                             decimal_found = True
+    #                         motor_position_str += sequence_string[i]
+    #                         i += 1
+    #                     try:
+    #                         motor_position = float(motor_position_str)
+    #                         if is_negative:
+    #                             motor_position = -motor_position
+    #                             negative_positions_found = True
+    #                             motor_position = 0  # Default to home position
+    #                     except ValueError:
+    #                         self.logger.error(
+    #                             "Invalid motor position in sequence file")
+    #                         return False
+
+    #                 # Create a step object and add it to the list
+    #                 step = Step(step_type, time_length, motor_position)
+    #                 self.steps.append(step)
+
+    #             # Log warning if negative positions were found
+    #             if negative_positions_found:
+    #                 self.logger.warning(
+    #                     "Negative motor positions found in sequence. These have been defaulted to 0 (home position)")
+
+    #             # Automatically start saving at sequence start
+    #             if not self.saving:
+    #                 # Get the save path from the sequence file
+    #                 if len(seq_save_path) > 1:    # Look for save path in second line of sequence file
+    #                     if seq_save_path.endswith('.csv'):
+    #                         self.savePathEdit.setText(seq_save_path)
+    #                     else:   # Add timestamped csv to the file path if no file specified
+    #                         self.savePathEdit.setText(os.path.join(
+    #                             seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+    #                 else:
+    #                     # If no save path is specified, use the default path
+    #                     self.savePathEdit.setText(
+    #                         os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+
+    #                 # Simulate save button click
+    #                 # This will trigger the slot with the correct checked state
+    #                 # Actually start the recording
+    #                 self.on_beginSaveButton_clicked(True)
+
+    #         return True
+
+    #     except FileNotFoundError:
+    #         self.logger.error("Sequence file not found")
+    #         return False
+    #     except IOError as e:
+    #         self.logger.error(f"Error reading sequence file: {e}")
+    #         return False
 
     def load_macro_labels(self):
         """Load and set macro button labels from JSON files."""
