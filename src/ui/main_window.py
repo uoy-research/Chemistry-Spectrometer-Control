@@ -1404,8 +1404,8 @@ class MainWindow(QMainWindow):
             valve_states = [0] * 8
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
             self.arduino_worker.set_valves(valve_states)
-            self.logger.info(f"Pressure build {
-                             'started' if checked else 'stopped'}")
+            self.logger.info(
+                f"Pressure build {'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
     def on_switchGasButton_clicked(self, checked: bool):
@@ -2126,58 +2126,36 @@ class MainWindow(QMainWindow):
 
     def next_step(self):
         """Execute the next step in the sequence."""
-        try:
-            # Check if Arduino worker exists and is running
-            if not self.arduino_worker or not self.arduino_worker.running:
-                raise RuntimeError("Arduino not connected")
+        self.steps.pop(0)  # Remove completed step
 
-            # Remove completed step
-            self.steps.pop(0)
+        if not self.steps:  # Sequence complete
+            self.step_timer.stop()
 
-            if self.steps:
-                # Execute next step
-                self.execute_step(self.steps[0])
-                # Reset step timer and schedule next step
-                self.step_start_time = time.time()
-                QTimer.singleShot(self.steps[0].time_length, self.next_step)
-            else:
-                # Sequence complete
-                self.step_timer.stop()
-
-                # Reset valves while preserving inlet/outlet
-                if self.arduino_worker and self.arduino_worker.running:
-                    self.reset_valves()
-                    self.logger.info("Reset valves after sequence completion")
-
-                # Disable sequence mode when complete
-                if self.motor_flag and self.motor_worker and self.motor_worker.running:
-                    self.motor_worker.set_sequence_mode(False)
-
-                # Update UI and handle completion
-                self.update_sequence_info("Complete", 0, 0, 0)
-                self.update_sequence_status("Complete")
-
-                # Stop data recording if active
-                if self.saving:
-                    self.plot_widget.stop_recording()
-                    self.beginSaveButton.setText("Begin Saving")
-                    self.beginSaveButton.setChecked(False)
-                    self.saving = False
-                    self.logger.info(
-                        "Data recording stopped with sequence completion")
-
-                self.logger.info("Sequence execution completed")
-
-        except Exception as e:
-            self.logger.error(f"Error in sequence execution: {e}")
-            self.handle_error("Failed to execute sequence")
-            # Reset valves on error too
+            # Reset valves while preserving inlet/outlet
             if self.arduino_worker and self.arduino_worker.running:
                 self.reset_valves()
-                self.logger.info("Reset valves after sequence error")
-            # Disable sequence mode on error
-            if self.motor_flag and self.motor_worker and self.motor_worker.running:
+
+            # Disable sequence mode
+            if self.motor_flag and self.motor_worker:
                 self.motor_worker.set_sequence_mode(False)
+
+            # Update UI and stop recording
+            self.update_sequence_info("Complete", 0, 0, 0)
+            self.update_sequence_status("Complete")
+            if self.saving:
+                self.plot_widget.stop_recording()
+
+            # Restart sequence monitoring
+            if self.arduino_worker and self.arduino_worker.running and self.arduino_worker.mode == 1:
+                self.logger.info("Restarting sequence monitoring")
+                self.start_sequence_monitoring()
+
+        else:
+            # Execute next step in current sequence
+            self.execute_step(self.steps[0])
+            # Reset step timer and schedule next step
+            self.step_start_time = time.time()
+            QTimer.singleShot(self.steps[0].time_length, self.next_step)
 
     def execute_step(self, step):
         """Execute a single sequence step."""
@@ -2554,145 +2532,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error loading sequence: {e}")
             return False
-
-    # def load_sequence(self):
-    #     """Load sequence from file.
-
-    #     Format: <step_type><time_length>[<motor_position>]
-    #     Where:
-    #         step_type: Single character (p,v,b,f,e)
-    #         time_length: Integer in milliseconds
-    #         motor_position: Optional float for motor position
-
-    #     Example: p1000v2000b1000
-    #     Motor Example: Mp1000m200.24v2000m23.20b1000m100.10
-    #     """
-    #     try:
-    #         negative_positions_found = False  # Track if any negative positions are found
-    #         self.steps = []  # initialise steps
-    #         with open(r"C:\ssbubble\sequence.txt", "r") as f:
-    #             raw_sequence = f.readlines()
-
-    #             # Check if the sequence file is empty
-    #             if not raw_sequence:
-    #                 self.logger.error("Sequence file is empty")
-    #                 return False
-
-    #             # Get the save path from the second line of the sequence file
-    #             seq_save_path = raw_sequence[1].strip()
-    #             sequence_string = raw_sequence[0].strip()
-    #             i = 0
-
-    #             # Check for capital 'M' in the sequence string
-    #             self.motor_flag = False
-    #             if 'M' in sequence_string:
-    #                 self.motor_flag = True
-    #                 sequence_string = sequence_string.replace(
-    #                     'M', '')  # Remove 'M' from the sequence string
-
-    #             if self.motor_flag:
-    #                 try:
-    #                     if not self.motor_worker.running or not self.motor_calibrated:
-    #                         self.logger.error(
-    #                             "Sequence requires motor, but motor is not ready")
-    #                         return False
-    #                 except Exception as e:
-    #                     self.logger.error(
-    #                         "Sequence requires motor, but motor is not ready")
-    #                     return False
-
-    #             # Parse the sequence string
-    #             while i < len(sequence_string):
-    #                 # Check for valid step types
-    #                 if sequence_string[i] in self.step_types.keys():
-    #                     step_type = sequence_string[i]
-    #                 else:
-    #                     self.logger.error("Invalid step type in sequence file")
-    #                     return False
-
-    #                 # Get the time length of the step
-    #                 i += 1
-    #                 time_length = ""
-    #                 while i < len(sequence_string) and sequence_string[i].isdigit():
-    #                     time_length += sequence_string[i]
-    #                     i += 1
-    #                 try:
-    #                     time_length = int(time_length)
-    #                 except ValueError:
-    #                     self.logger.error(
-    #                         "Invalid time length in sequence file")
-    #                     return False
-    #                 if time_length <= 0:
-    #                     self.logger.error(
-    #                         "Invalid time length in sequence file")
-    #                     return False
-
-    #                 # Get motor position if motor_flag is True
-    #                 motor_position = 0
-    #                 if self.motor_flag and i < len(sequence_string) and sequence_string[i] == 'm':
-    #                     i += 1
-    #                     motor_position_str = ""
-    #                     # Check for negative sign
-    #                     is_negative = False
-    #                     if i < len(sequence_string) and sequence_string[i] == '-':
-    #                         is_negative = True
-    #                         i += 1
-
-    #                     # Collect digits and decimal point for float values
-    #                     decimal_found = False
-    #                     while i < len(sequence_string) and (sequence_string[i].isdigit() or
-    #                                                         (sequence_string[i] == '.' and not decimal_found)):
-    #                         if sequence_string[i] == '.':
-    #                             decimal_found = True
-    #                         motor_position_str += sequence_string[i]
-    #                         i += 1
-    #                     try:
-    #                         motor_position = float(motor_position_str)
-    #                         if is_negative:
-    #                             motor_position = -motor_position
-    #                             negative_positions_found = True
-    #                             motor_position = 0  # Default to home position
-    #                     except ValueError:
-    #                         self.logger.error(
-    #                             "Invalid motor position in sequence file")
-    #                         return False
-
-    #                 # Create a step object and add it to the list
-    #                 step = Step(step_type, time_length, motor_position)
-    #                 self.steps.append(step)
-
-    #             # Log warning if negative positions were found
-    #             if negative_positions_found:
-    #                 self.logger.warning(
-    #                     "Negative motor positions found in sequence. These have been defaulted to 0 (home position)")
-
-    #             # Automatically start saving at sequence start
-    #             if not self.saving:
-    #                 # Get the save path from the sequence file
-    #                 if len(seq_save_path) > 1:    # Look for save path in second line of sequence file
-    #                     if seq_save_path.endswith('.csv'):
-    #                         self.savePathEdit.setText(seq_save_path)
-    #                     else:   # Add timestamped csv to the file path if no file specified
-    #                         self.savePathEdit.setText(os.path.join(
-    #                             seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-    #                 else:
-    #                     # If no save path is specified, use the default path
-    #                     self.savePathEdit.setText(
-    #                         os.path.join(self.default_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-
-    #                 # Simulate save button click
-    #                 # This will trigger the slot with the correct checked state
-    #                 # Actually start the recording
-    #                 self.on_beginSaveButton_clicked(True)
-
-    #         return True
-
-    #     except FileNotFoundError:
-    #         self.logger.error("Sequence file not found")
-    #         return False
-    #     except IOError as e:
-    #         self.logger.error(f"Error reading sequence file: {e}")
-    #         return False
 
     def load_macro_labels(self):
         """Load and set macro button labels from JSON files."""
