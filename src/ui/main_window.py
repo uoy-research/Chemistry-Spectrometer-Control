@@ -131,6 +131,9 @@ class MainWindow(QMainWindow):
         self.active_valve_macro = None
         self.active_macro_timer = None  # Track the active macro timer
 
+        # Add previous save path tracking
+        self.prev_save_path = None
+
     def initialize_control_states(self):
         """Initialize the enabled/disabled states of all controls."""
         # Motor controls
@@ -2517,26 +2520,32 @@ class MainWindow(QMainWindow):
                 if len(seq_save_path) > 1:
                     if seq_save_path.endswith('.csv'):
                         self.savePathEdit.setText(seq_save_path)
+                        self.prev_save_path = seq_save_path
                         self.saving = True
                         self.on_beginSaveButton_clicked(True)
                     else:
-                        self.savePathEdit.setText(os.path.join(
-                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
+                        new_path = os.path.join(
+                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\")
+                        self.savePathEdit.setText(new_path)
+                        self.prev_save_path = new_path
                         self.saving = True
                         self.on_beginSaveButton_clicked(True)
                 elif seq_save_path == "None":   # No save path means stop saving
                     self.savePathEdit.setText("")
+                    self.prev_save_path = None
                     self.saving = False
             else:
-                if seq_save_path != self.savePathEdit.text():
+                if seq_save_path != self.prev_save_path:
                     # New save path given, stop saving and restart with new path
                     self.on_beginSaveButton_clicked(False)
                     self.savePathEdit.setText(seq_save_path)
+                    self.prev_save_path = seq_save_path
                     self.saving = True
                     self.on_beginSaveButton_clicked(True)
                 elif seq_save_path == "None":
                     self.on_beginSaveButton_clicked(False)
                     self.savePathEdit.setText("")
+                    self.prev_save_path = None
                     self.saving = False
 
             return True
