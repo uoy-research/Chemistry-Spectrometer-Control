@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
 from PyQt6.QtGui import QFont
+from datetime import datetime
 import logging
 from typing import List, Optional, Union
 from pathlib import Path
@@ -1175,7 +1176,9 @@ class MainWindow(QMainWindow):
     def write_sequence_finish_time(self, sequence_time: float):
         """Write sequence finish time to file."""
         try:
-            end_time = self.sequence_start_time + sequence_time
+            # Convert sequence time from ms to datetime
+            end_datetime = datetime.datetime.fromtimestamp(self.sequence_start_time + (sequence_time / 1000))
+            end_time = f"[{end_datetime.year}, {end_datetime.month}, {end_datetime.day}, {end_datetime.hour}, {end_datetime.minute}, {end_datetime.second}, {int(end_datetime.microsecond)}]"
             with open(r"C:\ssbubble\sequence_finish_time.txt", "w") as f:
                 f.write(f"{end_time}")
             self.logger.info(f"Sequence finish time: {end_time}")
@@ -2423,14 +2426,14 @@ class MainWindow(QMainWindow):
 
         Format:
         list[<step_type>]
-        list[<motor_position>] or None
+        list[<motor_position>] or "None"
         list[<time_length>]
-        <data_save_path> or None
+        <data_save_path> or "None"
 
         Example:
         ['p', 'v', 'b', 'f', 'e']
-        [None, None, None, 1000, 2000]
-        [1000, 2000, 1000, 2000, 1000]
+        [None,1000,None,1000,2000]
+        [1000,2000,1000,2000,1000]
         C:\ssbubble\data\sequence_1.csv
 
         """
@@ -2453,32 +2456,43 @@ class MainWindow(QMainWindow):
             # Get the save path from the fourth line of the sequence file
             seq_save_path = sequence[3].strip()
 
-            # Check if save path is valid
-            if not seq_save_path or not os.path.isdir(seq_save_path):
-                self.logger.error("Invalid save path in sequence file")
-                return False
+            # Check if save path is valid (parent directory exists)
+            if seq_save_path and seq_save_path != "None":
+                save_dir = os.path.dirname(seq_save_path)
+                if not os.path.isdir(save_dir):
+                    self.logger.error(f"Invalid save directory: {save_dir}")
+                    return False
 
             # Convert lists into steps
-            step_types = sequence[0].strip().split(',')
-            motor_positions = sequence[1].strip().split(',')
-            time_lengths = sequence[2].strip().split(',')
+            step_types = sequence[0].strip().strip('[]').replace("'", "").replace(" ", "").split(',')
+            motor_positions = sequence[1].strip()
+            time_lengths = sequence[2].strip().strip('[]').replace(" ", "").split(',')
 
-            # Check if step types are valid
-            if not all(step in self.step_types for step in step_types):
-                self.logger.error("Invalid step types in sequence file")
-                return False
+            # Handle motor positions - convert to list or set all to None
+            if motor_positions == "None":
+                motor_positions = [None] * len(step_types)
+            else:
+                # Convert string list to actual list
+                motor_positions = motor_positions.strip('[]').replace(" ", "").split(',')
+                # Convert to numbers or None
+                try:
+                    motor_positions = [int(pos) if pos != "None" else None for pos in motor_positions]
+                except ValueError:
+                    self.logger.error("Invalid motor positions in sequence file")
+                    return False
 
-            # Check if step times are valid
+            # Convert time lengths to numbers
             try:
-                if not all(time.isdigit() for time in time_lengths) and not all(int(time) > 0 for time in time_lengths):
-                    self.logger.error("Invalid step times in sequence file")
+                time_lengths = [int(time) for time in time_lengths]
+                if not all(t > 0 for t in time_lengths):
+                    self.logger.error("Time lengths must be positive numbers")
                     return False
             except ValueError:
-                self.logger.error("Invalid step times in sequence file")
+                self.logger.error("Invalid time lengths in sequence file")
                 return False
 
             # Check if motor positions are valid
-            if motor_positions and not all(position is None or isinstance(position, (int, float)) and position >= 0 for position in motor_positions):
+            if motor_positions and not all(position is None or (isinstance(position, (int, float)) and position >= 0) for position in motor_positions):
                 self.logger.error("Invalid motor positions in sequence file")
                 return False
             else:
@@ -2488,8 +2502,11 @@ class MainWindow(QMainWindow):
             # Parse steps
             for i in range(len(step_types)):
                 step_type = step_types[i]
-                motor_position = min(
-                    motor_positions[i], self.motor_worker.max_position)
+                if motor_positions[i] is None:
+                    motor_position = None
+                else:
+                    motor_position = min(
+                        motor_positions[i], self.motor_worker.max_position)
                 time_length = time_lengths[i]
 
                 # Create step object
