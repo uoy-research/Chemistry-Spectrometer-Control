@@ -80,6 +80,23 @@ class MainWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
 
+        # Clean up old files
+        try:
+            ssbubble_path = Path("C:/ssbubble")
+            files_to_delete = [
+                "sequence.txt",
+                "prospa.txt",
+                "device_status.txt",
+                "sequence_finish_time.txt"
+            ]
+            for filename in files_to_delete:
+                file_path = ssbubble_path / filename
+                if file_path.exists():
+                    file_path.unlink()
+                    self.logger.info(f"Deleted {filename}")
+        except Exception as e:
+            self.logger.error(f"Error cleaning up files: {e}")
+
         # Initialize workers as None
         self.motor_worker = None
         self.arduino_worker = None
