@@ -2423,19 +2423,18 @@ class MainWindow(QMainWindow):
 
     def load_sequence(self):
         """Load sequence from file.
-
-        Format:
-        list[<step_type>]
-        list[<motor_position>] or "None"
-        list[<time_length>]
-        <data_save_path> or "None"
-
+        
+        Expected format:
+        ["step_type1","step_type2",...]  # Valid types: d,p,v,b,f,e,c
+        ["pos1","pos2",...] or ["None",...]  # Positions in mm or "None"
+        ["time1","time2",...]  # Times in milliseconds
+        save_path  # Path or "None"
+        
         Example:
-        ['p', 'v', 'b', 'f', 'e']
-        [None,1000,None,1000,2000]
-        [1000,2000,1000,2000,1000]
-        C:\ssbubble\data\sequence_1.csv
-
+        ["b","p","d","b","v"]
+        ["10","200","0","250","None"]
+        ["1000","1000","1000","1000","1000"]
+        C:\\ssbubble\\data
         """
         try:
             # Init steps
@@ -2453,33 +2452,25 @@ class MainWindow(QMainWindow):
                 self.logger.error("Sequence file is empty")
                 return False
 
-            # Get the save path from the fourth line of the sequence file
+            # Get the save path from the fourth line
             seq_save_path = sequence[3].strip()
 
-            # Check if save path is valid (parent directory exists)
-            if seq_save_path and seq_save_path != "None":
-                save_dir = os.path.dirname(seq_save_path)
-                if not os.path.isdir(save_dir):
-                    self.logger.error(f"Invalid save directory: {save_dir}")
-                    return False
+            # Convert lists into steps - handle double quoted format
+            step_types = sequence[0].strip().strip('[]').replace('"', '').split(',')
+            motor_positions = sequence[1].strip().strip('[]').replace('"', '').split(',')
+            time_lengths = sequence[2].strip().strip('[]').replace('"', '').split(',')
 
-            # Convert lists into steps
-            step_types = sequence[0].strip().strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
-            motor_positions = sequence[1].strip()
-            time_lengths = sequence[2].strip().strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
+            # Clean any whitespace
+            step_types = [s.strip() for s in step_types]
+            motor_positions = [p.strip() for p in motor_positions]
+            time_lengths = [t.strip() for t in time_lengths]
 
-            # Handle motor positions - convert to list or set all to None
-            if motor_positions == "None":
-                motor_positions = [None] * len(step_types)
-            else:
-                # Convert string list to actual list
-                motor_positions = motor_positions.strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
-                # Convert to numbers or None
-                try:
-                    motor_positions = [float(pos) if pos != "None" else None for pos in motor_positions]
-                except ValueError:
-                    self.logger.error("Invalid motor positions in sequence file")
-                    return False
+            # Validate step types
+            valid_step_types = set(self.step_types.keys())  # d,p,v,b,f,e,c
+            if not all(step_type in valid_step_types for step_type in step_types):
+                invalid_types = [t for t in step_types if t not in valid_step_types]
+                self.logger.error(f"Invalid step types in sequence: {invalid_types}. Valid types are: {list(valid_step_types)}")
+                return False
 
             # Convert time lengths to numbers
             try:
@@ -2488,25 +2479,32 @@ class MainWindow(QMainWindow):
                     self.logger.error("Time lengths must be positive numbers")
                     return False
             except ValueError:
-                self.logger.error("Invalid time lengths in sequence file")
+                self.logger.error("Invalid time lengths in sequence file - must be integers")
                 return False
 
-            # Check if motor positions are valid
-            if motor_positions and not all(position is None or (isinstance(position, (int, float)) and position >= 0) for position in motor_positions):
-                self.logger.error("Invalid motor positions in sequence file")
-                return False
-            else:
-                if any(position is not None for position in motor_positions):
+            # Handle motor positions
+            try:
+                motor_positions = [None if pos == "None" else float(pos) for pos in motor_positions]
+                if any(pos is not None and pos < 0 for pos in motor_positions):
+                    self.logger.error("Motor positions must be non-negative")
+                    return False
+                if any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
+            except ValueError:
+                self.logger.error("Invalid motor positions in sequence file - must be numbers or 'None'")
+                return False
+
+            # Validate sequence lengths match
+            if not (len(step_types) == len(motor_positions) == len(time_lengths)):
+                self.logger.error("Sequence lists have different lengths")
+                return False
 
             # Parse steps
             for i in range(len(step_types)):
                 step_type = step_types[i]
-                if motor_positions[i] is None:
-                    motor_position = None
-                else:
-                    motor_position = min(
-                        motor_positions[i], self.motor_worker.max_position)
+                motor_position = motor_positions[i]
+                if motor_position is not None:
+                    motor_position = min(motor_position, self.motor_worker.max_position)
                 time_length = time_lengths[i]
 
                 # Create step object

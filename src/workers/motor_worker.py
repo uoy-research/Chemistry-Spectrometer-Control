@@ -266,6 +266,10 @@ class MotorWorker(QThread):
         self._pending_position = None
         self._max_retries = 50
 
+        # Add position limits from controller
+        self.max_position = self.controller.POSITION_MAX
+        self.min_position = self.controller.POSITION_MIN
+
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
         try:
