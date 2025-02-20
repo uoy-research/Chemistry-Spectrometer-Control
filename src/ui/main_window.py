@@ -2464,19 +2464,19 @@ class MainWindow(QMainWindow):
                     return False
 
             # Convert lists into steps
-            step_types = sequence[0].strip().strip('[]').replace("'", "").replace(" ", "").split(',')
+            step_types = sequence[0].strip().strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
             motor_positions = sequence[1].strip()
-            time_lengths = sequence[2].strip().strip('[]').replace(" ", "").split(',')
+            time_lengths = sequence[2].strip().strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
 
             # Handle motor positions - convert to list or set all to None
             if motor_positions == "None":
                 motor_positions = [None] * len(step_types)
             else:
                 # Convert string list to actual list
-                motor_positions = motor_positions.strip('[]').replace(" ", "").split(',')
+                motor_positions = motor_positions.strip('[]').replace('"', '').replace("'", "").replace(" ", "").split(',')
                 # Convert to numbers or None
                 try:
-                    motor_positions = [int(pos) if pos != "None" else None for pos in motor_positions]
+                    motor_positions = [float(pos) if pos != "None" else None for pos in motor_positions]
                 except ValueError:
                     self.logger.error("Invalid motor positions in sequence file")
                     return False
