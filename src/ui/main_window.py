@@ -1847,9 +1847,14 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def on_beginSaveButton_clicked(self, checked=None):
         """Handle begin save button click."""
+        # Add debug logging for initial state
+        self.logger.debug(f"Begin save clicked - Initial state: checked={checked}, saving={self.saving}")
+
         # If called programmatically, use button's checked state
         if checked is None:
             checked = self.beginSaveButton.isChecked()
+        
+        self.logger.debug(f"Using checked state: {checked}")
 
         if checked:
             try:
@@ -1859,11 +1864,13 @@ class MainWindow(QMainWindow):
 
                 # Get or generate save path
                 save_path = self.savePathEdit.text()
+                self.logger.debug(f"Save path from edit: {save_path}")
+                
                 if not save_path:
                     # Generate default save path with timestamp
                     timestamp = time.strftime("%Y%m%d_%H%M%S")
-                    save_path = str(
-                        data_dir / f"pressure_data_{timestamp}.csv")
+                    save_path = str(data_dir / f"pressure_data_{timestamp}.csv")
+                    self.logger.debug(f"Generated save path: {save_path}")
 
                 # Update the text field with the generated path
                 self.savePathEdit.setText(save_path)
@@ -1872,6 +1879,7 @@ class MainWindow(QMainWindow):
                 Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
                 # Start recording
+                self.logger.debug("Attempting to start recording...")
                 if self.plot_widget.start_recording(save_path):
                     self.beginSaveButton.setText("Stop Saving")
                     self.saving = True
@@ -1887,10 +1895,10 @@ class MainWindow(QMainWindow):
                 self.saving = False
                 self.beginSaveButton.setText("Begin Saving")
         else:
+            self.logger.debug("Stopping recording...")
             self.plot_widget.stop_recording()
             self.beginSaveButton.setText("Begin Saving")
-            self.beginSaveButton.setChecked(
-                False)  # Ensure button is unchecked
+            self.beginSaveButton.setChecked(False)
             self.saving = False
             self.logger.info("Stopped recording data")
 
@@ -2122,14 +2130,16 @@ class MainWindow(QMainWindow):
                 # Clear plot before starting new sequence
                 self.plot_widget.clear_plot()
 
-                # Start data recording if enabled
-                if self.saving:
+                # Only start recording if not already recording
+                if self.saving and not self.plot_widget.recording:
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
                     filepath = os.path.join(
                         self.default_save_path, f"sequence_{timestamp}.csv")
                     if not self.plot_widget.start_recording(filepath):
                         self.handle_error("Failed to start data recording")
                         return
+                else:
+                    self.logger.debug(f"Recording already active or disabled - saving={self.saving}, recording={self.plot_widget.recording}")
 
                 # Execute first step
                 self.execute_step(self.steps[0])
@@ -2538,15 +2548,16 @@ class MainWindow(QMainWindow):
                     if seq_save_path.endswith('.csv'):
                         self.savePathEdit.setText(seq_save_path)
                         self.prev_save_path = seq_save_path
-                        self.saving = True
-                        self.on_beginSaveButton_clicked(True)
+                        # Don't set saving=True until after start_recording succeeds
+                        if self.on_beginSaveButton_clicked(True):
+                            self.saving = True
                     else:
                         new_path = os.path.join(
                             seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\")
                         self.savePathEdit.setText(new_path)
                         self.prev_save_path = new_path
-                        self.saving = True
-                        self.on_beginSaveButton_clicked(True)
+                        if self.on_beginSaveButton_clicked(True):
+                            self.saving = True
                 elif seq_save_path == "None":   # No save path means stop saving
                     self.savePathEdit.setText("")
                     self.prev_save_path = None
@@ -2554,11 +2565,11 @@ class MainWindow(QMainWindow):
             else:
                 if seq_save_path != self.prev_save_path:
                     # New save path given, stop saving and restart with new path
-                    self.on_beginSaveButton_clicked(False)
+                    self.on_beginSaveButton_clicked(False)  # Stop current recording
                     self.savePathEdit.setText(seq_save_path)
                     self.prev_save_path = seq_save_path
-                    self.saving = True
-                    self.on_beginSaveButton_clicked(True)
+                    if self.on_beginSaveButton_clicked(True):  # Start new recording
+                        self.saving = True
                 elif seq_save_path == "None":
                     self.on_beginSaveButton_clicked(False)
                     self.savePathEdit.setText("")
