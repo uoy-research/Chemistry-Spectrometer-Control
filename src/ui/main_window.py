@@ -1177,8 +1177,8 @@ class MainWindow(QMainWindow):
         """Write sequence finish time to file."""
         try:
             # Convert sequence time from ms to datetime
-            end_datetime = datetime.datetime.fromtimestamp(self.sequence_start_time + (sequence_time / 1000))
-            end_time = f"[{end_datetime.year}, {end_datetime.month}, {end_datetime.day}, {end_datetime.hour}, {end_datetime.minute}, {end_datetime.second}, {int(end_datetime.microsecond)}]"
+            end_datetime = datetime.fromtimestamp(self.sequence_start_time + (sequence_time / 1000))
+            end_time = f"[{end_datetime.year}, {end_datetime.month:02d}, {end_datetime.day:02d}, {end_datetime.hour:02d}, {end_datetime.minute:02d}, {end_datetime.second:02d}, {int(end_datetime.microsecond)}]"
             with open(r"C:\ssbubble\sequence_finish_time.txt", "w") as f:
                 f.write(f"{end_time}")
             self.logger.info(f"Sequence finish time: {end_time}")
