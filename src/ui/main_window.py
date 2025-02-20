@@ -2782,9 +2782,9 @@ class MainWindow(QMainWindow):
             self.delay_timer = QTimer()
             self.delay_timer.setSingleShot(True)
             self.delay_timer.timeout.connect(self.find_sequence_file)
-            self.delay_timer.start()  # 2 second delay
+            self.delay_timer.start()  # Can put a delay here if needed
             self.logger.info(
-                "Will start sequence file monitoring in 2 seconds")
+                "Starting sequence file monitoring")
         except Exception as e:
             self.logger.error(f"Error setting up sequence monitoring: {e}")
 
