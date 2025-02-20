@@ -2610,10 +2610,10 @@ class MainWindow(QMainWindow):
                 f.write('1' if success else '0')
 
             # Delete sequence file only if not in test mode
-            if success and not (self.test_mode or self.keep_sequence):
+            if success and not  self.keep_sequence:
                 sequence_path.unlink()
                 self.logger.info("Sequence file processed and deleted")
-            elif success and (self.test_mode or self.keep_sequence):
+            elif success and self.keep_sequence:
                 self.logger.info(
                     "Sequence file processed but preserved")
             else:
@@ -2747,7 +2747,7 @@ class MainWindow(QMainWindow):
             self.delay_timer = QTimer()
             self.delay_timer.setSingleShot(True)
             self.delay_timer.timeout.connect(self.find_sequence_file)
-            self.delay_timer.start(2000)  # 2 second delay
+            self.delay_timer.start()  # 2 second delay
             self.logger.info(
                 "Will start sequence file monitoring in 2 seconds")
         except Exception as e:
