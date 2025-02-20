@@ -2178,7 +2178,7 @@ class MainWindow(QMainWindow):
             self.update_sequence_info("Complete", 0, 0, 0)
             self.update_sequence_status("Complete")
             if self.saving:
-                self.plot_widget.stop_recording()
+                self.on_beginSaveButton_clicked(False)
 
             # Restart sequence monitoring
             if self.arduino_worker and self.arduino_worker.running and self.arduino_worker.mode == 1:
