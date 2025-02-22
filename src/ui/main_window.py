@@ -1194,15 +1194,31 @@ class MainWindow(QMainWindow):
             self.handle_error(f"Sequence file check failed: {str(e)}")
 
     def write_sequence_finish_time(self, sequence_time: float):
-        """Write sequence finish time to file."""
+        """Write sequence finish time to file.
+        
+        Args:
+            sequence_time: Total sequence time in milliseconds
+        """
         try:
-            # Convert sequence time from ms to datetime
-            end_datetime = datetime.fromtimestamp(self.sequence_start_time + (sequence_time / 1000))
+            # Get start time - use delayed start time if exists, otherwise use current time
+            if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay:
+                start_time = self.sequence_start_delay.timestamp()
+            else:
+                start_time = time.time()
+
+            # Calculate end time by adding sequence duration
+            end_datetime = datetime.fromtimestamp(start_time + (sequence_time / 1000))
+            
+            # Format end time as required
             end_time = f"[{end_datetime.year}, {end_datetime.month:02d}, {end_datetime.day:02d}, {end_datetime.hour:02d}, {end_datetime.minute:02d}, {end_datetime.second:02d}, {int(end_datetime.microsecond)}]"
+            
+            # Write to file
             with open(r"C:\ssbubble\sequence_finish_time.txt", "w") as f:
                 f.write(f"{end_time}")
+            
             self.logger.info(f"Sequence finish time: {end_time}")
             return True
+            
         except Exception as e:
             self.logger.error(f"Error writing sequence finish time: {e}")
             return False
