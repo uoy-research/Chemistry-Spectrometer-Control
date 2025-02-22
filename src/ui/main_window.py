@@ -2127,37 +2127,60 @@ class MainWindow(QMainWindow):
         """Start sequence execution."""
         try:
             if self.steps:
-                # Clear plot before starting new sequence
-                self.plot_widget.clear_plot()
-
-                # Only start recording if not already recording
-                if self.saving and not self.plot_widget.recording:
-                    timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    filepath = os.path.join(
-                        self.default_save_path, f"sequence_{timestamp}.csv")
-                    if not self.plot_widget.start_recording(filepath):
-                        self.handle_error("Failed to start data recording")
+                # Check if we need to delay the sequence start
+                if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay:
+                    current_time = datetime.now()
+                    if current_time < self.sequence_start_delay:
+                        # Calculate delay in milliseconds
+                        delay_ms = int((self.sequence_start_delay - current_time).total_seconds() * 1000)
+                        
+                        # Update status to show waiting
+                        self.update_sequence_status(f"Waiting for start time: {self.sequence_start_delay.strftime('%Y-%m-%d %H:%M:%S.%f')}")
+                        
+                        # Schedule the actual sequence start
+                        QTimer.singleShot(delay_ms, self._start_sequence_execution)
+                        self.logger.info(f"Sequence delayed to start at {self.sequence_start_delay}")
                         return
-                else:
-                    self.logger.debug(f"Recording already active or disabled - saving={self.saving}, recording={self.plot_widget.recording}")
-
-                # Execute first step
-                self.execute_step(self.steps[0])
-
-                # Start step timer
-                self.step_start_time = time.time()
-                self.step_timer = QTimer()
-                self.step_timer.timeout.connect(self.update_step_time)
-                self.step_timer.start(100)  # Update every 100ms
-
-                # Schedule next step
-                QTimer.singleShot(self.steps[0].time_length, self.next_step)
-
-                self.logger.info("Sequence execution started")
+                
+                # No delay needed, start immediately
+                self._start_sequence_execution()
 
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
+
+    def _start_sequence_execution(self):
+        """Internal method to execute sequence after any delay."""
+        try:
+            # Clear plot before starting new sequence
+            self.plot_widget.clear_plot()
+
+            # Only start recording if not already recording
+            if self.saving and not self.plot_widget.recording:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                filepath = os.path.join(self.default_save_path, f"sequence_{timestamp}.csv")
+                if not self.plot_widget.start_recording(filepath):
+                    self.handle_error("Failed to start data recording")
+                    return
+
+            # Execute first step
+            self.execute_step(self.steps[0])
+
+            # Start step timer
+            self.step_start_time = time.time()
+            self.step_timer = QTimer()
+            self.step_timer.timeout.connect(self.update_step_time)
+            self.step_timer.start(100)  # Update every 100ms
+
+            # Schedule next step
+            QTimer.singleShot(self.steps[0].time_length, self.next_step)
+
+            self.logger.info("Sequence execution started")
+            self.update_sequence_status("Running")
+
+        except Exception as e:
+            self.logger.error(f"Error executing sequence: {e}")
+            self.handle_error("Failed to execute sequence")
 
     def next_step(self):
         """Execute the next step in the sequence."""
@@ -2459,18 +2482,18 @@ class MainWindow(QMainWindow):
         ["pos1","pos2",...] or ["None",...]  # Positions in mm or "None"
         ["time1","time2",...]  # Times in milliseconds
         save_path  # Path or "None"
+        [year,month,day,hour,minute,second,millisecond] or "None" # Start delay timestamp
         
         Example:
         ["b","p","d","b","v"]
         ["10","200","0","250","None"]
         ["1000","1000","1000","1000","1000"]
         C:\\ssbubble\\data
+        [2025,2,22,18,58,10,861]
         """
         try:
             # Init steps
             self.steps = []
-
-            # Init motor flag
             self.motor_flag = False
 
             # Check if sequence file exists
@@ -2481,6 +2504,31 @@ class MainWindow(QMainWindow):
             if not sequence:
                 self.logger.error("Sequence file is empty")
                 return False
+
+            # Parse start delay timestamp from fifth line
+            start_delay_str = sequence[4].strip()
+            start_delay = None
+            
+            if start_delay_str != "None":
+                try:
+                    # Parse timestamp list [year,month,day,hour,minute,second,millisecond]
+                    timestamp_list = eval(start_delay_str)
+                    from datetime import datetime
+                    start_delay = datetime(
+                        timestamp_list[0],  # year
+                        timestamp_list[1],  # month
+                        timestamp_list[2],  # day
+                        timestamp_list[3],  # hour
+                        timestamp_list[4],  # minute
+                        timestamp_list[5],  # second
+                        timestamp_list[6]   # microsecond
+                    )
+                except Exception as e:
+                    self.logger.error(f"Invalid start delay timestamp format: {e}")
+                    return False
+
+            # Store start delay
+            self.sequence_start_delay = start_delay
 
             # Get the save path from the fourth line
             seq_save_path = sequence[3].strip()
