@@ -34,6 +34,7 @@ UstepperS32 stepper;
 
 const int TxenPin = -1; // -1 disables the feature, change that if you are using an RS485 driver, this pin would be connected to the DE and /RE pins of the driver.
 const byte SlaveId = 11;
+const int mmSteps = 6400; // steps per mm
 
 /* Motor parameters */
 double runCurrent = 100; // Motor run current, % of maximum
@@ -41,7 +42,7 @@ double holdCurrent = 10;  // Motor hold current, % of maximum
 double brakeCurrent = 100; // Motor brake current, % of maximum
 float maxAcceleration = 23250; // Motor acceleration, steps/s^2
 float maxDeceleration = 23250; // Motor deceleration, steps/s^2
-int maxVelocity = 6500/2; // Motor maximum velocity, steps/s
+int maxVelocity = 6500; // Motor maximum velocity, steps/s
 int stallSensitivity = 0; // Stall sensitivity, arbitrary (-64 - +63), lower number = higher sensitivity
 
 /* Motor standby parameters */
@@ -88,6 +89,7 @@ const int intPin2 = 9; // This is the interrupt pin for the uStepper S32
 // # | ,                        | ,       | current motor position                  |
 // # | Top Position Reg         | 7-8     | two hold registers used to contain the  |
 // # | ,                        | ,       | top motor position                      |
+// # | Speed Reg                | 9       | Contains the speed of the motor         |
 // # | Command Coil             | 1       | Flag to show if command is waiting      |                
 // # | Calibration Coil         | 2       | Flag to show if motor is calibrated     |
 // # | Init Coil                | 3       | Flag to show if serial comms established|                
@@ -119,6 +121,8 @@ void setup(){
   stepper.setMaxVelocity(standby_maxVelocity); // Set maximum velocity of motor
   delay(500);
   //Serial.println("Motor ready! First calibrate positions using character 'i'.");
+
+  mb.setHreg(9, 4000);
 }
 
 void loop() {
@@ -205,12 +209,7 @@ void handleInput(char input) {
 
     case 't': // Sample to up position
       //Serial.println("Sample up!");
-      stepper.setCurrent(runCurrent);
-      stepper.setHoldCurrent(holdCurrent);
-      stepper.setMaxAcceleration(maxAcceleration);
-      stepper.setMaxDeceleration(maxDeceleration);
-      stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
+      setCustomSpeed();
       upPosition = topPosition - 100000;
       setPosition = upPosition;
       stepper.movePosition(setPosition);
@@ -266,18 +265,20 @@ void handleInput(char input) {
       break;
     case 'x': // Move to position
       //Serial.println("Moving to position!");
-      stepper.setCurrent(runCurrent);
-      stepper.setHoldCurrent(holdCurrent);
-      stepper.setMaxAcceleration(maxAcceleration);
-      stepper.setMaxDeceleration(maxDeceleration);
-      stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity);
+      //stepper.setCurrent(runCurrent);
+      //stepper.setHoldCurrent(holdCurrent);
+      //stepper.setMaxAcceleration(maxAcceleration);
+      //stepper.setMaxDeceleration(maxDeceleration);
+      //stepper.setBrakeMode(COOLBRAKE);
+      //stepper.setMaxVelocity(maxVelocity);
+      setCustomSpeed();
       setPosition = getTargetPosition();
       setPosition = min(upPosition, (upPosition - setPosition));
       setPosition = max(downPosition, setPosition);
       stepper.movePosition(setPosition);
       break;
     case 'c': // Calibrate
+      mb.setCoil(2, 0); // Set calibration flag to false
       stepper.setCurrent(runCurrent);
       stepper.setHoldCurrent(holdCurrent);
       stepper.setMaxAcceleration(maxAcceleration);
@@ -372,6 +373,7 @@ void addCoils(){
   mb.addHreg(6, 0);
   mb.addHreg(7, 0);
   mb.addHreg(8, 0);
+  mb.addHreg(9, 0);
   mb.addCoil(1, 0);
   mb.addCoil(2, 0);
   mb.addCoil(3, 0);
@@ -422,4 +424,13 @@ void slowSpeed() {
   stepper.setMaxDeceleration(maxDeceleration);
   stepper.setBrakeMode(COOLBRAKE);
   stepper.setMaxVelocity(maxVelocity/2);
+}
+
+void setCustomSpeed() {
+  stepper.setCurrent(runCurrent);
+  stepper.setHoldCurrent(holdCurrent);
+  stepper.setMaxAcceleration(maxAcceleration);
+  stepper.setMaxDeceleration(maxDeceleration);
+  stepper.setBrakeMode(COOLBRAKE);
+  stepper.setMaxVelocity(mb.Hreg(9));
 }

@@ -1,22 +1,21 @@
+import matplotlib.pyplot as plt
+import json
+import csv
+import random
+import threading
+import time
+import matplotlib
+import logging
+import sys
+from PyQt6 import QtCore, QtGui, QtWidgets
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from motorController import MotorController
+from arduinoController import ArduinoController
 from pathlib import Path
 import os
 os.environ['MPLCONFIGDIR'] = str(Path.home())+"/.matplotlib/"
-from arduinoController import ArduinoController
-from motorController import MotorController
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
-from PyQt6 import QtCore, QtGui, QtWidgets
-import sys
-import os
-import logging
-import matplotlib
-import time
-import threading
-import random
-import csv
-import json
-import matplotlib.pyplot as plt
 matplotlib.use('QtAgg')
 
 
@@ -27,7 +26,7 @@ class Ui_MainWindow(object):
         # Initialise variables
 
         # how frequently the valve states are checked (ms)
-        self.valveCheckInterval = 50
+        self.valveCheckInterval = 100
 
         # List of valve settings for each step type
         self.valve_settings = {
@@ -909,7 +908,7 @@ class Ui_MainWindow(object):
 
         # Create the graph widgets
         self.figure = Figure()
-        self.sc = RealTimePlot(parent=self)
+        self.sc = RealTimePlot(self)
         self.graphWidget = QtWidgets.QWidget(
             parent=self.centralwidget)
         self.graphWidget.setGeometry(QtCore.QRect(121, 325, 621, 294))
@@ -1143,9 +1142,6 @@ class Ui_MainWindow(object):
 
             self.connect_arduino_signals()    # Connect the worker signals to appropriate slots
 
-            # Start the arduino time that read pressure readings every 500ms
-            self.arduino_worker.start_timer()
-
             # Create an event loop
             loop = QtCore.QEventLoop()
 
@@ -1173,6 +1169,8 @@ class Ui_MainWindow(object):
                 self.ardConnected = True
                 # Start the watchdog timer that updates arduino connection status
                 self.setup_arduino_watchdog()
+                # Start the arduino time that read pressure readings every 500ms
+                self.arduino_worker.start_timer()
             else:
                 self.ardConnected = False
                 self.arduino_worker.stop()
@@ -1728,7 +1726,7 @@ class Ui_MainWindow(object):
         logging.debug("Quick vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.vent_flag:
+            if self.vent_flag or self.sc.p2_data[-1] < 0.1:
                 self.quickVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
                     self.previous_valve_states)
@@ -1738,7 +1736,7 @@ class Ui_MainWindow(object):
                 self.previous_valve_states = self.valveStates.copy()
                 self.quickVentButton.setChecked(True)
                 self.arduino_worker.set_valve_signal.emit(
-                    [2, 2, 1, 2, 1, 2, 2, 2])
+                    [2, 2, 1, 0, 1, 2, 2, 2])
                 self.toggle_valve_controls(False)
                 self.quickVentButton.setEnabled(True)
                 self.vent_flag = True
@@ -1749,7 +1747,7 @@ class Ui_MainWindow(object):
         logging.debug("Slow vent button clicked")
         self.update_valve_states()
         if self.ardConnected:
-            if self.vent_flag:
+            if self.vent_flag or self.sc.p2_data[-1] < 0.1:
                 self.slowVentButton.setChecked(False)
                 self.arduino_worker.set_valve_signal.emit(
                     self.previous_valve_states)
@@ -2663,11 +2661,14 @@ class ValveMacroEditor(QtWidgets.QDialog):  # Valve Macro Editor
         super().closeEvent(event)
 
 
-class RealTimePlot(FigureCanvasQTAgg):
+class RealTimePlot(FigureCanvasQTAgg, QtCore.QObject):
+
     def __init__(self, parent):
         self.fig, self.ax = plt.subplots()
-        super().__init__(self.fig)
+        FigureCanvasQTAgg.__init__(self, self.fig)
+        QtCore.QObject.__init__(self)
 
+        self.parent = parent
         self.max_points = 500
 
         # Initialize data
@@ -2727,12 +2728,7 @@ class RealTimePlot(FigureCanvasQTAgg):
             if self.parent.vent_flag:
                 logging.info(f"Pressure 3: {pressure_values[2]}")
                 if pressure_values[2] < 0.1:
-                    self.parent.arduino_worker.set_valve_signal.emit(
-                        self.parent.previous_valve_states)
-                    self.parent.vent_flag = False
-                    self.parent.quickVentButton.setChecked(False)
-                    self.parent.slowVentButton.setChecked(False)
-                    self.parent.toggle_valve_controls(True)
+                    logging.info("Venting complete")
 
             # Update the plot's data without clearing
             if self.parent.pressure1RadioButton.isChecked():
@@ -2979,6 +2975,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.arduino_worker.stop()
                 if self.verbosity:
                     print("Controller stopped")
+        except AttributeError:
+            pass
+        try:
+            if self.motor_worker:
+                self.motor_worker.stop()
+                if self.verbosity:
+                    print("Motor stopped")
         except AttributeError:
             pass
         if self.verbosity:

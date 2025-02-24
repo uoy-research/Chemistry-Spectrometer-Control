@@ -13,7 +13,7 @@ const int resetCoil = 17;
 
 const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
 const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
-const int VALVES[] = {8, 9, 10, 22, 52, 26, 28, 30};
+const int VALVES[] = {8, 26, 9, 10, 22, 52, 28, 30};
 const int test_led = 12;
 
 const int valveCoil[] = {0, 1, 2, 3, 4, 5, 6, 7}; //coil addresses for valves
@@ -28,7 +28,10 @@ const unsigned long pollTime = 500; //default time between pressure readings
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
 
 //Analog pins - pressure1 is external
+//pins for Chym setup
 const int Pressure1 = A1; const int Pressure2 = A2; const int Pressure3 = A3; const int Pressure4 = A4;
+//pins for older setup
+//const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; const int Pressure4 = A6;
 
 //VARIABLES
 bool TTLState = 1; //TTL state
@@ -250,7 +253,7 @@ void reset(){
 
 void setValves(){
     //set valves based on coil values
-    for (int i = 4; i >= 0; i--)
+    for (int i = 5; i >= 0; i--)
     {
         setValve(i, mb.coil(valveCoil[i]));
     }
