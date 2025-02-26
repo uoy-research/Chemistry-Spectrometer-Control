@@ -21,6 +21,7 @@ import json
 import os
 
 from utils.config import Config
+from utils.timing_logger import setup_timing_logger, get_timing_logger  # Add import
 from workers.arduino_worker import ArduinoWorker
 from workers.motor_worker import MotorWorker
 from .widgets.plot_widget import PlotWidget
@@ -60,11 +61,13 @@ class MainWindow(QMainWindow):
         'c': 'Close'
     }
 
-    def __init__(self, test_mode: bool = False, keep_sequence: bool = False):
+    def __init__(self, test_mode: bool = False, keep_sequence: bool = False, timing_mode: bool = False):
         """Initialize main window.
 
         Args:
             test_mode: Use mock controllers for testing
+            keep_sequence: Keep sequence file after processing
+            timing_mode: Enable timing logs for events
         """
         super().__init__()
 
@@ -75,6 +78,7 @@ class MainWindow(QMainWindow):
         self.config = Config()
         self.test_mode = test_mode
         self.keep_sequence = keep_sequence
+        self.timing_mode = timing_mode  # Store timing mode flag
 
         # Initialize logger
         self.logger = logging.getLogger(__name__)
@@ -150,6 +154,9 @@ class MainWindow(QMainWindow):
 
         # Add previous save path tracking
         self.prev_save_path = None
+
+        # Setup timing logger
+        self.timing_logger = setup_timing_logger(timing_mode)
 
     def initialize_control_states(self):
         """Initialize the enabled/disabled states of all controls."""
@@ -1041,7 +1048,8 @@ class MainWindow(QMainWindow):
                 self.motor_worker = MotorWorker(
                     port=port,
                     update_interval=self.config.motor_update_interval,
-                    mock=self.test_mode
+                    mock=self.test_mode,
+                    timing_mode=self.timing_mode  # Pass timing mode to worker
                 )
 
                 # Setup connections for new worker
@@ -1732,19 +1740,15 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def on_motorMoveToTargetButton_clicked(self):
         """Handle move to target button click."""
-        if self.motor_worker.running:
-            try:
-                target = self.target_motor_pos_edit.value()
-
-                # Special case: if target is 0, use to_bottom command instead
-                if target == 0:
-                    if self.motor_worker.to_top():
-                        self.logger.info(
-                            "Moving motor to top position (364.40)")
-                        return
-                    else:
-                        self.handle_error("Failed to move motor to top")
-                        return
+        try:
+            target = float(self.target_motor_pos_edit.text())
+            if self.motor_worker.running:
+                if self.timing_mode:
+                    self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
+                
+                if not self.motor_worker.move_to(target):
+                    self.handle_error("Failed to move motor to target")
+                    return
 
                 if target < 0:
                     QMessageBox.warning(self, "Invalid Position",
@@ -1764,8 +1768,8 @@ class MainWindow(QMainWindow):
 
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}mm")
-            except ValueError:
-                self.handle_error("Invalid target position")
+        except ValueError:
+            self.handle_error("Invalid target position")
 
     @pyqtSlot()
     def on_motorToBottomButton_clicked(self):
@@ -2834,7 +2838,8 @@ class MainWindow(QMainWindow):
         self.motor_worker = MotorWorker(
             port=port,
             update_interval=self.config.motor_update_interval,
-            mock=self.test_mode
+            mock=self.test_mode,
+            timing_mode=self.timing_mode  # Pass timing mode to worker
         )
         self.setup_connections()
         self.logger.info(f"Motor port updated to COM{port}")

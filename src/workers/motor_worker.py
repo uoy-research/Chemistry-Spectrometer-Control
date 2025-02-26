@@ -10,6 +10,7 @@ from typing import Optional, Union, Tuple
 import threading
 
 from controllers.motor_controller import MotorController
+from utils.timing_logger import get_timing_logger  # Add import
 
 
 class MockMotorController:
@@ -226,13 +227,14 @@ class MotorWorker(QThread):
     _instance_count = 0
     _instance_lock = threading.Lock()  # Add thread safety
 
-    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False):
         """Initialize worker.
         
         Args:
             port: COM port number
             update_interval: Position update interval in seconds (default 0.1)
             mock: Use mock controller for testing
+            timing_mode: Enable timing logs for events
         """
         super().__init__()
         with self._instance_lock:
@@ -269,6 +271,9 @@ class MotorWorker(QThread):
         # Add position limits from controller
         self.max_position = self.controller.POSITION_MAX
         self.min_position = self.controller.POSITION_MIN
+
+        self.timing_mode = timing_mode
+        self.timing_logger = get_timing_logger()  # Use the shared logger instance
 
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
@@ -312,27 +317,18 @@ class MotorWorker(QThread):
 
         while self._running:
             if not self._paused and not self._pause_updates:
-                # Get current position
                 position = self.controller.get_position()
-                
-                # Check if controller is still running
-                if not self.controller.running:
-                    self.logger.error("Motor controller stopped due to connection issues")
-                    self._running = False
-                    self.status_changed.emit("Motor disconnected")
-                    break
-                    
                 if position is not None:
                     if position != self._current_position:
                         self._current_position = position
-                        # Remove the negative sign here
                         self.position_updated.emit(float(position))
 
                     # Check if target reached
                     if self._target_position is not None:
-                        # Remove position inversion here
                         current_adjusted = position
                         if abs(current_adjusted - self._target_position) < 0.005:
+                            if self.timing_mode:
+                                self.timing_logger.info(f"MOTOR_MOVEMENT_COMPLETE - Position: {position}mm")
                             self._target_position = None
                             self.movement_completed.emit(True)
                 else:
@@ -378,6 +374,10 @@ class MotorWorker(QThread):
             self._pending_position = position
             self._retry_count = 0
             
+            # Log timing event when command is sent
+            if self.timing_mode:
+                self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
+            
             # Log sequence mode state
             self.logger.info(f"Move command received. Sequence mode: {self._in_sequence}")
             
@@ -411,6 +411,9 @@ class MotorWorker(QThread):
             success, actual_target = self.controller.set_position(self._pending_position, wait=False)
             if success:
                 self._target_position = actual_target
+                # Log timing event if target was limited
+                if self.timing_mode and actual_target != self._pending_position:
+                    self.timing_logger.info(f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
                     self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
                 self._cleanup_retry()
