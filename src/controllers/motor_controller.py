@@ -61,7 +61,7 @@ class MotorController:
             self.instrument = minimalmodbus.Instrument(self.port, self.address)
             # Configure Modbus RTU settings
             self.instrument.serial.baudrate = 9600
-            self.instrument.serial.timeout = 0.2  # Reduce timeout to prevent blocking
+            self.instrument.serial.timeout = 0.05  # Reduce timeout to prevent blocking
             self.instrument.serial.bytesize = 8
             self.instrument.serial.parity = 'N'
             self.instrument.serial.stopbits = 1
@@ -271,7 +271,8 @@ class MotorController:
                     return True, actual_target
                 finally:
                     # Restore original timeout
-                    self.instrument.serial.timeout = original_timeout
+                    pass
+                    #self.instrument.serial.timeout = original_timeout
                 
             except Exception as e:
                 if self._in_sequence:

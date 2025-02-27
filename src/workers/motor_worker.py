@@ -437,8 +437,8 @@ class MotorWorker(QThread):
                 self._retry_timer.setSingleShot(True)
                 self._retry_timer.timeout.connect(self._try_move)
             
-            self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in 100ms...")
-            self._retry_timer.start(100)  # 100ms delay between retries
+            self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in 10ms...")
+            self._retry_timer.start(1)  # 100ms delay between retries
         else:
             # Max retries reached
             if error_msg:
