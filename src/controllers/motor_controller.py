@@ -6,6 +6,7 @@ import minimalmodbus
 import time
 import logging
 import ctypes
+import threading
 from typing import Optional, Union, Tuple
 
 
@@ -37,6 +38,14 @@ class MotorController:
         self._limits_enabled = True  # Add flag for motor limits
         self._error_state = False  # Add flag to track error state
 
+        # Add mutex for thread synchronization
+        self._modbus_lock = threading.RLock()  # Use RLock to allow reentrant locking
+
+        # Add command prioritization flags
+        self._command_in_progress = False
+        self.last_position_read_time = 0
+        self.position_read_interval = 0.1  # Minimum time between position reads
+
     def _setup_logging(self):
         """Setup logging for the Arduino controller."""
         self.logger = logging.getLogger(__name__)
@@ -47,7 +56,7 @@ class MotorController:
 
     def start(self) -> bool:
         """Start and initialize the motor controller.
-        
+
         Returns:
             bool: True if successfully started and initialized, False otherwise
         """
@@ -67,36 +76,40 @@ class MotorController:
             self.instrument.serial.stopbits = 1
             self.instrument.mode = minimalmodbus.MODE_RTU
             self.instrument.clear_buffers_before_each_transaction = True
-            
+
             # Remove blocking sleep and try immediate connection test
             try:
                 self.instrument.write_bit(3, 1)
                 self.serial_connected = True
                 # self.logger.info(f"Connected to motor on {self.port}")
-                
-                result = self.instrument.read_bit(3, 1) 
+
+                result = self.instrument.read_bit(3, 1)
                 if result:
                     self.logger.info("Motor controller initialized")
                     self.running = True
-                    
+
                     # Get initial position reading
                     try:
-                        readings = self.instrument.read_registers(5, 2, functioncode=3)
+                        readings = self.instrument.read_registers(
+                            5, 2, functioncode=3)
                         raw_steps = self.assemble(readings[0], readings[1])
-                        initial_position = round(raw_steps / self.STEPS_PER_MM, 5)
+                        initial_position = round(
+                            raw_steps / self.STEPS_PER_MM, 5)
                         self._initial_offset = initial_position
-                        #self.logger.info(f"Initial position offset set to: {initial_position}")
+                        # self.logger.info(f"Initial position offset set to: {initial_position}")
                     except Exception as e:
-                        self.logger.error(f"Failed to get initial position: {e}")
+                        self.logger.error(
+                            f"Failed to get initial position: {e}")
                         self._initial_offset = 0
-                    
+
                     return True
                 else:
                     self.logger.error("Motor controller not initialized")
                     return False
-                    
+
             except Exception as e:
-                self.logger.error(f"Failed to initialize motor controller: {e}")
+                self.logger.error(
+                    f"Failed to initialize motor controller: {e}")
                 return False
 
         except Exception as e:
@@ -108,49 +121,69 @@ class MotorController:
         if not self.running or self._error_state:
             return None
 
+        # Skip position reading if a command is in progress or if we've read recently
+        current_time = time.time()
+        if self._command_in_progress:
+            return self._current_position  # Return last known position
+
+        # Enforce minimum interval between position reads
+        if current_time - self.last_position_read_time < self.position_read_interval:
+            return self._current_position
+
         try:
             if self.mode == 2:  # Test mode
                 return self._current_position
 
             # Add retry mechanism for reading position
             max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    readings = self.instrument.read_registers(5, 2, functioncode=3)
-                    raw_steps = self.assemble(readings[0], readings[1])
-                    position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
-                    self.motor_position = position
-                    self._consecutive_errors = 0  # Reset error counter on success
-                    
-                    # Add debug log for raw step data
-                    # self.logger.debug(f"Raw step data - High: {readings[0]}, Low: {readings[1]}, Combined: {raw_steps} steps")
-                    
-                    return float(position)
-                except Exception as e:
-                    if attempt == max_retries - 1:  # Last attempt
-                        raise
-                    time.sleep(0.1)
+
+            # Acquire lock with timeout to prevent blocking commands
+            if not self._modbus_lock.acquire(timeout=0.05):  # 50ms timeout
+                return self._current_position  # Return last known position if can't get lock
+
+            try:
+                self.last_position_read_time = current_time
+
+                for attempt in range(max_retries):
+                    try:
+                        readings = self.instrument.read_registers(
+                            5, 2, functioncode=3)
+                        raw_steps = self.assemble(readings[0], readings[1])
+                        position = round(
+                            (raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
+                        self.motor_position = position
+                        self._current_position = position  # Update cached position
+                        self._consecutive_errors = 0  # Reset error counter on success
+
+                        return float(position)
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            raise
+                        time.sleep(0.1)
+            finally:
+                self._modbus_lock.release()
 
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
             self.serial_connected = False
             self._consecutive_errors += 1
-            
+
             # Only stop on consecutive errors if not in sequence mode
             if not self._in_sequence and self._consecutive_errors >= self._max_consecutive_errors:
-                self.logger.error("Too many consecutive errors, stopping motor controller")
+                self.logger.error(
+                    "Too many consecutive errors, stopping motor controller")
                 self.running = False
                 self.serial_connected = False
                 self._error_state = True  # Set error state flag
-                
-            return None
+
+            return self._current_position  # Return last known position on error
 
     def start_calibration(self) -> bool:
         """Start the calibration process."""
         try:
             # Reset calibration flag so offset will be recalculated
             self._is_calibrated = False
-            
+
             # Send calibration command
             self.instrument.write_register(2, ord('c'))
             time.sleep(1)
@@ -168,32 +201,36 @@ class MotorController:
         try:
             calibrated = self.instrument.read_bit(2, 1)
             self.serial_connected = True
-            
+
             # First check if calibration is complete from controller
             if calibrated:
                 if not self._is_calibrated:
                     # Now we know calibration is truly complete, wait for motor to settle
                     time.sleep(0.5)
-                    
+
                     # Record position offset after calibration is complete
                     try:
-                        readings = self.instrument.read_registers(5, 2, functioncode=3)
+                        readings = self.instrument.read_registers(
+                            5, 2, functioncode=3)
                         raw_steps = self.assemble(readings[0], readings[1])
-                        calibration_position = round(raw_steps / self.STEPS_PER_MM, 5)
+                        calibration_position = round(
+                            raw_steps / self.STEPS_PER_MM, 5)
                         # Calculate offset to make current position show POSITION_MAX
                         self._initial_offset = calibration_position - self.POSITION_MAX
-                        self.logger.info(f"Calibration complete - Position offset set to: {self._initial_offset}")
-                        
+                        self.logger.info(
+                            f"Calibration complete - Position offset set to: {self._initial_offset}")
+
                         # Set calibration state
                         self._is_calibrated = True
                         # Return True to indicate successful calibration
                         return True
-                        
+
                     except Exception as e:
-                        self.logger.error(f"Failed to get calibration position: {e}")
+                        self.logger.error(
+                            f"Failed to get calibration position: {e}")
                         self._initial_offset = 0
                         return False
-                
+
             return bool(calibrated)
         except Exception as e:
             self.serial_connected = False
@@ -202,19 +239,21 @@ class MotorController:
     def set_sequence_mode(self, enabled: bool):
         """Enable or disable sequence mode for continuous movement."""
         self._in_sequence = enabled
-        self.logger.info(f"Sequence mode {'enabled' if enabled else 'disabled'}")
-    
+        self.logger.info(
+            f"Sequence mode {'enabled' if enabled else 'disabled'}")
+
     def move_to(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
         """Wrapper for set_position to maintain compatibility."""
         # During sequence mode, ignore "movement in progress" state
         if self._in_sequence:
             return self.set_position(position, wait=False)
         return self.set_position(position, wait)
-        
+
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
         """Set motor position with optional limit checking."""
         if not self.running or self._error_state:  # Check error state
-            self.logger.error("Motor controller is in error state or not running")
+            self.logger.error(
+                "Motor controller is in error state or not running")
             return False, position
 
         try:
@@ -224,7 +263,8 @@ class MotorController:
             # Apply limits only if enabled
             if self._limits_enabled:
                 if position > self.POSITION_MAX:
-                    self.logger.warning(f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
+                    self.logger.warning(
+                        f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
                     actual_target = self.POSITION_MAX
                     position = self.POSITION_MAX
                 elif position < self.POSITION_MIN:
@@ -244,44 +284,54 @@ class MotorController:
             # Convert from bottom-referenced to top-referenced position
             # If position is 200mm from bottom, we want (364.40 - 200.00)mm from top
             top_referenced_position = self.POSITION_MAX - position
-            
+
             # Convert position to steps
-            position_steps = int(round(top_referenced_position * self.STEPS_PER_MM))
+            position_steps = int(
+                round(top_referenced_position * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
-            
-            # Send position commands with minimal delay
-            try:
-                # Clear buffers before sending new commands
-                self.instrument.serial.reset_input_buffer()
-                self.instrument.serial.reset_output_buffer()
-                
-                # Increase timeout temporarily for these operations
-                original_timeout = self.instrument.serial.timeout
-                self.instrument.serial.timeout = 0.5  # 500ms timeout
-                
+
+            # Acquire lock for command execution
+            with self._modbus_lock:
+                # Set command priority flag
+                self._command_in_progress = True
+
                 try:
-                    self.instrument.write_register(3, high)
-                    time.sleep(0.01)  # Small delay between writes
-                    self.instrument.write_register(4, low)
-                    time.sleep(0.01)
-                    self.instrument.write_register(2, ord('x'))
-                    time.sleep(0.01)
-                    self.instrument.write_bit(1, 1)
-                    self.serial_connected = True
-                    return True, actual_target
+                    # Clear buffers before sending new commands
+                    self.instrument.serial.reset_input_buffer()
+                    self.instrument.serial.reset_output_buffer()
+
+                    # Increase timeout temporarily for these operations
+                    original_timeout = self.instrument.serial.timeout
+                    self.instrument.serial.timeout = 0.5  # 500ms timeout
+
+                    try:
+                        self.instrument.write_register(3, high)
+                        time.sleep(0.02)  # Increased delay between writes
+                        self.instrument.write_register(4, low)
+                        time.sleep(0.02)  # Increased delay between writes
+                        self.instrument.write_register(2, ord('x'))
+                        time.sleep(0.02)  # Increased delay between writes
+                        self.instrument.write_bit(1, 1)
+                        self.serial_connected = True
+                        return True, actual_target
+                    finally:
+                        # Restore original timeout
+                        self.instrument.serial.timeout = original_timeout
+                except Exception as e:
+                    if self._in_sequence:
+                        # Fail fast in sequence mode
+                        raise
+                    self.logger.error(f"Failed to send position commands: {e}")
+                    return False, position
                 finally:
-                    # Restore original timeout
-                    self.instrument.serial.timeout = original_timeout
-                
-            except Exception as e:
-                if self._in_sequence:
-                    # Fail fast in sequence mode
-                    raise
-                self.logger.error(f"Failed to send position commands: {e}")
-                return False, position
+                    # Always clear command priority flag
+                    self._command_in_progress = False
 
             if wait and not self._in_sequence:
-                while True:
+                # Wait for position to be reached
+                timeout = 30  # 30 second timeout
+                start_time = time.time()
+                while time.time() - start_time < timeout:
                     current = self.get_position()
                     if current is not None:
                         # Convert current position to bottom-referenced for comparison
@@ -289,6 +339,9 @@ class MotorController:
                         if abs(current_from_bottom - position) < 0.005:
                             break
                     time.sleep(0.1)
+                else:
+                    self.logger.warning(
+                        f"Timeout waiting for position {position}")
 
             return True, actual_target
 
@@ -303,54 +356,116 @@ class MotorController:
 
     def stop_motor(self) -> bool:
         """Stop motor movement with retries."""
-        max_retries = 10
-        for attempt in range(max_retries):
+        if not self.running:
+            return False
+
+        # Acquire lock for command execution
+        with self._modbus_lock:
+            # Set command priority flag
+            self._command_in_progress = True
+
             try:
-                self.instrument.write_register(2, ord('s'))
-                self.instrument.write_bit(1, 1)
-                self.serial_connected = True
-                self.logger.info("Motor stop command sent successfully")
-                return True
-            except Exception as e:
-                if attempt == max_retries - 1:  # Last attempt
-                    self.logger.error(f"Failed to stop motor after {max_retries} attempts: {e}")
-                    self.serial_connected = False
-                    return False
-                self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
-                time.sleep(0.1)  # Short delay between retries
+                max_retries = 10
+                for attempt in range(max_retries):
+                    try:
+                        # Increase timeout for stop command
+                        original_timeout = self.instrument.serial.timeout
+                        self.instrument.serial.timeout = 0.5  # 500ms timeout
+
+                        try:
+                            self.instrument.write_register(2, ord('s'))
+                            time.sleep(0.05)  # Longer delay for stop command
+                            self.instrument.write_bit(1, 1)
+                            self.serial_connected = True
+                            self.logger.info(
+                                "Motor stop command sent successfully")
+                            return True
+                        finally:
+                            # Restore original timeout
+                            self.instrument.serial.timeout = original_timeout
+
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            self.logger.error(
+                                f"Failed to stop motor after {max_retries} attempts: {e}")
+                            self.serial_connected = False
+                            return False
+                        self.logger.warning(
+                            f"Stop attempt {attempt + 1} failed, retrying...")
+                        time.sleep(0.1)  # Short delay between retries
+
+                return False
+            finally:
+                # Always clear command priority flag
+                self._command_in_progress = False
 
     def to_bottom(self) -> bool:
         """Move motor to bottom position."""
         if not self.running or self._error_state:  # Check error state
-            self.logger.error("Motor controller is in error state or not running")
+            self.logger.error(
+                "Motor controller is in error state or not running")
             return False
 
-        try:
-            self.instrument.write_register(2, ord('b'))
-            self.instrument.write_bit(1, 1)
-            self.serial_connected = True
-            return True
-        except Exception as e:
-            self.logger.error(f"Couldn't move to bottom: {e}")
-            self.serial_connected = False
-            return False
-        
+        # Acquire lock for command execution
+        with self._modbus_lock:
+            # Set command priority flag
+            self._command_in_progress = True
+
+            try:
+                # Increase timeout for this command
+                original_timeout = self.instrument.serial.timeout
+                self.instrument.serial.timeout = 0.5  # 500ms timeout
+
+                try:
+                    self.instrument.write_register(2, ord('b'))
+                    time.sleep(0.05)  # Longer delay for important command
+                    self.instrument.write_bit(1, 1)
+                    self.serial_connected = True
+                    return True
+                finally:
+                    # Restore original timeout
+                    self.instrument.serial.timeout = original_timeout
+            except Exception as e:
+                self.logger.error(f"Couldn't move to bottom: {e}")
+                self.serial_connected = False
+                return False
+            finally:
+                # Always clear command priority flag
+                self._command_in_progress = False
+
     def to_top(self) -> bool:
         """Move motor to top position."""
         if not self.running or self._error_state:  # Check error state
-            self.logger.error("Motor controller is in error state or not running")
+            self.logger.error(
+                "Motor controller is in error state or not running")
             return False
 
-        try:
-            self.instrument.write_register(2, ord('t'))
-            self.instrument.write_bit(1, 1)
-            self.serial_connected = True
-            return True
-        except Exception as e:
-            self.logger.error(f"Couldn't move to top: {e}")
-            self.serial_connected = False
-            return False
+        # Acquire lock for command execution
+        with self._modbus_lock:
+            # Set command priority flag
+            self._command_in_progress = True
 
+            try:
+                # Increase timeout for this command
+                original_timeout = self.instrument.serial.timeout
+                self.instrument.serial.timeout = 0.5  # 500ms timeout
+
+                try:
+                    self.instrument.write_register(2, ord('t'))
+                    time.sleep(0.05)  # Longer delay for important command
+                    self.instrument.write_bit(1, 1)
+                    self.serial_connected = True
+                    return True
+                finally:
+                    # Restore original timeout
+                    self.instrument.serial.timeout = original_timeout
+            except Exception as e:
+                self.logger.error(f"Couldn't move to top: {e}")
+                self.serial_connected = False
+                return False
+            finally:
+                # Always clear command priority flag
+                self._command_in_progress = False
 
     def get_top_position(self) -> Optional[float]:
         """Get the top position of the motor."""
@@ -389,17 +504,17 @@ class MotorController:
                     self.instrument.write_bit(3, 0)
                 except Exception as e:
                     self.logger.warning(f"Failed to clear init flag: {e}")
-                    
+
             if self.instrument is not None:
                 try:
                     self.instrument.serial.close()
                 except Exception as e:
                     self.logger.warning(f"Failed to close serial port: {e}")
-                    
+
             self.running = False
             self.serial_connected = False
             self.logger.info("Motor controller stopped")
-            
+
         except Exception as e:
             self.logger.error(f"Error stopping motor controller: {e}")
 
@@ -431,14 +546,15 @@ class MotorController:
                 raw_position = self.assemble(readings[0], readings[1])
                 self.motor_position = raw_position - offset
             except Exception as e:
-                self.logger.error(f"Failed to update position after setting offset: {e}")
+                self.logger.error(
+                    f"Failed to update position after setting offset: {e}")
 
     def set_speed(self, speed: int) -> bool:
         """Set motor speed via Modbus.
-        
+
         Args:
             speed: Speed value (0-6500)
-            
+
         Returns:
             bool: True if successful
         """
@@ -447,19 +563,19 @@ class MotorController:
             if speed < self.SPEED_MIN or speed > self.SPEED_MAX:
                 self.logger.error(f"Invalid speed value: {speed}")
                 return False
-            
+
             # Write speed to register 9
             self.instrument.write_register(9, speed)
-            #self.logger.info(f"Motor speed set to {speed}")
+            # self.logger.info(f"Motor speed set to {speed}")
             return True
-        
+
         except Exception as e:
             self.logger.error(f"Failed to set motor speed: {e}")
             return False
 
     def step_motor(self, step_char: str) -> bool:
         """Step motor by predefined amount.
-        
+
         Args:
             step_char: Command character:
                 'q': +50mm
@@ -468,7 +584,7 @@ class MotorController:
                 'r': -1mm
                 'f': -10mm
                 'v': -50mm
-                
+
         Returns:
             bool: True if command sent successfully
         """
@@ -486,7 +602,8 @@ class MotorController:
     def set_limits_enabled(self, enabled: bool):
         """Enable or disable motor position limits."""
         self._limits_enabled = enabled
-        self.logger.info(f"Motor limits {'enabled' if enabled else 'disabled'}")
+        self.logger.info(
+            f"Motor limits {'enabled' if enabled else 'disabled'}")
 
     def check_position_valid(self, position: float) -> bool:
         """Check if position is within valid range."""
@@ -496,10 +613,10 @@ class MotorController:
 
     def set_acceleration(self, accel: int) -> bool:
         """Set motor acceleration via Modbus.
-        
+
         Args:
             accel: Acceleration value (0-23250)
-            
+
         Returns:
             bool: True if successful
         """
@@ -508,11 +625,11 @@ class MotorController:
             if accel < self.ACCEL_MIN or accel > self.ACCEL_MAX:
                 self.logger.error(f"Invalid acceleration value: {accel}")
                 return False
-            
+
             # Write acceleration to register 10
             self.instrument.write_register(10, accel)
             return True
-        
+
         except Exception as e:
             self.logger.error(f"Failed to set motor acceleration: {e}")
             return False
