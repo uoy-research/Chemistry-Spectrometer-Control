@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
 from PyQt6.QtGui import QFont
+from datetime import datetime
 import logging
 from typing import List, Optional, Union
 from pathlib import Path
@@ -20,6 +21,7 @@ import json
 import os
 
 from utils.config import Config
+from utils.timing_logger import setup_timing_logger, get_timing_logger  # Add import
 from workers.arduino_worker import ArduinoWorker
 from workers.motor_worker import MotorWorker
 from .widgets.plot_widget import PlotWidget
@@ -59,11 +61,13 @@ class MainWindow(QMainWindow):
         'c': 'Close'
     }
 
-    def __init__(self, test_mode: bool = False, keep_sequence: bool = False):
+    def __init__(self, test_mode: bool = False, keep_sequence: bool = False, timing_mode: bool = False):
         """Initialize main window.
 
         Args:
             test_mode: Use mock controllers for testing
+            keep_sequence: Keep sequence file after processing
+            timing_mode: Enable timing logs for events
         """
         super().__init__()
 
@@ -74,10 +78,28 @@ class MainWindow(QMainWindow):
         self.config = Config()
         self.test_mode = test_mode
         self.keep_sequence = keep_sequence
+        self.timing_mode = timing_mode  # Store timing mode flag
 
         # Initialize logger
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Initializing MainWindow with test_mode={test_mode}")
+
+        # Clean up old files
+        try:
+            ssbubble_path = Path("C:/ssbubble")
+            files_to_delete = [
+                "sequence.txt",
+                "prospa.txt",
+                "device_status.txt",
+                "sequence_finish_time.txt"
+            ]
+            for filename in files_to_delete:
+                file_path = ssbubble_path / filename
+                if file_path.exists():
+                    file_path.unlink()
+                    self.logger.info(f"Deleted {filename}")
+        except Exception as e:
+            self.logger.error(f"Error cleaning up files: {e}")
 
         # Initialize workers as None
         self.motor_worker = None
@@ -129,6 +151,12 @@ class MainWindow(QMainWindow):
         # Add this new instance variable to track active macro
         self.active_valve_macro = None
         self.active_macro_timer = None  # Track the active macro timer
+
+        # Add previous save path tracking
+        self.prev_save_path = None
+
+        # Setup timing logger
+        self.timing_logger = setup_timing_logger(timing_mode)
 
     def initialize_control_states(self):
         """Initialize the enabled/disabled states of all controls."""
@@ -1020,7 +1048,8 @@ class MainWindow(QMainWindow):
                 self.motor_worker = MotorWorker(
                     port=port,
                     update_interval=self.config.motor_update_interval,
-                    mock=self.test_mode
+                    mock=self.test_mode,
+                    timing_mode=self.timing_mode  # Pass timing mode to worker
                 )
 
                 # Setup connections for new worker
@@ -1173,13 +1202,31 @@ class MainWindow(QMainWindow):
             self.handle_error(f"Sequence file check failed: {str(e)}")
 
     def write_sequence_finish_time(self, sequence_time: float):
-        """Write sequence finish time to file."""
+        """Write sequence finish time to file.
+        
+        Args:
+            sequence_time: Total sequence time in milliseconds
+        """
         try:
-            end_time = self.sequence_start_time + sequence_time
+            # Get start time - use delayed start time if exists, otherwise use current time
+            if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay:
+                start_time = self.sequence_start_delay.timestamp()
+            else:
+                start_time = time.time()
+
+            # Calculate end time by adding sequence duration
+            end_datetime = datetime.fromtimestamp(start_time + (sequence_time / 1000))
+            
+            # Format end time as required
+            end_time = f"[{end_datetime.year}, {end_datetime.month:02d}, {end_datetime.day:02d}, {end_datetime.hour:02d}, {end_datetime.minute:02d}, {end_datetime.second:02d}, {int(end_datetime.microsecond)}]"
+            
+            # Write to file
             with open(r"C:\ssbubble\sequence_finish_time.txt", "w") as f:
                 f.write(f"{end_time}")
+            
             self.logger.info(f"Sequence finish time: {end_time}")
             return True
+            
         except Exception as e:
             self.logger.error(f"Error writing sequence finish time: {e}")
             return False
@@ -1693,19 +1740,15 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def on_motorMoveToTargetButton_clicked(self):
         """Handle move to target button click."""
-        if self.motor_worker.running:
-            try:
-                target = self.target_motor_pos_edit.value()
-
-                # Special case: if target is 0, use to_bottom command instead
-                if target == 0:
-                    if self.motor_worker.to_top():
-                        self.logger.info(
-                            "Moving motor to top position (364.40)")
-                        return
-                    else:
-                        self.handle_error("Failed to move motor to top")
-                        return
+        try:
+            target = float(self.target_motor_pos_edit.text())
+            if self.motor_worker.running:
+                if self.timing_mode:
+                    self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
+                
+                if not self.motor_worker.move_to(target):
+                    self.handle_error("Failed to move motor to target")
+                    return
 
                 if target < 0:
                     QMessageBox.warning(self, "Invalid Position",
@@ -1725,8 +1768,8 @@ class MainWindow(QMainWindow):
 
                 self.motor_worker.move_to(target)
                 self.logger.info(f"Moving motor to position {target}mm")
-            except ValueError:
-                self.handle_error("Invalid target position")
+        except ValueError:
+            self.handle_error("Invalid target position")
 
     @pyqtSlot()
     def on_motorToBottomButton_clicked(self):
@@ -1824,9 +1867,14 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def on_beginSaveButton_clicked(self, checked=None):
         """Handle begin save button click."""
+        # Add debug logging for initial state
+        self.logger.debug(f"Begin save clicked - Initial state: checked={checked}, saving={self.saving}")
+
         # If called programmatically, use button's checked state
         if checked is None:
             checked = self.beginSaveButton.isChecked()
+        
+        self.logger.debug(f"Using checked state: {checked}")
 
         if checked:
             try:
@@ -1836,11 +1884,13 @@ class MainWindow(QMainWindow):
 
                 # Get or generate save path
                 save_path = self.savePathEdit.text()
+                self.logger.debug(f"Save path from edit: {save_path}")
+                
                 if not save_path:
                     # Generate default save path with timestamp
                     timestamp = time.strftime("%Y%m%d_%H%M%S")
-                    save_path = str(
-                        data_dir / f"pressure_data_{timestamp}.csv")
+                    save_path = str(data_dir / f"pressure_data_{timestamp}.csv")
+                    self.logger.debug(f"Generated save path: {save_path}")
 
                 # Update the text field with the generated path
                 self.savePathEdit.setText(save_path)
@@ -1849,6 +1899,7 @@ class MainWindow(QMainWindow):
                 Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
                 # Start recording
+                self.logger.debug("Attempting to start recording...")
                 if self.plot_widget.start_recording(save_path):
                     self.beginSaveButton.setText("Stop Saving")
                     self.saving = True
@@ -1864,10 +1915,10 @@ class MainWindow(QMainWindow):
                 self.saving = False
                 self.beginSaveButton.setText("Begin Saving")
         else:
+            self.logger.debug("Stopping recording...")
             self.plot_widget.stop_recording()
             self.beginSaveButton.setText("Begin Saving")
-            self.beginSaveButton.setChecked(
-                False)  # Ensure button is unchecked
+            self.beginSaveButton.setChecked(False)
             self.saving = False
             self.logger.info("Stopped recording data")
 
@@ -2096,35 +2147,60 @@ class MainWindow(QMainWindow):
         """Start sequence execution."""
         try:
             if self.steps:
-                # Clear plot before starting new sequence
-                self.plot_widget.clear_plot()
-
-                # Start data recording if enabled
-                if self.saving:
-                    timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    filepath = os.path.join(
-                        self.default_save_path, f"sequence_{timestamp}.csv")
-                    if not self.plot_widget.start_recording(filepath):
-                        self.handle_error("Failed to start data recording")
+                # Check if we need to delay the sequence start
+                if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay:
+                    current_time = datetime.now()
+                    if current_time < self.sequence_start_delay:
+                        # Calculate delay in milliseconds
+                        delay_ms = int((self.sequence_start_delay - current_time).total_seconds() * 1000)
+                        
+                        # Update status to show waiting
+                        self.update_sequence_status(f"Waiting for start time: {self.sequence_start_delay.strftime('%Y-%m-%d %H:%M:%S.%f')}")
+                        
+                        # Schedule the actual sequence start
+                        QTimer.singleShot(delay_ms, self._start_sequence_execution)
+                        self.logger.info(f"Sequence delayed to start at {self.sequence_start_delay}")
                         return
-
-                # Execute first step
-                self.execute_step(self.steps[0])
-
-                # Start step timer
-                self.step_start_time = time.time()
-                self.step_timer = QTimer()
-                self.step_timer.timeout.connect(self.update_step_time)
-                self.step_timer.start(100)  # Update every 100ms
-
-                # Schedule next step
-                QTimer.singleShot(self.steps[0].time_length, self.next_step)
-
-                self.logger.info("Sequence execution started")
+                
+                # No delay needed, start immediately
+                self._start_sequence_execution()
 
         except Exception as e:
             self.logger.error(f"Error starting sequence: {e}")
             self.handle_error("Failed to start sequence")
+
+    def _start_sequence_execution(self):
+        """Internal method to execute sequence after any delay."""
+        try:
+            # Clear plot before starting new sequence
+            self.plot_widget.clear_plot()
+
+            # Only start recording if not already recording
+            if self.saving and not self.plot_widget.recording:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                filepath = os.path.join(self.default_save_path, f"sequence_{timestamp}.csv")
+                if not self.plot_widget.start_recording(filepath):
+                    self.handle_error("Failed to start data recording")
+                    return
+
+            # Execute first step
+            self.execute_step(self.steps[0])
+
+            # Start step timer
+            self.step_start_time = time.time()
+            self.step_timer = QTimer()
+            self.step_timer.timeout.connect(self.update_step_time)
+            self.step_timer.start(100)  # Update every 100ms
+
+            # Schedule next step
+            QTimer.singleShot(self.steps[0].time_length, self.next_step)
+
+            self.logger.info("Sequence execution started")
+            self.update_sequence_status("Running")
+
+        except Exception as e:
+            self.logger.error(f"Error executing sequence: {e}")
+            self.handle_error("Failed to execute sequence")
 
     def next_step(self):
         """Execute the next step in the sequence."""
@@ -2145,7 +2221,7 @@ class MainWindow(QMainWindow):
             self.update_sequence_info("Complete", 0, 0, 0)
             self.update_sequence_status("Complete")
             if self.saving:
-                self.plot_widget.stop_recording()
+                self.on_beginSaveButton_clicked(False)
 
             # Restart sequence monitoring
             if self.arduino_worker and self.arduino_worker.running and self.arduino_worker.mode == 1:
@@ -2420,25 +2496,24 @@ class MainWindow(QMainWindow):
 
     def load_sequence(self):
         """Load sequence from file.
-
-        Format:
-        list[<step_type>]
-        list[<motor_position>] or None
-        list[<time_length>]
-        <data_save_path> or None
-
+        
+        Expected format:
+        ["step_type1","step_type2",...]  # Valid types: d,p,v,b,f,e,c
+        ["pos1","pos2",...] or ["None",...]  # Positions in mm or "None"
+        ["time1","time2",...]  # Times in milliseconds
+        save_path  # Path or "None"
+        [year,month,day,hour,minute,second,millisecond] or "None" # Start delay timestamp
+        
         Example:
-        ['p', 'v', 'b', 'f', 'e']
-        [None, None, None, 1000, 2000]
-        [1000, 2000, 1000, 2000, 1000]
-        C:\ssbubble\data\sequence_1.csv
-
+        ["b","p","d","b","v"]
+        ["10","200","0","250","None"]
+        ["1000","1000","1000","1000","1000"]
+        C:\\ssbubble\\data
+        [2025,2,22,18,58,10,861]
         """
         try:
             # Init steps
             self.steps = []
-
-            # Init motor flag
             self.motor_flag = False
 
             # Check if sequence file exists
@@ -2450,46 +2525,84 @@ class MainWindow(QMainWindow):
                 self.logger.error("Sequence file is empty")
                 return False
 
-            # Get the save path from the fourth line of the sequence file
+            # Parse start delay timestamp from fifth line
+            start_delay_str = sequence[4].strip()
+            start_delay = None
+            
+            if start_delay_str != "None":
+                try:
+                    # Parse timestamp list [year,month,day,hour,minute,second,millisecond]
+                    timestamp_list = eval(start_delay_str)
+                    from datetime import datetime
+                    start_delay = datetime(
+                        timestamp_list[0],  # year
+                        timestamp_list[1],  # month
+                        timestamp_list[2],  # day
+                        timestamp_list[3],  # hour
+                        timestamp_list[4],  # minute
+                        timestamp_list[5],  # second
+                        timestamp_list[6]   # microsecond
+                    )
+                except Exception as e:
+                    self.logger.error(f"Invalid start delay timestamp format: {e}")
+                    return False
+
+            # Store start delay
+            self.sequence_start_delay = start_delay
+
+            # Get the save path from the fourth line
             seq_save_path = sequence[3].strip()
 
-            # Check if save path is valid
-            if not seq_save_path or not os.path.isdir(seq_save_path):
-                self.logger.error("Invalid save path in sequence file")
+            # Convert lists into steps - handle double quoted format
+            step_types = sequence[0].strip().strip('[]').replace('"', '').split(',')
+            motor_positions = sequence[1].strip().strip('[]').replace('"', '').split(',')
+            time_lengths = sequence[2].strip().strip('[]').replace('"', '').split(',')
+
+            # Clean any whitespace
+            step_types = [s.strip() for s in step_types]
+            motor_positions = [p.strip() for p in motor_positions]
+            time_lengths = [t.strip() for t in time_lengths]
+
+            # Validate step types
+            valid_step_types = set(self.step_types.keys())  # d,p,v,b,f,e,c
+            if not all(step_type in valid_step_types for step_type in step_types):
+                invalid_types = [t for t in step_types if t not in valid_step_types]
+                self.logger.error(f"Invalid step types in sequence: {invalid_types}. Valid types are: {list(valid_step_types)}")
                 return False
 
-            # Convert lists into steps
-            step_types = sequence[0].strip().split(',')
-            motor_positions = sequence[1].strip().split(',')
-            time_lengths = sequence[2].strip().split(',')
-
-            # Check if step types are valid
-            if not all(step in self.step_types for step in step_types):
-                self.logger.error("Invalid step types in sequence file")
-                return False
-
-            # Check if step times are valid
+            # Convert time lengths to numbers
             try:
-                if not all(time.isdigit() for time in time_lengths) and not all(int(time) > 0 for time in time_lengths):
-                    self.logger.error("Invalid step times in sequence file")
+                time_lengths = [int(time) for time in time_lengths]
+                if not all(t > 0 for t in time_lengths):
+                    self.logger.error("Time lengths must be positive numbers")
                     return False
             except ValueError:
-                self.logger.error("Invalid step times in sequence file")
+                self.logger.error("Invalid time lengths in sequence file - must be integers")
                 return False
 
-            # Check if motor positions are valid
-            if motor_positions and not all(position is None or isinstance(position, (int, float)) and position >= 0 for position in motor_positions):
-                self.logger.error("Invalid motor positions in sequence file")
-                return False
-            else:
-                if any(position is not None for position in motor_positions):
+            # Handle motor positions
+            try:
+                motor_positions = [None if pos == "None" else float(pos) for pos in motor_positions]
+                if any(pos is not None and pos < 0 for pos in motor_positions):
+                    self.logger.error("Motor positions must be non-negative")
+                    return False
+                if any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
+            except ValueError:
+                self.logger.error("Invalid motor positions in sequence file - must be numbers or 'None'")
+                return False
+
+            # Validate sequence lengths match
+            if not (len(step_types) == len(motor_positions) == len(time_lengths)):
+                self.logger.error("Sequence lists have different lengths")
+                return False
 
             # Parse steps
             for i in range(len(step_types)):
                 step_type = step_types[i]
-                motor_position = min(
-                    motor_positions[i], self.motor_worker.max_position)
+                motor_position = motor_positions[i]
+                if motor_position is not None:
+                    motor_position = min(motor_position, self.motor_worker.max_position)
                 time_length = time_lengths[i]
 
                 # Create step object
@@ -2502,26 +2615,33 @@ class MainWindow(QMainWindow):
                 if len(seq_save_path) > 1:
                     if seq_save_path.endswith('.csv'):
                         self.savePathEdit.setText(seq_save_path)
-                        self.saving = True
-                        self.on_beginSaveButton_clicked(True)
+                        self.prev_save_path = seq_save_path
+                        # Don't set saving=True until after start_recording succeeds
+                        if self.on_beginSaveButton_clicked(True):
+                            self.saving = True
                     else:
-                        self.savePathEdit.setText(os.path.join(
-                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\"))
-                        self.saving = True
-                        self.on_beginSaveButton_clicked(True)
+                        new_path = os.path.join(
+                            seq_save_path, f"pressure_data_{time.strftime('%m%d-%H%M')}.csv").replace("/", "\\")
+                        self.savePathEdit.setText(new_path)
+                        self.prev_save_path = new_path
+                        if self.on_beginSaveButton_clicked(True):
+                            self.saving = True
                 elif seq_save_path == "None":   # No save path means stop saving
                     self.savePathEdit.setText("")
+                    self.prev_save_path = None
                     self.saving = False
             else:
-                if seq_save_path != self.savePathEdit.text():
+                if seq_save_path != self.prev_save_path:
                     # New save path given, stop saving and restart with new path
-                    self.on_beginSaveButton_clicked(False)
+                    self.on_beginSaveButton_clicked(False)  # Stop current recording
                     self.savePathEdit.setText(seq_save_path)
-                    self.saving = True
-                    self.on_beginSaveButton_clicked(True)
+                    self.prev_save_path = seq_save_path
+                    if self.on_beginSaveButton_clicked(True):  # Start new recording
+                        self.saving = True
                 elif seq_save_path == "None":
                     self.on_beginSaveButton_clicked(False)
                     self.savePathEdit.setText("")
+                    self.prev_save_path = None
                     self.saving = False
 
             return True
@@ -2593,10 +2713,10 @@ class MainWindow(QMainWindow):
                 f.write('1' if success else '0')
 
             # Delete sequence file only if not in test mode
-            if success and not (self.test_mode or self.keep_sequence):
+            if success and not  self.keep_sequence:
                 sequence_path.unlink()
                 self.logger.info("Sequence file processed and deleted")
-            elif success and (self.test_mode or self.keep_sequence):
+            elif success and self.keep_sequence:
                 self.logger.info(
                     "Sequence file processed but preserved")
             else:
@@ -2718,7 +2838,8 @@ class MainWindow(QMainWindow):
         self.motor_worker = MotorWorker(
             port=port,
             update_interval=self.config.motor_update_interval,
-            mock=self.test_mode
+            mock=self.test_mode,
+            timing_mode=self.timing_mode  # Pass timing mode to worker
         )
         self.setup_connections()
         self.logger.info(f"Motor port updated to COM{port}")
@@ -2730,9 +2851,9 @@ class MainWindow(QMainWindow):
             self.delay_timer = QTimer()
             self.delay_timer.setSingleShot(True)
             self.delay_timer.timeout.connect(self.find_sequence_file)
-            self.delay_timer.start(2000)  # 2 second delay
+            self.delay_timer.start()  # Can put a delay here if needed
             self.logger.info(
-                "Will start sequence file monitoring in 2 seconds")
+                "Starting sequence file monitoring")
         except Exception as e:
             self.logger.error(f"Error setting up sequence monitoring: {e}")
 

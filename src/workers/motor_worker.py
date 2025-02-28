@@ -11,6 +11,7 @@ import threading
 import queue
 
 from controllers.motor_controller import MotorController
+from utils.timing_logger import get_timing_logger  # Add import
 
 
 class MockMotorController:
@@ -235,13 +236,14 @@ class MotorWorker(QThread):
     _instance_count = 0
     _instance_lock = threading.Lock()  # Add thread safety
 
-    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False):
         """Initialize worker.
 
         Args:
             port: COM port number
             update_interval: Position update interval in seconds (default 0.1)
             mock: Use mock controller for testing
+            timing_mode: Enable timing logs for events
         """
         super().__init__()
         with self._instance_lock:
@@ -286,6 +288,13 @@ class MotorWorker(QThread):
         self._active_update_interval = 0.1  # 100ms when active
         self._last_command_time = 0
         self._idle_timeout = 5.0  # Switch to idle mode after 5 seconds of no commands
+
+        # Add position limits from controller
+        self.max_position = self.controller.POSITION_MAX
+        self.min_position = self.controller.POSITION_MIN
+
+        self.timing_mode = timing_mode
+        self.timing_logger = get_timing_logger()  # Use the shared logger instance
 
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
@@ -373,10 +382,11 @@ class MotorWorker(QThread):
 
                         # Check if target reached
                         if self._target_position is not None:
-                            # Remove position inversion here
-                            current_adjusted = position
+                                current_adjusted = position
                             if abs(current_adjusted - self._target_position) < 0.005:
-                                self._target_position = None
+                                if self.timing_mode:
+                                self.timing_logger.info(f"MOTOR_MOVEMENT_COMPLETE - Position: {position}mm")
+                            self._target_position = None
                                 self.movement_completed.emit(True)
 
                 # Sleep a small amount to prevent CPU hogging
@@ -493,6 +503,10 @@ class MotorWorker(QThread):
             self._pending_position = position
             self._retry_count = 0
 
+            # Log timing event when command is sent
+            if self.timing_mode:
+                self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
+            
             # Log sequence mode state
             self.logger.info(
                 f"Move command received. Sequence mode: {self._in_sequence}")
@@ -540,6 +554,9 @@ class MotorWorker(QThread):
                 self._pending_position, wait=False)
             if success:
                 self._target_position = actual_target
+                # Log timing event if target was limited
+                if self.timing_mode and actual_target != self._pending_position:
+                    self.timing_logger.info(f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
                     self.status_changed.emit(
                         f"Moving to limited position: {actual_target}mm")
@@ -566,8 +583,8 @@ class MotorWorker(QThread):
                 self._retry_timer.timeout.connect(self._try_move)
 
             self.logger.warning(
-                f"Move attempt {self._retry_count} failed, retrying in 100ms...")
-            self._retry_timer.start(100)  # 100ms delay between retries
+                f"Move attempt {self._retry_count} failed, retrying in 10ms...")
+            self._retry_timer.start(1)  # 100ms delay between retries
         else:
             # Max retries reached
             if error_msg:

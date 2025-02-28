@@ -110,8 +110,9 @@ class PlotWidget(QWidget):
         if readings is None:
             return
         
-        # Add debug logging
-        self.logger.debug(f"Received readings: {readings}")
+        # Add comprehensive debug logging
+        self.logger.debug(f"Update plot called - recording={self.recording}, has_writer={self.csv_writer is not None}")
+        self.logger.debug(f"Readings received: {readings}")
 
         current_time = time.time() - self.start_time
 
@@ -122,8 +123,15 @@ class PlotWidget(QWidget):
 
         # Save data if recording
         if self.recording and self.csv_writer:
-            self.csv_writer.writerow([current_time] + readings)
-            self.save_file.flush()  # Ensure data is written to disk
+            try:
+                row = [current_time] + readings
+                self.logger.debug(f"Writing row to CSV: {row}")
+                self.csv_writer.writerow(row)
+                self.save_file.flush()  # Ensure data is written to disk
+            except Exception as e:
+                self.logger.error(f"Error writing data: {e}")
+                # Add detailed error info
+                self.logger.error(f"CSV writer state: recording={self.recording}, writer={self.csv_writer}, file={self.save_file}")
 
         # Remove old data points
         if len(self.times) > self.max_points:
@@ -208,26 +216,54 @@ class PlotWidget(QWidget):
     def start_recording(self, filepath: str):
         """Start recording data to CSV file."""
         try:
+            self.logger.info(f"Attempting to start recording to {filepath}")
+            
+            # Check if already recording
+            if self.recording:
+                self.logger.warning("Already recording - stopping current recording")
+                self.stop_recording()
+            
+            # Verify file path
+            if not filepath:
+                self.logger.error("Empty file path provided")
+                return False
+            
             self.save_file = open(filepath, 'w', newline='')
             self.csv_writer = csv.writer(self.save_file)
+            
             # Write header
-            self.csv_writer.writerow(
-                ['Time'] + [f'Sensor{i+1}' for i in range(4)])
+            header = ['Time'] + [f'Sensor{i+1}' for i in range(4)]
+            self.logger.debug(f"Writing CSV header: {header}")
+            self.csv_writer.writerow(header)
+            
             self.recording = True
             self.start_time = time.time()  # Reset start time for recording
+            
+            # Verify recording state
+            self.logger.info(f"Recording started successfully - recording={self.recording}, has_writer={self.csv_writer is not None}")
             return True
+        
         except Exception as e:
             self.logger.error(f"Failed to start recording: {e}")
+            # Add error state info
+            self.logger.error(f"Error state: recording={getattr(self, 'recording', None)}, writer={getattr(self, 'csv_writer', None)}")
             return False
 
     def stop_recording(self):
         """Stop recording data."""
+        self.logger.info("Stopping recording...")
         if self.recording:
             self.recording = False
             if self.save_file:
-                self.save_file.close()
-                self.save_file = None
-                self.csv_writer = None
+                try:
+                    self.save_file.flush()  # Ensure all data is written
+                    self.save_file.close()
+                    self.logger.info("Recording stopped and file closed")
+                except Exception as e:
+                    self.logger.error(f"Error closing save file: {e}")
+                finally:
+                    self.save_file = None
+                    self.csv_writer = None
 
     def clear_plot(self):
         """Clear all plot data and reset."""

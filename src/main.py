@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+import argparse
 
 # Use relative imports since we're inside the package
 from ui.main_window import MainWindow
@@ -52,6 +53,12 @@ def main():
 
         # Create Qt application
         logger.debug("Creating QApplication")
+        parser = argparse.ArgumentParser(description='SSBubble application')
+        parser.add_argument('--test', action='store_true', help='Use mock controllers for testing')
+        parser.add_argument('--keep-sequence', action='store_true', help='Keep sequence file after processing')
+        parser.add_argument('--timing', action='store_true', help='Enable timing mode for event logging')
+        args = parser.parse_args()
+
         app = QApplication(sys.argv)
         app.setApplicationName("SSBubble")
 
@@ -69,7 +76,9 @@ def main():
         
         # Create and show main window
         logger.debug("Creating main window")
-        window = MainWindow(test_mode=test_mode)
+        window = MainWindow(test_mode=args.test, 
+                           keep_sequence=args.keep_sequence,
+                           timing_mode=args.timing)
         logger.debug("Showing main window")
         window.show()
 
