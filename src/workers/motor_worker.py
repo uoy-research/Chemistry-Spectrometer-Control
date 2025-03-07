@@ -382,12 +382,12 @@ class MotorWorker(QThread):
 
                         # Check if target reached
                         if self._target_position is not None:
-                                current_adjusted = position
+                            current_adjusted = position
                             if abs(current_adjusted - self._target_position) < 0.005:
                                 if self.timing_mode:
-                                self.timing_logger.info(f"MOTOR_MOVEMENT_COMPLETE - Position: {position}mm")
-                            self._target_position = None
-                                self.movement_completed.emit(True)
+                                    self.timing_logger.info(f"MOTOR_MOVEMENT_COMPLETE - Position: {position}mm")
+                                    self._target_position = None
+                                    self.movement_completed.emit(True)
 
                 # Sleep a small amount to prevent CPU hogging
                 time.sleep(0.01)
