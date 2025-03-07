@@ -174,7 +174,7 @@ void loop() {
       mb.setCoil(2, 0); //Reset init flag
       mb.setHreg(9, 4000); //Reset speed and accel
       mb.setHreg(10, 23250);
-      setCustomSpeed(); //Apply settings
+      noSpeed(); //Apply settings
       serialConnected = false;
     }  
   }  
@@ -191,7 +191,7 @@ void loop() {
   handleCalibration();
   
   // Handle interrupts
-  handleInterrupts();
+  //handleInterrupts();
 
   // Direct command handling for calibration
   if (mb.coil(1) == 1) {
@@ -266,10 +266,11 @@ void handleCalibration() {
       
     case CAL_MOVING_UP:
       // Check if we've hit the top limit switch
-      if (digitalRead(intPin1) == HIGH) {
-        stepper.stop(HARD);
+      if (topInterruptActive) {
+        topInterruptActive = false;
+        //stepper.stop(HARD);
         topPosition = stepper.getPosition();
-        upPosition = topPosition - 10000; // Simplified - just 10000 steps below top
+        upPosition = topPosition - 100000; // Simplified - just 100000 steps below top
         setTopPosition(upPosition);
         
         // Wait a moment before continuing
@@ -293,8 +294,9 @@ void handleCalibration() {
       
     case CAL_FOUND_TOP:
       // Small delay to let things settle
-      if (millis() - lastCalibrationTime > 500) {
+      if (millis() - lastCalibrationTime > 0 && digitalRead(intPin1) == LOW) {
         // Return to home position (10000 steps below top)
+        fastSpeed();
         stepper.movePosition(upPosition);
         setPosition = upPosition;
         setTargetPosition(0);
@@ -399,11 +401,15 @@ void handleInput(char input) {
 // # +--------------------------+---------+-----------------------------------------+
 
 void topInterrupt() {
-  // Stop immediately
-  stepper.stop(HARD);
-  
-  // Set a flag instead of blocking
   topInterruptActive = true;
+  stepper.stop(HARD);
+  fastSpeed();
+  while(digitalRead(intPin1) == HIGH){
+    stepper.moveAngle(-1);
+  }
+  stepper.stop(HARD);
+  //downPosition = stepper.getPosition();
+  noSpeed();
 }
 
 // Handle interrupts in main loop
@@ -426,7 +432,7 @@ void handleInterrupts() {
         downPosition = topPosition - 2475000; // define down pos once calibrated
         setPosition = upPosition;
         delay(10);
-        setTargetPosition(0);
+        setTargetPosition(upPosition);
         mb.setCoil(1, 1); // New Command - Move to setPosition
         mb.setHreg(2, 'x'); // Reset command register
         mb.setCoil(2, 1); // Set calibration flag to true
@@ -603,6 +609,8 @@ void noSpeed() {
   stepper.setMaxDeceleration(standby_maxDeceleration);
   stepper.setBrakeMode(FREEWHEELBRAKE);
   stepper.setMaxVelocity(standby_maxVelocity);
+
+  stepper.setMaxVelocity(0);
 }
 
 void fastSpeed() {
