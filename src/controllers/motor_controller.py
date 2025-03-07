@@ -70,7 +70,7 @@ class MotorController:
             self.instrument = minimalmodbus.Instrument(self.port, self.address)
             # Configure Modbus RTU settings
             self.instrument.serial.baudrate = 9600
-            self.instrument.serial.timeout = 0.05  # Reduce timeout to prevent blocking
+            self.instrument.serial.timeout = 0.005  # Reduce timeout to prevent blocking
             self.instrument.serial.bytesize = 8
             self.instrument.serial.parity = 'N'
             self.instrument.serial.stopbits = 1
@@ -135,10 +135,10 @@ class MotorController:
                 return self._current_position
 
             # Add retry mechanism for reading position
-            max_retries = 3
+            max_retries = 1
 
             # Acquire lock with timeout to prevent blocking commands
-            if not self._modbus_lock.acquire(timeout=0.05):  # 50ms timeout
+            if not self._modbus_lock.acquire(timeout=0.005):  # 5ms timeout
                 return self._current_position  # Return last known position if can't get lock
 
             try:
@@ -157,9 +157,9 @@ class MotorController:
 
                         return float(position)
                     except Exception as e:
-                        if attempt == max_retries - 1:  # Last attempt
+                        if attempt >= max_retries - 1:  # Last attempt
                             raise
-                        time.sleep(0.1)
+                        time.sleep(0.005)
             finally:
                 self._modbus_lock.release()
 
@@ -186,7 +186,7 @@ class MotorController:
 
             # Send calibration command
             self.instrument.write_register(2, ord('c'))
-            time.sleep(1)
+            time.sleep(0.05)
             self.instrument.write_bit(1, 1)
             self.serial_connected = True
             self.logger.info("Calibrating motor, please wait")
@@ -302,15 +302,17 @@ class MotorController:
 
                     # Increase timeout temporarily for these operations
                     original_timeout = self.instrument.serial.timeout
-                    self.instrument.serial.timeout = 0.5  # 500ms timeout
+                    #self.instrument.serial.timeout = 0.5  # 500ms timeout
 
                     try:
-                        self.instrument.write_register(3, high)
-                        time.sleep(0.02)  # Increased delay between writes
-                        self.instrument.write_register(4, low)
-                        time.sleep(0.02)  # Increased delay between writes
-                        self.instrument.write_register(2, ord('x'))
-                        time.sleep(0.02)  # Increased delay between writes
+                        #self.instrument.write_register(3, high)
+                        #time.sleep(0.05)  # Increased delay between writes
+                        #self.instrument.write_register(4, low)
+                        #time.sleep(0.05)  # Increased delay between writes
+                        self.instrument.write_registers(2, [ord('x'), high, low])
+                        time.sleep(0.01)  # Increased delay between writes
+                        #self.instrument.write_register(2, ord('x'))
+                        #time.sleep(0.01)  # Increased delay between writes
                         self.instrument.write_bit(1, 1)
                         self.serial_connected = True
                         return True, actual_target
@@ -370,11 +372,11 @@ class MotorController:
                     try:
                         # Increase timeout for stop command
                         original_timeout = self.instrument.serial.timeout
-                        self.instrument.serial.timeout = 0.5  # 500ms timeout
+                        #self.instrument.serial.timeout = 0.5  # 500ms timeout
 
                         try:
                             self.instrument.write_register(2, ord('s'))
-                            time.sleep(0.05)  # Longer delay for stop command
+                            time.sleep(0.01)  # Longer delay for stop command
                             self.instrument.write_bit(1, 1)
                             self.serial_connected = True
                             self.logger.info(
@@ -392,7 +394,7 @@ class MotorController:
                             return False
                         self.logger.warning(
                             f"Stop attempt {attempt + 1} failed, retrying...")
-                        time.sleep(0.1)  # Short delay between retries
+                        time.sleep(0.005)  # Short delay between retries
 
                 return False
             finally:
