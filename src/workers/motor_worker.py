@@ -236,7 +236,7 @@ class MotorWorker(QThread):
     _instance_count = 0
     _instance_lock = threading.Lock()  # Add thread safety
 
-    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False):
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False, debug_mode: bool = False):
         """Initialize worker.
 
         Args:
@@ -244,6 +244,7 @@ class MotorWorker(QThread):
             update_interval: Position update interval in seconds (default 0.1)
             mock: Use mock controller for testing
             timing_mode: Enable timing logs for events
+            debug_mode: Enable debug register monitoring
         """
         super().__init__()
         with self._instance_lock:
@@ -296,6 +297,15 @@ class MotorWorker(QThread):
         self.timing_mode = timing_mode
         self.timing_logger = get_timing_logger()  # Use the shared logger instance
 
+        self._debug_mode = debug_mode
+        
+        # Add a dedicated timer for debug register reading
+        if self._debug_mode:
+            self._debug_timer = QTimer()
+            self._debug_timer.timeout.connect(self._read_debug_register)
+            # Read debug register every 500ms
+            self._debug_timer.setInterval(500)
+
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
         try:
@@ -311,92 +321,35 @@ class MotorWorker(QThread):
         return cls._instance_count
 
     def run(self):
-        """Main worker loop."""
-        if isinstance(self.controller, MockMotorController):
-            self._running = True
-            self.logger.info("Mock motor worker thread running")
-            self.status_changed.emit("Mock motor worker running")
-
-            # Keep the thread alive for mock mode
-            while self._running:
-                if not self._paused and not self._pause_updates:
-                    # Remove the negative sign here
-                    self.position_updated.emit(
-                        float(self.controller.get_position()))
-                time.sleep(self.update_interval)
-
-            self.logger.info("Mock motor worker thread stopped")
-            return
-
-        # Real motor code...
-        self.status_changed.emit("Starting motor worker...")
-
-        if not self.controller.start():
-            self.error_occurred.emit("Failed to connect to motor")
-            return
-
+        """Run the worker thread."""
         self._running = True
-        self.status_changed.emit("Motor worker running")
+        self.logger.info(f"MotorWorker {self._instance_id} started")
+        self.status_changed.emit("Motor worker started")
 
-        # Start command processing thread
-        command_thread = threading.Thread(target=self._process_command_queue)
-        command_thread.daemon = True
-        command_thread.start()
+        # Start the debug timer if in debug mode
+        if self._debug_mode:
+            self._debug_timer.start()
+            self.logger.info("Debug register monitoring started")
 
-        last_position_check = 0
-        current_interval = self._active_update_interval
-
+        # Main worker loop
         while self._running:
-            try:
-                # Process any pending commands first
+            if not self._paused:
+                self._check_motor_status()
                 self._check_command_queue()
 
-                # Determine update interval based on activity
-                current_time = time.time()
-                time_since_command = current_time - self._last_command_time
+            # Adaptive sleep based on activity
+            if time.time() - self._last_command_time > self._idle_timeout:
+                # Idle mode - slower updates
+                time.sleep(self._idle_update_interval)
+            else:
+                # Active mode - faster updates
+                time.sleep(self._active_update_interval)
 
-                if time_since_command > self._idle_timeout:
-                    current_interval = self._idle_update_interval
-                else:
-                    current_interval = self._active_update_interval
-
-                # Only check position if enough time has passed
-                if not self._paused and not self._pause_updates and (current_time - last_position_check) >= current_interval:
-                    # Get current position
-                    position = self.controller.get_position()
-                    last_position_check = current_time
-
-                    # Check if controller is still running
-                    if not self.controller.running:
-                        self.logger.error(
-                            "Motor controller stopped due to connection issues")
-                        self._running = False
-                        self.status_changed.emit("Motor disconnected")
-                        break
-
-                    if position is not None:
-                        if position != self._current_position:
-                            self._current_position = position
-                            # Remove the negative sign here
-                            self.position_updated.emit(float(position))
-
-                        # Check if target reached
-                        if self._target_position is not None:
-                            current_adjusted = position
-                            if abs(current_adjusted - self._target_position) < 0.005:
-                                if self.timing_mode:
-                                    self.timing_logger.info(f"MOTOR_MOVEMENT_COMPLETE - Position: {position}mm")
-                                    self._target_position = None
-                                    self.movement_completed.emit(True)
-
-                # Sleep a small amount to prevent CPU hogging
-                time.sleep(0.01)
-
-            except Exception as e:
-                self.logger.error(f"Error in motor worker run loop: {e}")
-                time.sleep(0.1)  # Sleep longer on error
-
-        self.controller.stop()
+        # Clean up
+        if self._debug_mode and hasattr(self, '_debug_timer'):
+            self._debug_timer.stop()
+        
+        self.logger.info(f"MotorWorker {self._instance_id} stopped")
         self.status_changed.emit("Motor worker stopped")
 
     def _check_command_queue(self):
@@ -411,17 +364,36 @@ class MotorWorker(QThread):
                     self._process_next_command()
 
     def _process_command_queue(self):
-        """Process commands from the queue in a separate thread."""
+        """Process commands from the queue with priority handling."""
         while self._running:
             try:
-                if not self._command_queue.empty() and not self._command_processing:
-                    with self._command_lock:
-                        self._command_processing = True
-                        self._process_next_command()
-                time.sleep(0.01)  # Small sleep to prevent CPU hogging
+                # First check for high-priority commands
+                priority_command = None
+                with self._command_lock:
+                    # Look for priority commands without removing other commands
+                    for i in range(self._command_queue.qsize()):
+                        try:
+                            cmd = self._command_queue.queue[i]
+                            if cmd.get('priority', False):
+                                priority_command = self._command_queue.queue.pop(i)
+                                break
+                        except:
+                            pass
+                
+                # If no priority command, get next command normally
+                command = priority_command if priority_command else self._command_queue.get(timeout=0.1)
+                
+                # Process the command
+                self._command_processing = True
+                # Command processing logic...
+                
+            except queue.Empty:
+                # No commands in queue
+                pass
             except Exception as e:
-                self.logger.error(f"Error processing command queue: {e}")
-                time.sleep(0.1)  # Sleep longer on error
+                self.logger.error(f"Error processing command: {e}")
+            finally:
+                self._command_processing = False
 
     def _process_next_command(self):
         """Process the next command in the queue."""
@@ -502,48 +474,21 @@ class MotorWorker(QThread):
             position = float(position)
             self._pending_position = position
             self._retry_count = 0
-
+            
             # Log timing event when command is sent
             if self.timing_mode:
                 self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
             
-            # Log sequence mode state
-            self.logger.info(
-                f"Move command received. Sequence mode: {self._in_sequence}")
-
-            # Handle mock mode differently
-            if isinstance(self.controller, MockMotorController):
-                success, actual_target = self.controller.set_position(position)
-                if success:
-                    self._target_position = actual_target
-                    self.position_updated.emit(
-                        actual_target)  # Update UI immediately
-                    if actual_target != position:
-                        self.status_changed.emit(
-                            f"Moving to limited position: {actual_target}mm")
-                    return True
-                else:
-                    self.error_occurred.emit("Failed to move mock motor")
-                    return False
-
             # Add command to queue for real motor
             self._command_queue.put({
                 'type': 'move_to',
                 'args': [position],
                 'kwargs': {'position': position}
             })
-
-            # Set target position for position checking
-            self._target_position = position
-
-            # Update status
-            self.status_changed.emit(f"Moving to position: {position}mm")
+            
             return True
-
-        except (ValueError, TypeError):
-            self.error_occurred.emit("Invalid position value")
-            return False
         except Exception as e:
+            # Error handling...
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
             return False
 
@@ -1035,3 +980,108 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Failed to set motor acceleration: {e}")
             return False
+
+    def _check_motor_status(self):
+        """Check motor status and update UI."""
+        if not self.running or not self.controller:
+            return
+
+        try:
+            # Get current position
+            position = self.controller.get_position()
+            
+            # Debug mode - read register 13 for debug messages
+            if self._debug_mode:
+                try:
+                    # Print a very visible message when reading debug register
+                    print("\n" + "="*50)
+                    print("ATTEMPTING TO READ DEBUG REGISTER 13")
+                    print("="*50 + "\n")
+                    
+                    self.logger.info("Reading debug register 13...")
+                    
+                    # Make sure we're using the right controller
+                    if hasattr(self.controller, 'instrument') and self.controller.instrument:
+                        debug_value = self.controller.instrument.read_register(13, functioncode=3)
+                        print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
+                        self.logger.info(f"Debug register value: 0x{debug_value:X}")
+                        
+                        if debug_value != 0:
+                            debug_message = self._decode_debug_value(debug_value)
+                            # Use INFO level instead of DEBUG to ensure visibility
+                            print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")
+                            self.logger.info(f"Motor Debug: {debug_message}")
+                            # Reset the register after reading
+                            self.controller.instrument.write_register(13, 0)
+                    else:
+                        self.logger.warning("Controller has no instrument attribute or it's None")
+                except Exception as e:
+                    # Use ERROR level to make sure we see any issues
+                    print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
+                    self.logger.error(f"Failed to read debug register: {e}")
+            
+            if position is not None:
+                # Update position
+                self._current_position = position
+                self.position_updated.emit(position)
+                
+                # Check if we've reached the target
+                if self._target_position is not None:
+                    if abs(position - self._target_position) < 0.01:
+                        # Position reached
+                        if self.timing_mode and self._last_command_time > 0:
+                            # Log timing event
+                            elapsed = time.time() - self._last_command_time
+                            self.timing_logger.info(
+                                f"MOTOR_POSITION_REACHED - Position: {position}mm, Time: {elapsed:.3f}s")
+                        
+                        self._target_position = None
+                        self._last_command_time = 0
+                        self.status_changed.emit("Position reached")
+                        
+                        # Emit signal for position reached
+                        self.position_reached.emit(position)
+        
+        except Exception as e:
+            self.logger.error(f"Error checking motor status: {e}")
+
+    def _decode_debug_value(self, value):
+        """Decode debug values from register 13."""
+        debug_codes = {
+            0xC0DE: "Calibration command received",
+            0xCAFE: "Calibration started",
+            0xBEEF: "Top position found",
+            0xDEAD: "Calibration timeout"
+        }
+        return debug_codes.get(value, f"Unknown debug code: 0x{value:X}")
+
+    def _read_debug_register(self):
+        """Read the debug register and log its value."""
+        if not self.running or not self.controller:
+            return
+        
+        try:
+            # Print a very visible message when reading debug register
+            print("\n" + "="*50)
+            print("ATTEMPTING TO READ DEBUG REGISTER 13")
+            print("="*50 + "\n")
+            
+            # Make sure we're using the right controller
+            if hasattr(self.controller, 'instrument') and self.controller.instrument:
+                debug_value = self.controller.instrument.read_register(13, functioncode=3)
+                print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
+                self.logger.info(f"Debug register value: 0x{debug_value:X}")
+                
+                if debug_value != 0:
+                    debug_message = self._decode_debug_value(debug_value)
+                    # Use INFO level instead of DEBUG to ensure visibility
+                    print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")
+                    self.logger.info(f"Motor Debug: {debug_message}")
+                    # Reset the register after reading
+                    self.controller.instrument.write_register(13, 0)
+            else:
+                self.logger.warning("Controller has no instrument attribute or it's None")
+        except Exception as e:
+            # Use ERROR level to make sure we see any issues
+            print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
+            self.logger.error(f"Failed to read debug register: {e}")

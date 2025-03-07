@@ -32,71 +32,44 @@ def setup_exception_handling(app):
 
 
 def main():
-    """Main application entry point."""
-    # Initialize logging first, before any other operations
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler()
-        ]
-    )
-    logger = logging.getLogger('SSBubble')
-    
-    # Log that we're starting
-    logger.info("=== Starting SSBubble application ===")
-    
+    """Main entry point for the application."""
     try:
-        # Log Python path for debugging
-        logger.debug(f"Python path: {sys.path}")
-        logger.debug(f"Current working directory: {Path.cwd()}")
-
-        # Create Qt application
-        logger.debug("Creating QApplication")
-        parser = argparse.ArgumentParser(description='SSBubble application')
+        # Parse command line arguments
+        parser = argparse.ArgumentParser(description='SSBubble Control Application')
+        parser.add_argument('--config', type=str, help='Path to config file')
+        parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+        parser.add_argument('--timing', action='store_true', help='Enable timing mode')
         parser.add_argument('--test', action='store_true', help='Use mock controllers for testing')
         parser.add_argument('--keep-sequence', action='store_true', help='Keep sequence file after processing')
-        parser.add_argument('--timing', action='store_true', help='Enable timing mode for event logging')
         args = parser.parse_args()
-
-        app = QApplication(sys.argv)
-        app.setApplicationName("SSBubble")
-
-        # Set up exception handling
-        logger.debug("Setting up exception handling")
-        setup_exception_handling(app)
-
-        # Load configuration
-        logger.debug("Loading configuration")
-        config = Config()
-
-        # Check for --test or -t flag
-        test_mode = '--test' in sys.argv or '-t' in sys.argv
-        logger.info(f"Test mode: {test_mode}")
         
-        # Create and show main window
-        logger.debug("Creating main window")
-        window = MainWindow(test_mode=args.test, 
-                           keep_sequence=args.keep_sequence,
-                           timing_mode=args.timing)
-        logger.debug("Showing main window")
+        # Set up logging (without debug parameter)
+        setup_logging()
+        
+        # If debug mode is enabled, set log level to DEBUG
+        if args.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.debug("Debug logging enabled")
+        
+        # Create application
+        app = QApplication(sys.argv)
+        
+        # Create main window with args
+        window = MainWindow(
+            test_mode=args.test,
+            keep_sequence=args.keep_sequence,
+            timing_mode=args.timing,
+            args=args  # Pass all args to the window
+        )
+        
+        # Show window
         window.show()
-
-        # Start Qt event loop
-        logger.debug("Starting Qt event loop")
-        exit_code = app.exec()
-
-        # Clean up
-        logger.info("Application shutting down")
-        return exit_code
-
-    except ImportError as e:
-        logging.error(f"Import error: {e}", exc_info=True)
-        logging.error(f"Module name: {getattr(e, 'name', 'unknown')}")
-        logging.error(f"Module path: {getattr(e, 'path', 'unknown')}")
-        return 1
+        
+        # Run application
+        return app.exec()
+        
     except Exception as e:
-        logging.error(f"Failed to start application: {e}", exc_info=True)
+        logging.error(f"Application error: {e}", exc_info=True)
         return 1
 
 

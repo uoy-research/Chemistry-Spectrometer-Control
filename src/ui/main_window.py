@@ -61,16 +61,13 @@ class MainWindow(QMainWindow):
         'c': 'Close'
     }
 
-    def __init__(self, test_mode: bool = False, keep_sequence: bool = False, timing_mode: bool = False):
-        """Initialize main window.
-
-        Args:
-            test_mode: Use mock controllers for testing
-            keep_sequence: Keep sequence file after processing
-            timing_mode: Enable timing logs for events
-        """
+    def __init__(self, test_mode=False, keep_sequence=False, timing_mode=False, args=None):
+        """Initialize the main window."""
         super().__init__()
-
+        
+        # Store command line args
+        self.args = args
+        
         # Reset motor worker instance count at startup
         MotorWorker.reset_instance_count()
 
@@ -2945,3 +2942,34 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.logger.error(f"Failed to update device status file: {e}")
+
+    def _setup_motor_worker(self):
+        """Set up the motor worker thread."""
+        try:
+            # Get debug mode from command line args
+            debug_mode = hasattr(self.args, 'debug') and self.args.debug
+            
+            # Create motor worker with debug mode if enabled
+            self.motor_worker = MotorWorker(
+                port=int(self.config.get('motor', 'port')),
+                update_interval=0.1,
+                mock=(self.config.get('motor', 'mode') == '2'),
+                timing_mode=self.timing_mode,
+                debug_mode=debug_mode
+            )
+            
+            # Log debug mode status
+            if debug_mode:
+                self.logger.info("Motor debug mode enabled - monitoring register 13")
+            
+            # Connect signals
+            self.motor_worker.position_updated.connect(self._update_motor_position)
+            self.motor_worker.error_occurred.connect(self._handle_motor_error)
+            self.motor_worker.status_changed.connect(self._update_motor_status)
+            self.motor_worker.calibration_state_changed.connect(self._update_calibration_state)
+            
+            # Start the worker
+            self.motor_worker.start()
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up motor worker: {e}")

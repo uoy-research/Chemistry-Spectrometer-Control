@@ -38,11 +38,12 @@ class MotorController:
         self._limits_enabled = True  # Add flag for motor limits
         self._error_state = False  # Add flag to track error state
 
-        # Add mutex for thread synchronization
-        self._modbus_lock = threading.RLock()  # Use RLock to allow reentrant locking
-
+        # Add locks for different operations
+        self._modbus_lock = threading.Lock()  # Main communication lock
+        self._command_lock = threading.Lock()  # High-priority command lock
+        self._command_in_progress = False  # Flag for command priority
+        
         # Add command prioritization flags
-        self._command_in_progress = False
         self.last_position_read_time = 0
         self.position_read_interval = 0.1  # Minimum time between position reads
 
@@ -69,7 +70,7 @@ class MotorController:
 
             self.instrument = minimalmodbus.Instrument(self.port, self.address)
             # Configure Modbus RTU settings
-            self.instrument.serial.baudrate = 9600
+            self.instrument.serial.baudrate = 115200
             self.instrument.serial.timeout = 0.005  # Reduce timeout to prevent blocking
             self.instrument.serial.bytesize = 8
             self.instrument.serial.parity = 'N'
@@ -118,65 +119,27 @@ class MotorController:
 
     def get_position(self) -> Optional[float]:
         """Get current motor position."""
-        if not self.running or self._error_state:
+        # Skip position reading if high-priority command is in progress
+        if self._command_in_progress:
+            return self._current_position
+            
+        if not self.running:
             return None
 
-        # Skip position reading if a command is in progress or if we've read recently
-        current_time = time.time()
-        if self._command_in_progress:
-            return self._current_position  # Return last known position
-
-        # Enforce minimum interval between position reads
-        if current_time - self.last_position_read_time < self.position_read_interval:
-            return self._current_position
-
         try:
-            if self.mode == 2:  # Test mode
-                return self._current_position
-
-            # Add retry mechanism for reading position
-            max_retries = 1
-
-            # Acquire lock with timeout to prevent blocking commands
-            if not self._modbus_lock.acquire(timeout=0.005):  # 5ms timeout
-                return self._current_position  # Return last known position if can't get lock
-
-            try:
-                self.last_position_read_time = current_time
-
-                for attempt in range(max_retries):
-                    try:
-                        readings = self.instrument.read_registers(
-                            5, 2, functioncode=3)
-                        raw_steps = self.assemble(readings[0], readings[1])
-                        position = round(
-                            (raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
-                        self.motor_position = position
-                        self._current_position = position  # Update cached position
-                        self._consecutive_errors = 0  # Reset error counter on success
-
-                        return float(position)
-                    except Exception as e:
-                        if attempt >= max_retries - 1:  # Last attempt
-                            raise
-                        time.sleep(0.005)
-            finally:
-                self._modbus_lock.release()
-
+            with self._modbus_lock:  # Use main lock for position reading
+                readings = self.instrument.read_registers(5, 2, functioncode=3)
+                raw_steps = self.assemble(readings[0], readings[1])
+                position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
+                self._current_position = position
+                self._consecutive_errors = 0
+                return float(position)
+                
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
             self.serial_connected = False
             self._consecutive_errors += 1
-
-            # Only stop on consecutive errors if not in sequence mode
-            if not self._in_sequence and self._consecutive_errors >= self._max_consecutive_errors:
-                self.logger.error(
-                    "Too many consecutive errors, stopping motor controller")
-                self.running = False
-                self.serial_connected = False
-                self._error_state = True  # Set error state flag
-
-            return self._current_position  # Return last known position on error
+            return self._current_position
 
     def start_calibration(self) -> bool:
         """Start the calibration process."""
@@ -250,102 +213,46 @@ class MotorController:
         return self.set_position(position, wait)
 
     def set_position(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
-        """Set motor position with optional limit checking."""
-        if not self.running or self._error_state:  # Check error state
-            self.logger.error(
-                "Motor controller is in error state or not running")
+        """Set motor position with high priority."""
+        if not self.running or self._error_state:
             return False, position
 
         try:
             position = float(position)
             actual_target = position
 
-            # Apply limits only if enabled
+            # Apply limits if enabled
             if self._limits_enabled:
                 if position > self.POSITION_MAX:
-                    self.logger.warning(
-                        f"Target position {position}mm exceeds maximum {self.POSITION_MAX}mm, limiting to maximum")
                     actual_target = self.POSITION_MAX
                     position = self.POSITION_MAX
                 elif position < self.POSITION_MIN:
                     position = self.POSITION_MIN
                     actual_target = self.POSITION_MIN
 
-            if self.mode == 2:  # Test mode
-                self._current_position = position
-                return True, actual_target
-
-            # Only check calibration if not in sequence mode
-            if not self._in_sequence:
-                if not self.check_calibrated():
-                    self.logger.error("Motor not calibrated")
-                    return False, position
-
-            # Convert from bottom-referenced to top-referenced position
-            # If position is 200mm from bottom, we want (364.40 - 200.00)mm from top
-            top_referenced_position = self.POSITION_MAX - position
-
             # Convert position to steps
-            position_steps = int(
-                round(top_referenced_position * self.STEPS_PER_MM))
+            position_steps = int(round((self.POSITION_MAX - position) * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
 
-            # Acquire lock for command execution
-            with self._modbus_lock:
-                # Set command priority flag
-                self._command_in_progress = True
-
+            # Use command lock for high-priority operations
+            with self._command_lock:
+                self._command_in_progress = True  # Set priority flag
                 try:
-                    # Clear buffers before sending new commands
-                    self.instrument.serial.reset_input_buffer()
-                    self.instrument.serial.reset_output_buffer()
-
-                    # Increase timeout temporarily for these operations
-                    original_timeout = self.instrument.serial.timeout
-                    #self.instrument.serial.timeout = 0.5  # 500ms timeout
-
-                    try:
-                        #self.instrument.write_register(3, high)
-                        #time.sleep(0.05)  # Increased delay between writes
-                        #self.instrument.write_register(4, low)
-                        #time.sleep(0.05)  # Increased delay between writes
+                    with self._modbus_lock:  # Also acquire modbus lock
+                        # Clear buffers once
+                        self.instrument.serial.reset_input_buffer()
+                        self.instrument.serial.reset_output_buffer()
+                        
+                        # Send all commands in a single batch when possible
                         self.instrument.write_registers(2, [ord('x'), high, low])
-                        time.sleep(0.01)  # Increased delay between writes
-                        #self.instrument.write_register(2, ord('x'))
-                        #time.sleep(0.01)  # Increased delay between writes
+                        time.sleep(0.01)  # Small delay for controller processing
                         self.instrument.write_bit(1, 1)
-                        self.serial_connected = True
-                        return True, actual_target
-                    finally:
-                        # Restore original timeout
-                        self.instrument.serial.timeout = original_timeout
-                except Exception as e:
-                    if self._in_sequence:
-                        # Fail fast in sequence mode
-                        raise
-                    self.logger.error(f"Failed to send position commands: {e}")
-                    return False, position
+                        
+                    self.serial_connected = True
+                    return True, actual_target
+                    
                 finally:
-                    # Always clear command priority flag
-                    self._command_in_progress = False
-
-            if wait and not self._in_sequence:
-                # Wait for position to be reached
-                timeout = 30  # 30 second timeout
-                start_time = time.time()
-                while time.time() - start_time < timeout:
-                    current = self.get_position()
-                    if current is not None:
-                        # Convert current position to bottom-referenced for comparison
-                        current_from_bottom = self.POSITION_MAX - current
-                        if abs(current_from_bottom - position) < 0.005:
-                            break
-                    time.sleep(0.1)
-                else:
-                    self.logger.warning(
-                        f"Timeout waiting for position {position}")
-
-            return True, actual_target
+                    self._command_in_progress = False  # Clear priority flag
 
         except Exception as e:
             self.logger.error(f"Error setting position: {e}")
@@ -635,3 +542,29 @@ class MotorController:
         except Exception as e:
             self.logger.error(f"Failed to set motor acceleration: {e}")
             return False
+
+    def get_velocity(self) -> Optional[float]:
+        """Get current motor velocity from registers 11 (high) and 12 (low).
+        
+        Returns:
+            float: Current velocity or None if read fails
+        """
+        if not self.running:
+            return None
+        
+        try:
+            # Skip velocity reading if high-priority command is in progress
+            if self._command_in_progress:
+                return None
+            
+            with self._modbus_lock:  # Use main lock for velocity reading
+                # Read both registers
+                readings = self.instrument.read_registers(11, 2, functioncode=3)
+                # Assemble the velocity value from high and low bytes
+                velocity = self.assemble(readings[0], readings[1])
+                self.serial_connected = True
+                return float(velocity)
+        except Exception as e:
+            self.logger.error(f"Failed to read motor velocity: {e}")
+            self.serial_connected = False
+            return None
