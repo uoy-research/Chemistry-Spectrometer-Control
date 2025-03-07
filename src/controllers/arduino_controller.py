@@ -73,7 +73,7 @@ class ArduinoController:
             # Create Modbus instrument
             self.arduino = minimalmodbus.Instrument(f"COM{self.port}", 10)
             self.arduino.serial.baudrate = 9600
-            self.arduino.serial.timeout = 0.5  # Reduce timeout
+            self.arduino.serial.timeout = 0.01  # Reduce timeout
             
             time.sleep(1)
 

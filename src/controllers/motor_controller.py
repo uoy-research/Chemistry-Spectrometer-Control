@@ -300,23 +300,12 @@ class MotorController:
                     self.instrument.serial.reset_input_buffer()
                     self.instrument.serial.reset_output_buffer()
 
-                    # Increase timeout temporarily for these operations
-                    original_timeout = self.instrument.serial.timeout
-                    self.instrument.serial.timeout = 0.5  # 500ms timeout
+                    self.instrument.write_registers(2, [ord('x'), high, low])
+                    time.sleep(0.01)  # Increased delay between writes
+                    self.instrument.write_bit(1, 1)
+                    self.serial_connected = True
+                    return True, actual_target
 
-                    try:
-                        self.instrument.write_register(3, high)
-                        time.sleep(0.02)  # Increased delay between writes
-                        self.instrument.write_register(4, low)
-                        time.sleep(0.02)  # Increased delay between writes
-                        self.instrument.write_register(2, ord('x'))
-                        time.sleep(0.02)  # Increased delay between writes
-                        self.instrument.write_bit(1, 1)
-                        self.serial_connected = True
-                        return True, actual_target
-                    finally:
-                        # Restore original timeout
-                        self.instrument.serial.timeout = original_timeout
                 except Exception as e:
                     if self._in_sequence:
                         # Fail fast in sequence mode
@@ -368,21 +357,13 @@ class MotorController:
                 max_retries = 10
                 for attempt in range(max_retries):
                     try:
-                        # Increase timeout for stop command
-                        original_timeout = self.instrument.serial.timeout
-                        self.instrument.serial.timeout = 0.5  # 500ms timeout
-
-                        try:
-                            self.instrument.write_register(2, ord('s'))
-                            time.sleep(0.05)  # Longer delay for stop command
-                            self.instrument.write_bit(1, 1)
-                            self.serial_connected = True
-                            self.logger.info(
-                                "Motor stop command sent successfully")
-                            return True
-                        finally:
-                            # Restore original timeout
-                            self.instrument.serial.timeout = original_timeout
+                        self.instrument.write_register(2, ord('s'))
+                        time.sleep(0.05)  # Longer delay for stop command
+                        self.instrument.write_bit(1, 1)
+                        self.serial_connected = True
+                        self.logger.info(
+                            "Motor stop command sent successfully")
+                        return True
 
                     except Exception as e:
                         if attempt == max_retries - 1:  # Last attempt
@@ -412,19 +393,11 @@ class MotorController:
             self._command_in_progress = True
 
             try:
-                # Increase timeout for this command
-                original_timeout = self.instrument.serial.timeout
-                self.instrument.serial.timeout = 0.5  # 500ms timeout
-
-                try:
-                    self.instrument.write_register(2, ord('b'))
-                    time.sleep(0.05)  # Longer delay for important command
-                    self.instrument.write_bit(1, 1)
-                    self.serial_connected = True
-                    return True
-                finally:
-                    # Restore original timeout
-                    self.instrument.serial.timeout = original_timeout
+                self.instrument.write_register(2, ord('b'))
+                time.sleep(0.05)  # Longer delay for important command
+                self.instrument.write_bit(1, 1)
+                self.serial_connected = True
+                return True
             except Exception as e:
                 self.logger.error(f"Couldn't move to bottom: {e}")
                 self.serial_connected = False
@@ -446,19 +419,11 @@ class MotorController:
             self._command_in_progress = True
 
             try:
-                # Increase timeout for this command
-                original_timeout = self.instrument.serial.timeout
-                self.instrument.serial.timeout = 0.5  # 500ms timeout
-
-                try:
-                    self.instrument.write_register(2, ord('t'))
-                    time.sleep(0.05)  # Longer delay for important command
-                    self.instrument.write_bit(1, 1)
-                    self.serial_connected = True
-                    return True
-                finally:
-                    # Restore original timeout
-                    self.instrument.serial.timeout = original_timeout
+                self.instrument.write_register(2, ord('t'))
+                time.sleep(0.05)  # Longer delay for important command
+                self.instrument.write_bit(1, 1)
+                self.serial_connected = True
+                return True
             except Exception as e:
                 self.logger.error(f"Couldn't move to top: {e}")
                 self.serial_connected = False
