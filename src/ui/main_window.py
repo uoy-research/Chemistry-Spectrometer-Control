@@ -903,7 +903,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Ready")
 
     def setup_connections(self):
-        """Setup signal connections."""
+        """Set up signal-slot connections."""
         if self._connections_initialized:
             return
 
@@ -1018,6 +1018,17 @@ class MainWindow(QMainWindow):
             # Connect mode change signals
             self.arduino_connect_button_group.buttonClicked.connect(
                 self.on_arduino_mode_changed)
+
+            # Connect motor worker signals
+            if self.motor_worker:
+                self.motor_worker.position_updated.connect(self._update_motor_position)
+                self.motor_worker.error_occurred.connect(self._handle_motor_error)
+                self.motor_worker.status_changed.connect(self._update_motor_status)
+                self.motor_worker.calibration_state_changed.connect(self._update_calibration_state)
+                
+                # Make sure position_reached signal is connected
+                if hasattr(self.motor_worker, 'position_reached'):
+                    self.motor_worker.position_reached.connect(self._handle_position_reached)
 
             self._connections_initialized = True
 
@@ -2973,3 +2984,9 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             self.logger.error(f"Error setting up motor worker: {e}")
+
+    @pyqtSlot(float)
+    def _handle_position_reached(self, position):
+        """Handle motor position reached signal."""
+        self.logger.info(f"Motor reached position: {position}mm")
+        # Any additional handling when position is reached

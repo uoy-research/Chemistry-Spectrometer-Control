@@ -131,7 +131,11 @@ class MotorController:
                 readings = self.instrument.read_registers(5, 2, functioncode=3)
                 raw_steps = self.assemble(readings[0], readings[1])
                 position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
+                
+                # Store previous position to detect when target is reached
+                self._previous_position = self._current_position
                 self._current_position = position
+                
                 self._consecutive_errors = 0
                 return float(position)
                 

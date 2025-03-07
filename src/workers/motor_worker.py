@@ -9,6 +9,7 @@ import logging
 from typing import Optional, Union, Tuple, List, Dict, Any
 import threading
 import queue
+from pathlib import Path
 
 from controllers.motor_controller import MotorController
 from utils.timing_logger import get_timing_logger  # Add import
@@ -224,6 +225,7 @@ class MotorWorker(QThread):
         error_occurred(str): Emitted when an error occurs
         status_changed(str): Emitted when worker status changes
         calibration_state_changed(bool): Emitted when motor calibration state changes
+        position_reached(float): Emitted when motor position reaches a target
     """
 
     position_updated = pyqtSignal(float)
@@ -231,6 +233,7 @@ class MotorWorker(QThread):
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
+    position_reached = pyqtSignal(float)  # Ensure this signal is defined
 
     # Class variables
     _instance_count = 0
@@ -295,7 +298,31 @@ class MotorWorker(QThread):
         self.min_position = self.controller.POSITION_MIN
 
         self.timing_mode = timing_mode
-        self.timing_logger = get_timing_logger()  # Use the shared logger instance
+        if timing_mode:
+            # Make sure we get a valid logger
+            self.timing_logger = get_timing_logger()
+            if self.timing_logger is None:
+                # If get_timing_logger returns None, create a fallback logger
+                self.timing_logger = logging.getLogger('motor_timing')
+                self.timing_logger.setLevel(logging.INFO)
+                
+                # Create a file handler if needed
+                try:
+                    log_dir = Path("C:/ssbubble/logs")
+                    log_dir.mkdir(parents=True, exist_ok=True)
+                    log_file = log_dir / f"motor_timing_{time.strftime('%Y%m%d_%H%M%S')}.log"
+                    handler = logging.FileHandler(log_file)
+                    formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(message)s', 
+                                               datefmt='%Y-%m-%d %H:%M:%S')
+                    handler.setFormatter(formatter)
+                    self.timing_logger.addHandler(handler)
+                except Exception as e:
+                    self.logger.error(f"Failed to create timing logger: {e}")
+            
+            # Initialize timing variables
+            self._last_command_time = 0
+        else:
+            self.timing_logger = None
 
         self._debug_mode = debug_mode
         
@@ -305,6 +332,11 @@ class MotorWorker(QThread):
             self._debug_timer.timeout.connect(self._read_debug_register)
             # Read debug register every 500ms
             self._debug_timer.setInterval(500)
+
+        # Initialize target position tracking
+        self._target_position = None
+        self._current_position = 0.0
+        self._previous_position = 0.0
 
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
@@ -363,46 +395,27 @@ class MotorWorker(QThread):
                     self._command_processing = True
                     self._process_next_command()
 
-    def _process_command_queue(self):
-        """Process commands from the queue with priority handling."""
-        while self._running:
-            try:
-                # First check for high-priority commands
-                priority_command = None
-                with self._command_lock:
-                    # Look for priority commands without removing other commands
-                    for i in range(self._command_queue.qsize()):
-                        try:
-                            cmd = self._command_queue.queue[i]
-                            if cmd.get('priority', False):
-                                priority_command = self._command_queue.queue.pop(i)
-                                break
-                        except:
-                            pass
-                
-                # If no priority command, get next command normally
-                command = priority_command if priority_command else self._command_queue.get(timeout=0.1)
-                
-                # Process the command
-                self._command_processing = True
-                # Command processing logic...
-                
-            except queue.Empty:
-                # No commands in queue
-                pass
-            except Exception as e:
-                self.logger.error(f"Error processing command: {e}")
-            finally:
-                self._command_processing = False
-
     def _process_next_command(self):
-        """Process the next command in the queue."""
+        """Process the next command in the queue with improved error handling."""
         try:
             if self._command_queue.empty():
                 self._command_processing = False
                 return
 
-            command = self._command_queue.get()
+            # Look for priority commands first
+            priority_command = None
+            for i in range(self._command_queue.qsize()):
+                try:
+                    cmd = list(self._command_queue.queue)[i]
+                    if cmd.get('priority', False):
+                        priority_command = self._command_queue.queue[i]
+                        self._command_queue.queue.remove(priority_command)
+                        break
+                except:
+                    pass  # Skip if there's an issue accessing a command
+            
+            # Use priority command if found, otherwise get next in queue
+            command = priority_command if priority_command else self._command_queue.get()
             self._last_command_time = time.time()
 
             cmd_type = command.get('type')
@@ -412,22 +425,35 @@ class MotorWorker(QThread):
             if cmd_type == 'move_to':
                 position = args[0] if args else kwargs.get('position')
                 if position is not None:
-                    success, _ = self.controller.set_position(position)
-                    if not success:
-                        self.error_occurred.emit(
-                            f"Failed to move to position {position}")
+                    # For move commands, use the retry mechanism
+                    self._pending_position = position
+                    self._try_move()
             elif cmd_type == 'stop':
-                self.controller.stop_motor()
+                success = self.controller.stop_motor()
+                if not success:
+                    # Retry stop command up to 3 times
+                    for i in range(3):
+                        time.sleep(0.05)  # Short delay between retries
+                        if self.controller.stop_motor():
+                            break
             elif cmd_type == 'to_top':
-                self.controller.to_top()
+                success = self.controller.to_top()
+                if not success and self.timing_mode:
+                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: to_top")
             elif cmd_type == 'to_bottom':
-                self.controller.to_bottom()
+                success = self.controller.to_bottom()
+                if not success and self.timing_mode:
+                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: to_bottom")
             elif cmd_type == 'calibrate':
-                self.controller.start_calibration()
+                success = self.controller.start_calibration()
+                if not success and self.timing_mode:
+                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: calibrate")
             elif cmd_type == 'set_speed':
                 speed = args[0] if args else kwargs.get('speed')
                 if speed is not None:
-                    self.controller.set_speed(speed)
+                    success = self.controller.set_speed(speed)
+                    if not success and self.timing_mode:
+                        self.timing_logger.info(f"MOTOR_COMMAND_FAILED - Command: set_speed, Value: {speed}")
 
             # Process next command if any
             if not self._command_queue.empty():
@@ -472,69 +498,82 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)
+            self.logger.info(f"Received move command to position: {position}mm")
             self._pending_position = position
+            self._target_position = position  # Make sure target is set
             self._retry_count = 0
             
             # Log timing event when command is sent
             if self.timing_mode:
+                self._last_command_time = time.time()  # Store command time
                 self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
             
             # Add command to queue for real motor
             self._command_queue.put({
                 'type': 'move_to',
                 'args': [position],
-                'kwargs': {'position': position}
+                'kwargs': {'position': position},
+                'priority': True  # Mark position commands as high priority
             })
+            
+            # Start retry mechanism immediately
+            self._try_move()
             
             return True
         except Exception as e:
-            # Error handling...
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
+            self.logger.error(f"Exception in move_to: {str(e)}")
             return False
 
     def _try_move(self):
-        """Attempt a single move command."""
+        """Attempt a single move command with automatic retries."""
         try:
-            success, actual_target = self.controller.set_position(
-                self._pending_position, wait=False)
+            if self._pending_position is None:  # Check for None specifically, not falsy values
+                return  # No pending position to process
+            
+            success, actual_target = self.controller.set_position(self._pending_position, wait=False)
+            
             if success:
                 self._target_position = actual_target
                 # Log timing event if target was limited
                 if self.timing_mode and actual_target != self._pending_position:
                     self.timing_logger.info(f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
-                    self.status_changed.emit(
-                        f"Moving to limited position: {actual_target}mm")
+                    self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
                 self._cleanup_retry()
             else:
                 self._handle_move_failure("Move command failed")
 
         except Exception as e:
             # Log the error and retry
-            self.logger.error(
-                f"Move attempt {self._retry_count + 1} failed: {str(e)}")
+            self.logger.error(f"Move attempt {self._retry_count + 1} failed: {str(e)}")
             self._handle_move_failure(str(e))
 
     def _handle_move_failure(self, error_msg: str = None):
-        """Handle move command failure."""
+        """Handle move command failure with automatic retries."""
         self._retry_count += 1
 
         # Continue retrying if in sequence mode or within retry limit
         if self._retry_count < self._max_retries:
-            # Schedule next retry
+            # Schedule next retry with exponential backoff (but cap at 500ms)
+            retry_delay = min(50 * (2 ** (self._retry_count // 3)), 500)
+            
+            if self._retry_count % 5 == 0:  # Log only every 5 retries to avoid spam
+                self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in {retry_delay}ms...")
+            
             if not self._retry_timer:
                 self._retry_timer = QTimer()
                 self._retry_timer.setSingleShot(True)
                 self._retry_timer.timeout.connect(self._try_move)
 
-            self.logger.warning(
-                f"Move attempt {self._retry_count} failed, retrying...")
-            self._retry_timer.start(1)  # 1ms delay between retries
+            self._retry_timer.start(retry_delay)  # Retry with backoff delay
         else:
             # Max retries reached
             if error_msg:
-                self.error_occurred.emit(
-                    f"Move failed after {self._max_retries} attempts: {error_msg}")
+                self.error_occurred.emit(f"Move failed after {self._max_retries} attempts: {error_msg}")
+                # Log timing event for failure
+                if self.timing_mode:
+                    self.timing_logger.info(f"MOTOR_COMMAND_FAILED - Position: {self._pending_position}mm, Attempts: {self._max_retries}")
             self._cleanup_retry()
 
     def _cleanup_retry(self):
@@ -982,7 +1021,7 @@ class MotorWorker(QThread):
             return False
 
     def _check_motor_status(self):
-        """Check motor status and update UI."""
+        """Check motor status and update UI with improved position tracking."""
         if not self.running or not self.controller:
             return
 
@@ -1021,26 +1060,54 @@ class MotorWorker(QThread):
                     self.logger.error(f"Failed to read debug register: {e}")
             
             if position is not None:
+                # Store previous position before updating
+                previous_position = self._current_position
+                
                 # Update position
                 self._current_position = position
                 self.position_updated.emit(position)
                 
                 # Check if we've reached the target
                 if self._target_position is not None:
+                    # Check if we're within tolerance of target
                     if abs(position - self._target_position) < 0.01:
                         # Position reached
                         if self.timing_mode and self._last_command_time > 0:
                             # Log timing event
                             elapsed = time.time() - self._last_command_time
                             self.timing_logger.info(
-                                f"MOTOR_POSITION_REACHED - Position: {position}mm, Time: {elapsed:.3f}s")
+                                f"MOTOR_POSITION_REACHED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
                         
+                        # Store the reached position before clearing target
+                        reached_position = self._target_position
                         self._target_position = None
                         self._last_command_time = 0
-                        self.status_changed.emit("Position reached")
+                        self.status_changed.emit(f"Position reached: {position:.2f}mm")
                         
-                        # Emit signal for position reached
-                        self.position_reached.emit(position)
+                        # Emit signal for position reached - ensure this signal is defined
+                        if hasattr(self, 'position_reached'):
+                            self.position_reached.emit(reached_position)
+                            self.movement_completed.emit(True)
+                    
+                    # Also check if we've passed the target (in case we missed the exact point)
+                    elif previous_position is not None:
+                        # If we were approaching target and now we're moving away from it
+                        approaching_before = abs(previous_position - self._target_position) > abs(position - self._target_position)
+                        if not approaching_before and abs(position - self._target_position) < 0.5:  # Within 0.5mm
+                            # We likely passed the target
+                            if self.timing_mode and self._last_command_time > 0:
+                                elapsed = time.time() - self._last_command_time
+                                self.timing_logger.info(
+                                    f"MOTOR_POSITION_PASSED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
+                            
+                            reached_position = self._target_position
+                            self._target_position = None
+                            self._last_command_time = 0
+                            self.status_changed.emit(f"Position passed: {position:.2f}mm")
+                            
+                            if hasattr(self, 'position_reached'):
+                                self.position_reached.emit(reached_position)
+                                self.movement_completed.emit(True)
         
         except Exception as e:
             self.logger.error(f"Error checking motor status: {e}")
