@@ -234,6 +234,10 @@ class MotorController:
             position_steps = int(round((self.POSITION_MAX - position) * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
 
+            # Debug output
+            self.logger.info(f"Setting position to {position}mm (steps: {position_steps})")
+            self.logger.info(f"High word: {high}, Low word: {low}")
+
             # Use command lock for high-priority operations
             with self._command_lock:
                 self._command_in_progress = True  # Set priority flag
@@ -244,8 +248,15 @@ class MotorController:
                         self.instrument.serial.reset_output_buffer()
                         
                         # Send all commands in a single batch when possible
-                        self.instrument.write_registers(2, [ord('x'), high, low])
+                        self.logger.info("Writing registers for position command")
+                        self.instrument.write_registers(3, [high, low])
                         time.sleep(0.01)  # Small delay for controller processing
+                        
+                        self.logger.info("Writing command register")
+                        self.instrument.write_register(2, ord('x'))
+                        time.sleep(0.01)  # Small delay for controller processing
+                        
+                        self.logger.info("Setting command flag")
                         self.instrument.write_bit(1, 1)
                         
                     self.serial_connected = True

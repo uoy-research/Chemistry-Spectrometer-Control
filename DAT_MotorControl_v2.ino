@@ -98,6 +98,23 @@ Command cmdBuffer[CMD_BUFFER_SIZE];
 uint8_t cmdBufferHead = 0;
 uint8_t cmdBufferTail = 0;
 
+// Forward declarations for functions used before they're defined
+void handleInput(char input);
+void addCoils();
+void setCustomSpeed();
+void fastSpeed();
+void noSpeed();
+void slowSpeed();
+void moveToPosition(int32_t position);
+void testPositionLimits();
+int32_t getTargetPosition();
+void setTargetPosition(int32_t targetPosition);
+void getCurrentPosition();
+int32_t combine(int16_t high, uint16_t low);
+void disassemble(int32_t combined, int16_t &high, uint16_t &low);
+void setTopPosition(int32_t topPosition);
+void handleCalibration();
+
 // Add a function to queue commands
 bool queueCommand(char type, int32_t value) {
   uint8_t nextHead = (cmdBufferHead + 1) % CMD_BUFFER_SIZE;
@@ -106,6 +123,10 @@ bool queueCommand(char type, int32_t value) {
   cmdBuffer[cmdBufferHead].type = type;
   cmdBuffer[cmdBufferHead].value = value;
   cmdBuffer[cmdBufferHead].active = true;
+  
+  // Debug output - log command being queued
+  mb.setHreg(13, 0xC001 | type); // Show command being queued
+  
   cmdBufferHead = nextHead;
   return true;
 }
@@ -120,7 +141,34 @@ void processCommandBuffer() {
   }
   
   // Process the command
-  handleInput(cmdBuffer[cmdBufferTail].type);
+  char cmdType = cmdBuffer[cmdBufferTail].type;
+  int32_t cmdValue = cmdBuffer[cmdBufferTail].value;
+  
+  // Debug output - log command being processed
+  mb.setHreg(13, 0xB000 | cmdType); // Show command being processed
+  
+  // Handle the command directly here
+  if (cmdType == 'x') {
+    // Move to position command
+    setCustomSpeed();
+    
+    // Get target position from the command value
+    setPosition = cmdValue;
+    
+    // Apply limits
+    if (setPosition > upPosition) {
+      setPosition = upPosition;
+    } else if (setPosition < downPosition) {
+      setPosition = downPosition;
+    }
+    
+    // Move to position
+    stepper.movePosition(setPosition);
+    mb.setHreg(13, 0xA001); // Indicate position command executed
+  } else {
+    // For other commands, use the standard handler
+    handleInput(cmdType);
+  }
   
   // Mark as processed
   cmdBuffer[cmdBufferTail].active = false;
@@ -141,6 +189,10 @@ unsigned long lastCalibrationTime = 0;
 void setup(){
   stepper.setup(NORMAL, 200);				     // Initialize uStepper S32
   MySerial.begin(baudrate);
+  
+  // Initialize position limits with safe defaults
+  downPosition = -2000000;  // Set a default value for downPosition
+  upPosition = 0;           // Set a default value for upPosition
   
   mb.config(baudrate); // Set up modbus communication
   mb.setAdditionalServerData("uStepper S32"); // Give it a name
@@ -190,135 +242,72 @@ void loop() {
   // Handle non-blocking calibration state machine
   handleCalibration();
   
-  // Handle interrupts
-  //handleInterrupts();
+  // Test position limits periodically
+  static unsigned long lastTestTime = 0;
+  if (millis() - lastTestTime > 5000) { // Test every 5 seconds
+    testPositionLimits();
+    lastTestTime = millis();
+  }
 
-  // Direct command handling for calibration
+  // Direct command handling for all commands
   if (mb.coil(1) == 1) {
     char input = mb.Hreg(2);
     
-    // Handle calibration command directly
-    if (input == 'c') {
-      // Reset calibration state
-      mb.setCoil(2, 0); // Set calibration flag to false
+    // Special handling for position command
+    if (input == 'x') {
+      int32_t targetPos = getTargetPosition();
+      mb.setHreg(13, 0xA005); // Log that we're processing a position command
       
-      // Force motor to be enabled with proper settings
-      stepper.setCurrent(runCurrent);
-      stepper.setHoldCurrent(holdCurrent);
-      stepper.setMaxAcceleration(maxAcceleration);
-      stepper.setMaxDeceleration(maxDeceleration);
-      stepper.setBrakeMode(COOLBRAKE);
-      stepper.setMaxVelocity(maxVelocity/4);
+      // Calculate target position with limits
+      int32_t calculatedPos = upPosition - targetPos;
       
-      // Start the calibration state machine
-      calibrationState = CAL_IDLE;
-      initFlag = 1;
+      // Apply upper limit
+      if (calculatedPos > upPosition) {
+        calculatedPos = upPosition;
+      }
+      
+      // Apply lower limit
+      if (calculatedPos < downPosition) {
+        calculatedPos = downPosition;
+      }
+      
+      targetPos = calculatedPos;
+      
+      setCustomSpeed();
+
+      // Execute position command directly
+      stepper.movePosition(targetPos);
       
       // Reset command flag
       mb.setCoil(1, 0);
-      
-      // Debug output
-      mb.setHreg(13, 0xC0DE); // Magic number to indicate calibration command received
+      mb.setHreg(2, 0);
     } else {
       // Queue other commands
       queueCommand(input, getTargetPosition());
+      
+      // Reset command flag
+      mb.setCoil(1, 0);
       mb.setHreg(2, 0);
-      mb.setCoil(1, 0); // Reset command flag
     }
+    
+    // Debug output
+    mb.setHreg(13, 0xC000 | input); // Store command for debugging
   }
   else if (mb.coil(2) == 1) {
     int32_t currentPos = combine(mb.Hreg(5), mb.Hreg(6));
     int32_t desiredPos = combine(mb.Hreg(3), mb.Hreg(4));
-    if (currentPos == desiredPos) {
+    
+    // Debug position values
+    if (currentPos != desiredPos) {
+      mb.setHreg(13, 0xA006); // Positions don't match
+    } else {
+      mb.setHreg(13, 0xA007); // Positions match
       mb.setCoil(1, 0);
     }
   }
 }
 
-// Add a non-blocking calibration state machine
-void handleCalibration() {
-  // Only process if we're in calibration mode
-  if (calibrationState == CAL_IDLE && !initFlag) {
-    return;
-  }
-  
-  // State machine for calibration
-  switch (calibrationState) {
-    case CAL_IDLE:
-      if (initFlag) {
-        // Start calibration - make sure motor is running at proper speed
-        stepper.setCurrent(runCurrent);
-        stepper.setHoldCurrent(holdCurrent);
-        stepper.setMaxAcceleration(maxAcceleration);
-        stepper.setMaxDeceleration(maxDeceleration);
-        stepper.setBrakeMode(COOLBRAKE);
-        stepper.setMaxVelocity(maxVelocity/4);
-        
-        // Start moving up
-        stepper.moveSteps(10000000); // Move up until we hit the limit switch
-        calibrationState = CAL_MOVING_UP;
-        lastCalibrationTime = millis();
-        
-        // Debug output - make sure to write to register 13
-        mb.setHreg(13, 0xCAFE); // Magic number to indicate calibration started
-      }
-      break;
-      
-    case CAL_MOVING_UP:
-      // Check if we've hit the top limit switch
-      if (topInterruptActive) {
-        topInterruptActive = false;
-        //stepper.stop(HARD);
-        topPosition = stepper.getPosition();
-        upPosition = topPosition - 100000; // Simplified - just 100000 steps below top
-        setTopPosition(upPosition);
-        
-        // Wait a moment before continuing
-        lastCalibrationTime = millis();
-        calibrationState = CAL_FOUND_TOP;
-        
-        // Debug output
-        mb.setHreg(11, 0xBEEF); // Magic number to indicate top found
-      }
-      
-      // Safety timeout - if we've been moving too long, stop
-      if (millis() - lastCalibrationTime > 10000) {
-        stepper.stop(HARD);
-        calibrationState = CAL_IDLE;
-        initFlag = 0;
-        
-        // Debug output
-        mb.setHreg(11, 0xDEAD); // Magic number to indicate timeout
-      }
-      break;
-      
-    case CAL_FOUND_TOP:
-      // Small delay to let things settle
-      if (millis() - lastCalibrationTime > 0 && digitalRead(intPin1) == LOW) {
-        // Return to home position (10000 steps below top)
-        fastSpeed();
-        stepper.movePosition(upPosition);
-        setPosition = upPosition;
-        setTargetPosition(0);
-        calibrationState = CAL_RETURNING_HOME;
-        lastCalibrationTime = millis();
-      }
-      break;
-      
-    case CAL_RETURNING_HOME:
-      // Check if we've reached home position
-      if (abs(stepper.getPosition() - upPosition) < 100 || 
-          millis() - lastCalibrationTime > 5000) {
-        // Calibration complete
-        mb.setCoil(2, 1); // Set calibration flag to true
-        calibrationState = CAL_IDLE;
-        initFlag = 0;
-      }
-      break;
-  }
-}
-
-// Modify the handleInput function to handle 'c' command
+// Modify the handleInput function to properly handle 'x' command
 void handleInput(char input) {
   switch(input) {
     case 'x': // Move to position - optimized
@@ -337,11 +326,12 @@ void handleInput(char input) {
       
       // Move to position
       stepper.movePosition(setPosition);
+      
+      // Debug output
+      mb.setHreg(13, 0xA000); // Indicate position command executed
       break;
       
     case 'c': // Calibrate - non-blocking
-      // This is now handled directly in the loop
-      // but we keep it here for completeness
       mb.setCoil(2, 0); // Set calibration flag to false
       fastSpeed();
       stepper.setMaxVelocity(maxVelocity/4);
@@ -349,6 +339,9 @@ void handleInput(char input) {
       // Start the calibration state machine
       calibrationState = CAL_IDLE;
       initFlag = 1;
+      
+      // Debug output
+      mb.setHreg(13, 0xC0DE); // Magic number to indicate calibration started
       break;
       
     case 'q': // +50mm
@@ -401,57 +394,14 @@ void handleInput(char input) {
 // # +--------------------------+---------+-----------------------------------------+
 
 void topInterrupt() {
-  topInterruptActive = true;
   stepper.stop(HARD);
-  fastSpeed();
-  while(digitalRead(intPin1) == HIGH){
-    stepper.moveAngle(-1);
-  }
-  stepper.stop(HARD);
-  //downPosition = stepper.getPosition();
-  noSpeed();
+  mb.setHreg(13, 0xF001); // Indicate top interrupt triggered
 }
 
-// Handle interrupts in main loop
-void handleInterrupts() {
-  if (topInterruptActive) {
-    // Handle top interrupt without blocking
-    fastSpeed();
-    if (digitalRead(intPin1) == HIGH) {
-      stepper.moveAngle(-1);
-    } else {
-      topInterruptActive = false;
-      topPosition = stepper.getPosition();
-      
-      if (initFlag == 1){
-        topPosition = stepper.getPosition();
-        
-        //Serial.print("Top position: "); Serial.println(topPosition);
-        upPosition = topPosition - 100000;
-        setTopPosition(upPosition);
-        downPosition = topPosition - 2475000; // define down pos once calibrated
-        setPosition = upPosition;
-        delay(10);
-        setTargetPosition(upPosition);
-        mb.setCoil(1, 1); // New Command - Move to setPosition
-        mb.setHreg(2, 'x'); // Reset command register
-        mb.setCoil(2, 1); // Set calibration flag to true
-        initFlag = 0;
-      }
-      noSpeed();
-    }
-  }
-}
-
-void botInterrupt(){
+// Replace botInterrupt with a simpler version that doesn't block
+void botInterrupt() {
   stepper.stop(HARD);
-  fastSpeed();
-  while(digitalRead(intPin2) == HIGH){
-    stepper.moveAngle(1);
-  }
-  stepper.stop(HARD);
-  //downPosition = stepper.getPosition();
-  noSpeed();
+  mb.setHreg(13, 0xF002); // Indicate bottom interrupt triggered
 }
 
 int32_t getTargetPosition(){
@@ -648,4 +598,150 @@ void setAccelerationProfile(uint8_t profile) {
       break;
   }
   setCustomSpeed();
+}
+
+// Add a non-blocking calibration state machine
+void handleCalibration() {
+  // Only process if we're in calibration mode
+  if (calibrationState == CAL_IDLE && !initFlag) {
+    return;
+  }
+  
+  // State machine for calibration
+  switch (calibrationState) {
+    case CAL_IDLE:
+      if (initFlag) {
+        // Start calibration - make sure motor is running at proper speed
+        stepper.setCurrent(runCurrent);
+        stepper.setHoldCurrent(holdCurrent);
+        stepper.setMaxAcceleration(maxAcceleration);
+        stepper.setMaxDeceleration(maxDeceleration);
+        stepper.setBrakeMode(COOLBRAKE);
+        stepper.setMaxVelocity(maxVelocity/4);
+        
+        // Start moving up
+        stepper.moveSteps(10000000); // Move up until we hit the limit switch
+        calibrationState = CAL_MOVING_UP;
+        lastCalibrationTime = millis();
+        
+        // Debug output - make sure to write to register 13
+        mb.setHreg(13, 0xCAFE); // Magic number to indicate calibration started
+      }
+      break;
+      
+    case CAL_MOVING_UP:
+      // Check if we've hit the top limit switch
+      if (digitalRead(intPin1) == HIGH) {
+        stepper.stop(HARD);
+        topPosition = stepper.getPosition();
+        
+        // IMPORTANT: Set both upPosition and downPosition based on topPosition
+        upPosition = topPosition - 100000; // Simplified - just 100000 steps below top
+        downPosition = topPosition - 2475000; // Define down position once calibrated
+        
+        // Debug the position values
+        mb.setHreg(14, upPosition >> 16);    // Store high word of upPosition
+        mb.setHreg(15, upPosition & 0xFFFF); // Store low word of upPosition
+        mb.setHreg(16, downPosition >> 16);    // Store high word of downPosition
+        mb.setHreg(17, downPosition & 0xFFFF); // Store low word of downPosition
+        
+        setTopPosition(upPosition);
+        
+        // Wait a moment before continuing
+        lastCalibrationTime = millis();
+        calibrationState = CAL_FOUND_TOP;
+        
+        // Debug output
+        mb.setHreg(13, 0xBEEF); // Magic number to indicate top found
+      }
+      
+      // Safety timeout - if we've been moving too long, stop
+      if (millis() - lastCalibrationTime > 10000) {
+        stepper.stop(HARD);
+        calibrationState = CAL_IDLE;
+        initFlag = 0;
+        
+        // Debug output
+        mb.setHreg(13, 0xDEAD); // Magic number to indicate timeout
+      }
+      break;
+      
+    case CAL_FOUND_TOP:
+      // Small delay to let things settle
+      if (millis() - lastCalibrationTime > 500) {
+        // Return to home position (10000 steps below top)
+        fastSpeed();
+        stepper.movePosition(upPosition);
+        setPosition = upPosition;
+        setTargetPosition(upPosition);
+        calibrationState = CAL_RETURNING_HOME;
+        lastCalibrationTime = millis();
+      }
+      break;
+      
+    case CAL_RETURNING_HOME:
+      // Check if we've reached home position
+      if (abs(stepper.getPosition() - upPosition) < 100 || 
+          millis() - lastCalibrationTime > 5000) {
+        // Calibration complete
+        mb.setCoil(2, 1); // Set calibration flag to true
+        calibrationState = CAL_IDLE;
+        initFlag = 0;
+        
+        // Debug output
+        mb.setHreg(13, 0xD00E); // Magic number to indicate calibration done
+      }
+      break;
+  }
+}
+
+// Modify the moveToPosition function to add more debugging
+void moveToPosition(int32_t position) {
+  // Set custom speed parameters
+  setCustomSpeed();
+  
+  // Debug the position values
+  mb.setHreg(13, 0xA010); // Starting move to position
+  
+  // Debug the position limits and target
+  mb.setHreg(14, upPosition >> 16);    // Store high word of upPosition
+  mb.setHreg(15, upPosition & 0xFFFF); // Store low word of upPosition
+  mb.setHreg(16, downPosition >> 16);    // Store high word of downPosition
+  mb.setHreg(17, downPosition & 0xFFFF); // Store low word of downPosition
+  mb.setHreg(18, position >> 16);    // Store high word of target position
+  mb.setHreg(19, position & 0xFFFF); // Store low word of target position
+  
+  // Apply limits
+  if (position > upPosition) {
+    position = upPosition;
+    mb.setHreg(13, 0xA002); // Position limited to upper bound
+  } else if (position < downPosition) {
+    position = downPosition;
+    mb.setHreg(13, 0xA003); // Position limited to lower bound
+  }
+  
+  // Debug the final position after limits
+  mb.setHreg(20, position >> 16);    // Store high word of final position
+  mb.setHreg(21, position & 0xFFFF); // Store low word of final position
+  
+  // Move to position
+  stepper.movePosition(position);
+  mb.setHreg(13, 0xA004); // Direct position command executed
+}
+
+// Add a function to directly test position limits
+void testPositionLimits() {
+  // Debug the current position limits
+  mb.setHreg(13, 0xA020); // Testing position limits
+  mb.setHreg(14, upPosition >> 16);    // Store high word of upPosition
+  mb.setHreg(15, upPosition & 0xFFFF); // Store low word of upPosition
+  mb.setHreg(16, downPosition >> 16);    // Store high word of downPosition
+  mb.setHreg(17, downPosition & 0xFFFF); // Store low word of downPosition
+  
+  // Test if position limits are valid
+  if (upPosition > downPosition) {
+    mb.setHreg(13, 0xA021); // Position limits are valid
+  } else {
+    mb.setHreg(13, 0xA022); // Position limits are invalid
+  }
 }
