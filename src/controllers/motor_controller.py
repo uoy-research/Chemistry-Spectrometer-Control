@@ -301,7 +301,7 @@ class MotorController:
                     self.instrument.serial.reset_output_buffer()
 
                     self.instrument.write_registers(2, [ord('x'), high, low])
-                    time.sleep(0.01)  # Increased delay between writes
+                    time.sleep(0.01)  # Decreased delay between writes
                     self.instrument.write_bit(1, 1)
                     self.serial_connected = True
                     return True, actual_target

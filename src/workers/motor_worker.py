@@ -285,7 +285,7 @@ class MotorWorker(QThread):
 
         # Reduce position polling frequency when idle
         self._idle_update_interval = 0.5  # 500ms when idle
-        self._active_update_interval = 0.1  # 100ms when active
+        self._active_update_interval = 0.005  # 5ms when active
         self._last_command_time = 0
         self._idle_timeout = 5.0  # Switch to idle mode after 5 seconds of no commands
 
