@@ -42,7 +42,7 @@ class MotorController:
         self._modbus_lock = threading.Lock()  # Main communication lock
         self._command_lock = threading.Lock()  # High-priority command lock
         self._command_in_progress = False  # Flag for command priority
-        
+
         # Add command prioritization flags
         self.last_position_read_time = 0
         self.position_read_interval = 0.1  # Minimum time between position reads
@@ -122,7 +122,7 @@ class MotorController:
         # Skip position reading if high-priority command is in progress
         if self._command_in_progress:
             return self._current_position
-            
+
         if not self.running:
             return None
 
@@ -130,15 +130,16 @@ class MotorController:
             with self._modbus_lock:  # Use main lock for position reading
                 readings = self.instrument.read_registers(5, 2, functioncode=3)
                 raw_steps = self.assemble(readings[0], readings[1])
-                position = round((raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
-                
+                position = round(
+                    (raw_steps / self.STEPS_PER_MM) - self._initial_offset, 5)
+
                 # Store previous position to detect when target is reached
                 self._previous_position = self._current_position
                 self._current_position = position
-                
+
                 self._consecutive_errors = 0
                 return float(position)
-                
+
         except Exception as e:
             self.logger.error(f"Error getting position: {e}")
             self.serial_connected = False
@@ -235,11 +236,13 @@ class MotorController:
                     actual_target = self.POSITION_MIN
 
             # Convert position to steps
-            position_steps = int(round((self.POSITION_MAX - position) * self.STEPS_PER_MM))
+            position_steps = int(
+                round((self.POSITION_MAX - position) * self.STEPS_PER_MM))
             high, low = self.disassemble(position_steps)
 
             # Debug output
-            self.logger.info(f"Setting position to {position}mm (steps: {position_steps})")
+            self.logger.info(
+                f"Setting position to {position}mm (steps: {position_steps})")
             self.logger.info(f"High word: {high}, Low word: {low}")
 
             # Use command lock for high-priority operations
@@ -250,22 +253,21 @@ class MotorController:
                         # Clear buffers once
                         self.instrument.serial.reset_input_buffer()
                         self.instrument.serial.reset_output_buffer()
-                        
+
                         # Send all commands in a single batch when possible
-                        self.logger.info("Writing registers for position command")
-                        self.instrument.write_registers(3, [high, low])
-                        time.sleep(0.01)  # Small delay for controller processing
-                        
-                        self.logger.info("Writing command register")
-                        self.instrument.write_register(2, ord('x'))
-                        time.sleep(0.01)  # Small delay for controller processing
-                        
+                        self.logger.info(
+                            "Writing registers for command register & position command")
+                        self.instrument.write_registers(
+                            2, [ord('x'), high, low])
+                        # Small delay for controller processing
+                        time.sleep(0.01)
+
                         self.logger.info("Setting command flag")
                         self.instrument.write_bit(1, 1)
-                        
+
                     self.serial_connected = True
                     return True, actual_target
-                    
+
                 finally:
                     self._command_in_progress = False  # Clear priority flag
 
@@ -294,7 +296,7 @@ class MotorController:
                     try:
                         # Increase timeout for stop command
                         original_timeout = self.instrument.serial.timeout
-                        #self.instrument.serial.timeout = 0.5  # 500ms timeout
+                        # self.instrument.serial.timeout = 0.5  # 500ms timeout
 
                         try:
                             self.instrument.write_register(2, ord('s'))
@@ -560,21 +562,22 @@ class MotorController:
 
     def get_velocity(self) -> Optional[float]:
         """Get current motor velocity from registers 11 (high) and 12 (low).
-        
+
         Returns:
             float: Current velocity or None if read fails
         """
         if not self.running:
             return None
-        
+
         try:
             # Skip velocity reading if high-priority command is in progress
             if self._command_in_progress:
                 return None
-            
+
             with self._modbus_lock:  # Use main lock for velocity reading
                 # Read both registers
-                readings = self.instrument.read_registers(11, 2, functioncode=3)
+                readings = self.instrument.read_registers(
+                    11, 2, functioncode=3)
                 # Assemble the velocity value from high and low bytes
                 velocity = self.assemble(readings[0], readings[1])
                 self.serial_connected = True
