@@ -289,7 +289,7 @@ class MotorWorker(QThread):
 
         # Reduce position polling frequency when idle
         self._idle_update_interval = 0.5  # 500ms when idle
-        self._active_update_interval = 0.1  # 100ms when active
+        self._active_update_interval = 0.01  # 10ms when active
         self._last_command_time = 0
         self._idle_timeout = 5.0  # Switch to idle mode after 5 seconds of no commands
 
@@ -305,27 +305,28 @@ class MotorWorker(QThread):
                 # If get_timing_logger returns None, create a fallback logger
                 self.timing_logger = logging.getLogger('motor_timing')
                 self.timing_logger.setLevel(logging.INFO)
-                
+
                 # Create a file handler if needed
                 try:
                     log_dir = Path("C:/ssbubble/logs")
                     log_dir.mkdir(parents=True, exist_ok=True)
-                    log_file = log_dir / f"motor_timing_{time.strftime('%Y%m%d_%H%M%S')}.log"
+                    log_file = log_dir / \
+                        f"motor_timing_{time.strftime('%Y%m%d_%H%M%S')}.log"
                     handler = logging.FileHandler(log_file)
-                    formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(message)s', 
-                                               datefmt='%Y-%m-%d %H:%M:%S')
+                    formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(message)s',
+                                                  datefmt='%Y-%m-%d %H:%M:%S')
                     handler.setFormatter(formatter)
                     self.timing_logger.addHandler(handler)
                 except Exception as e:
                     self.logger.error(f"Failed to create timing logger: {e}")
-            
+
             # Initialize timing variables
             self._last_command_time = 0
         else:
             self.timing_logger = None
 
         self._debug_mode = debug_mode
-        
+
         # Add a dedicated timer for debug register reading
         if self._debug_mode:
             self._debug_timer = QTimer()
@@ -380,7 +381,7 @@ class MotorWorker(QThread):
         # Clean up
         if self._debug_mode and hasattr(self, '_debug_timer'):
             self._debug_timer.stop()
-        
+
         self.logger.info(f"MotorWorker {self._instance_id} stopped")
         self.status_changed.emit("Motor worker stopped")
 
@@ -413,7 +414,7 @@ class MotorWorker(QThread):
                         break
                 except:
                     pass  # Skip if there's an issue accessing a command
-            
+
             # Use priority command if found, otherwise get next in queue
             command = priority_command if priority_command else self._command_queue.get()
             self._last_command_time = time.time()
@@ -439,21 +440,25 @@ class MotorWorker(QThread):
             elif cmd_type == 'to_top':
                 success = self.controller.to_top()
                 if not success and self.timing_mode:
-                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: to_top")
+                    self.timing_logger.info(
+                        "MOTOR_COMMAND_FAILED - Command: to_top")
             elif cmd_type == 'to_bottom':
                 success = self.controller.to_bottom()
                 if not success and self.timing_mode:
-                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: to_bottom")
+                    self.timing_logger.info(
+                        "MOTOR_COMMAND_FAILED - Command: to_bottom")
             elif cmd_type == 'calibrate':
                 success = self.controller.start_calibration()
                 if not success and self.timing_mode:
-                    self.timing_logger.info("MOTOR_COMMAND_FAILED - Command: calibrate")
+                    self.timing_logger.info(
+                        "MOTOR_COMMAND_FAILED - Command: calibrate")
             elif cmd_type == 'set_speed':
                 speed = args[0] if args else kwargs.get('speed')
                 if speed is not None:
                     success = self.controller.set_speed(speed)
                     if not success and self.timing_mode:
-                        self.timing_logger.info(f"MOTOR_COMMAND_FAILED - Command: set_speed, Value: {speed}")
+                        self.timing_logger.info(
+                            f"MOTOR_COMMAND_FAILED - Command: set_speed, Value: {speed}")
 
             # Process next command if any
             if not self._command_queue.empty():
@@ -498,16 +503,18 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)
-            self.logger.info(f"Received move command to position: {position}mm")
+            self.logger.info(
+                f"Received move command to position: {position}mm")
             self._pending_position = position
             self._target_position = position  # Make sure target is set
             self._retry_count = 0
-            
+
             # Log timing event when command is sent
             if self.timing_mode:
                 self._last_command_time = time.time()  # Store command time
-                self.timing_logger.info(f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
-            
+                self.timing_logger.info(
+                    f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
+
             # Add command to queue for real motor
             self._command_queue.put({
                 'type': 'move_to',
@@ -515,10 +522,10 @@ class MotorWorker(QThread):
                 'kwargs': {'position': position},
                 'priority': True  # Mark position commands as high priority
             })
-            
+
             # Start retry mechanism immediately
             self._try_move()
-            
+
             return True
         except Exception as e:
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
@@ -530,23 +537,27 @@ class MotorWorker(QThread):
         try:
             if self._pending_position is None:  # Check for None specifically, not falsy values
                 return  # No pending position to process
-            
-            success, actual_target = self.controller.set_position(self._pending_position, wait=False)
-            
+
+            success, actual_target = self.controller.set_position(
+                self._pending_position, wait=False)
+
             if success:
                 self._target_position = actual_target
                 # Log timing event if target was limited
                 if self.timing_mode and actual_target != self._pending_position:
-                    self.timing_logger.info(f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
+                    self.timing_logger.info(
+                        f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
-                    self.status_changed.emit(f"Moving to limited position: {actual_target}mm")
+                    self.status_changed.emit(
+                        f"Moving to limited position: {actual_target}mm")
                 self._cleanup_retry()
             else:
                 self._handle_move_failure("Move command failed")
 
         except Exception as e:
             # Log the error and retry
-            self.logger.error(f"Move attempt {self._retry_count + 1} failed: {str(e)}")
+            self.logger.error(
+                f"Move attempt {self._retry_count + 1} failed: {str(e)}")
             self._handle_move_failure(str(e))
 
     def _handle_move_failure(self, error_msg: str = None):
@@ -557,10 +568,11 @@ class MotorWorker(QThread):
         if self._retry_count < self._max_retries:
             # Schedule next retry with exponential backoff (but cap at 500ms)
             retry_delay = min(50 * (2 ** (self._retry_count // 3)), 500)
-            
+
             if self._retry_count % 5 == 0:  # Log only every 5 retries to avoid spam
-                self.logger.warning(f"Move attempt {self._retry_count} failed, retrying in {retry_delay}ms...")
-            
+                self.logger.warning(
+                    f"Move attempt {self._retry_count} failed, retrying in {retry_delay}ms...")
+
             if not self._retry_timer:
                 self._retry_timer = QTimer()
                 self._retry_timer.setSingleShot(True)
@@ -570,10 +582,12 @@ class MotorWorker(QThread):
         else:
             # Max retries reached
             if error_msg:
-                self.error_occurred.emit(f"Move failed after {self._max_retries} attempts: {error_msg}")
+                self.error_occurred.emit(
+                    f"Move failed after {self._max_retries} attempts: {error_msg}")
                 # Log timing event for failure
                 if self.timing_mode:
-                    self.timing_logger.info(f"MOTOR_COMMAND_FAILED - Position: {self._pending_position}mm, Attempts: {self._max_retries}")
+                    self.timing_logger.info(
+                        f"MOTOR_COMMAND_FAILED - Position: {self._pending_position}mm, Attempts: {self._max_retries}")
             self._cleanup_retry()
 
     def _cleanup_retry(self):
@@ -1028,7 +1042,7 @@ class MotorWorker(QThread):
         try:
             # Get current position
             position = self.controller.get_position()
-            
+
             # Debug mode - read register 13 for debug messages
             if self._debug_mode:
                 try:
@@ -1036,37 +1050,42 @@ class MotorWorker(QThread):
                     print("\n" + "="*50)
                     print("ATTEMPTING TO READ DEBUG REGISTER 13")
                     print("="*50 + "\n")
-                    
+
                     self.logger.info("Reading debug register 13...")
-                    
+
                     # Make sure we're using the right controller
                     if hasattr(self.controller, 'instrument') and self.controller.instrument:
-                        debug_value = self.controller.instrument.read_register(13, functioncode=3)
-                        print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
-                        self.logger.info(f"Debug register value: 0x{debug_value:X}")
-                        
+                        debug_value = self.controller.instrument.read_register(
+                            13, functioncode=3)
+                        print(
+                            f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
+                        self.logger.info(
+                            f"Debug register value: 0x{debug_value:X}")
+
                         if debug_value != 0:
-                            debug_message = self._decode_debug_value(debug_value)
+                            debug_message = self._decode_debug_value(
+                                debug_value)
                             # Use INFO level instead of DEBUG to ensure visibility
                             print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")
                             self.logger.info(f"Motor Debug: {debug_message}")
                             # Reset the register after reading
                             self.controller.instrument.write_register(13, 0)
                     else:
-                        self.logger.warning("Controller has no instrument attribute or it's None")
+                        self.logger.warning(
+                            "Controller has no instrument attribute or it's None")
                 except Exception as e:
                     # Use ERROR level to make sure we see any issues
                     print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
                     self.logger.error(f"Failed to read debug register: {e}")
-            
+
             if position is not None:
                 # Store previous position before updating
                 previous_position = self._current_position
-                
+
                 # Update position
                 self._current_position = position
                 self.position_updated.emit(position)
-                
+
                 # Check if we've reached the target
                 if self._target_position is not None:
                     # Check if we're within tolerance of target
@@ -1077,38 +1096,42 @@ class MotorWorker(QThread):
                             elapsed = time.time() - self._last_command_time
                             self.timing_logger.info(
                                 f"MOTOR_POSITION_REACHED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
-                        
+
                         # Store the reached position before clearing target
                         reached_position = self._target_position
                         self._target_position = None
                         self._last_command_time = 0
-                        self.status_changed.emit(f"Position reached: {position:.2f}mm")
-                        
+                        self.status_changed.emit(
+                            f"Position reached: {position:.2f}mm")
+
                         # Emit signal for position reached - ensure this signal is defined
                         if hasattr(self, 'position_reached'):
                             self.position_reached.emit(reached_position)
                             self.movement_completed.emit(True)
-                    
+
                     # Also check if we've passed the target (in case we missed the exact point)
                     elif previous_position is not None:
                         # If we were approaching target and now we're moving away from it
-                        approaching_before = abs(previous_position - self._target_position) > abs(position - self._target_position)
-                        if not approaching_before and abs(position - self._target_position) < 0.5:  # Within 0.5mm
+                        approaching_before = abs(
+                            previous_position - self._target_position) > abs(position - self._target_position)
+                        # Within 0.5mm
+                        if not approaching_before and abs(position - self._target_position) < 0.5:
                             # We likely passed the target
                             if self.timing_mode and self._last_command_time > 0:
                                 elapsed = time.time() - self._last_command_time
                                 self.timing_logger.info(
                                     f"MOTOR_POSITION_PASSED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
-                            
+
                             reached_position = self._target_position
                             self._target_position = None
                             self._last_command_time = 0
-                            self.status_changed.emit(f"Position passed: {position:.2f}mm")
-                            
+                            self.status_changed.emit(
+                                f"Position passed: {position:.2f}mm")
+
                             if hasattr(self, 'position_reached'):
                                 self.position_reached.emit(reached_position)
                                 self.movement_completed.emit(True)
-        
+
         except Exception as e:
             self.logger.error(f"Error checking motor status: {e}")
 
@@ -1126,19 +1149,20 @@ class MotorWorker(QThread):
         """Read the debug register and log its value."""
         if not self.running or not self.controller:
             return
-        
+
         try:
             # Print a very visible message when reading debug register
             print("\n" + "="*50)
             print("ATTEMPTING TO READ DEBUG REGISTER 13")
             print("="*50 + "\n")
-            
+
             # Make sure we're using the right controller
             if hasattr(self.controller, 'instrument') and self.controller.instrument:
-                debug_value = self.controller.instrument.read_register(13, functioncode=3)
+                debug_value = self.controller.instrument.read_register(
+                    13, functioncode=3)
                 print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
                 self.logger.info(f"Debug register value: 0x{debug_value:X}")
-                
+
                 if debug_value != 0:
                     debug_message = self._decode_debug_value(debug_value)
                     # Use INFO level instead of DEBUG to ensure visibility
@@ -1147,7 +1171,8 @@ class MotorWorker(QThread):
                     # Reset the register after reading
                     self.controller.instrument.write_register(13, 0)
             else:
-                self.logger.warning("Controller has no instrument attribute or it's None")
+                self.logger.warning(
+                    "Controller has no instrument attribute or it's None")
         except Exception as e:
             # Use ERROR level to make sure we see any issues
             print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
