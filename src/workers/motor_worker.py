@@ -567,7 +567,7 @@ class MotorWorker(QThread):
         # Continue retrying if in sequence mode or within retry limit
         if self._retry_count < self._max_retries:
             # Schedule next retry with exponential backoff (but cap at 500ms)
-            retry_delay = min(50 * (2 ** (self._retry_count // 3)), 500)
+            retry_delay = min(10 * (2 ** (self._retry_count // 3)), 500)
 
             if self._retry_count % 5 == 0:  # Log only every 5 retries to avoid spam
                 self.logger.warning(
