@@ -16,33 +16,30 @@ class LogFormatter(logging.Formatter):
         )
 
 
-def setup_logging(level="INFO"):
-    """Setup logging configuration."""
-    # Create logs directory if it doesn't exist
-    LOG_DIR.mkdir(exist_ok=True)
-
+def setup_logging(debug=False):
+    """Set up logging configuration.
+    
+    Args:
+        debug: If True, set log level to DEBUG, otherwise INFO
+    """
+    log_level = logging.DEBUG if debug else logging.INFO
+    
     # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, level))
-
-    # Clear any existing handlers
-    root_logger.handlers.clear()
-
-    # Create handlers
-    file_handler = logging.FileHandler(LOG_DIR / 'app.log', mode='w')
-    console_handler = logging.StreamHandler()
-
-    # Create formatter
-    formatter = LogFormatter()
-
-    # Set formatter for handlers
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-
-    # Add handlers to root logger
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
-
-    # Create and return application logger
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
+    
+    # Create logger
     logger = logging.getLogger('SSBubble')
+    logger.setLevel(log_level)
+    
+    # Log startup message
+    logger.info("=== Starting SSBubble application ===")
+    if debug:
+        logger.debug("Debug logging enabled")
+    
     return logger
