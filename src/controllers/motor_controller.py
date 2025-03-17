@@ -154,8 +154,6 @@ class MotorController:
 
             # Send calibration command
             self.instrument.write_register(2, ord('c'))
-            time.sleep(0.05)
-            self.instrument.write_bit(1, 1)
             self.serial_connected = True
             self.logger.info("Calibrating motor, please wait")
             return True
@@ -259,11 +257,6 @@ class MotorController:
                             "Writing registers for command register & position command")
                         self.instrument.write_registers(
                             2, [ord('x'), high, low])
-                        # Small delay for controller processing
-                        time.sleep(0.01)
-
-                        self.logger.info("Setting command flag")
-                        self.instrument.write_bit(1, 1)
 
                     self.serial_connected = True
                     return True, actual_target
@@ -300,8 +293,6 @@ class MotorController:
 
                         try:
                             self.instrument.write_register(2, ord('s'))
-                            time.sleep(0.01)  # Longer delay for stop command
-                            self.instrument.write_bit(1, 1)
                             self.serial_connected = True
                             self.logger.info(
                                 "Motor stop command sent successfully")
@@ -344,8 +335,6 @@ class MotorController:
 
                 try:
                     self.instrument.write_register(2, ord('b'))
-                    time.sleep(0.05)  # Longer delay for important command
-                    self.instrument.write_bit(1, 1)
                     self.serial_connected = True
                     return True
                 finally:
@@ -378,8 +367,6 @@ class MotorController:
 
                 try:
                     self.instrument.write_register(2, ord('t'))
-                    time.sleep(0.05)  # Longer delay for important command
-                    self.instrument.write_bit(1, 1)
                     self.serial_connected = True
                     return True
                 finally:
@@ -411,7 +398,6 @@ class MotorController:
         """Reset the motor controller."""
         try:
             self.instrument.write_register(2, ord('e'))
-            self.instrument.write_bit(1, 1)
             self.serial_connected = True
         except Exception as e:
             self.logger.error(f"Couldn't reset motor: {e}")
@@ -517,7 +503,6 @@ class MotorController:
         try:
             # Send step command
             self.instrument.write_register(2, ord(step_char))
-            self.instrument.write_bit(1, 1)
             self.serial_connected = True
             return True
         except Exception as e:
