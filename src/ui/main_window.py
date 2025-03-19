@@ -1739,11 +1739,12 @@ class MainWindow(QMainWindow):
         """Handle motor stop button click."""
         try:
             if self.motor_worker and self.motor_worker.running:
-                self.motor_worker.stop()
+                self.motor_worker.emergency_stop()
                 self.logger.info("Motor stopped by user")
         except Exception as e:
             self.logger.error(f"Error stopping motor: {e}")
             self.handle_error("Failed to stop motor")
+        self.update_device_status()  # Update device status after emergency stop
 
     @pyqtSlot()
     def on_motorMoveToTargetButton_clicked(self):
@@ -2475,17 +2476,6 @@ class MainWindow(QMainWindow):
         """Move motor to specified position."""
         position = self.position_spin.value()
         self.motor_worker.move_to(position)
-
-    def emergency_stop(self):
-        """Handle emergency stop."""
-        if self.motor_worker:  # Check if motor worker exists
-            self.motor_worker.emergency_stop()
-            self.motor_worker.stop()
-        self.arduino_worker.depressurize()
-        QMessageBox.warning(self, "Emergency Stop",
-                            "Emergency stop activated!")
-        self.logger.warning("Emergency stop activated")
-        self.update_device_status()  # Update device status after emergency stop
 
     def closeEvent(self, event):
         """Handle application shutdown."""
