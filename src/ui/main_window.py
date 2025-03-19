@@ -1087,6 +1087,7 @@ class MainWindow(QMainWindow):
                     self.disable_motor_controls(True)
             else:
                 # Disconnect and cleanup worker
+                self.cleanup_motor_timers()  # Add this line to clean up timers
                 self.cleanup_motor_worker()
                 self.motor_connect_btn.setText("Connect")
                 self.motor_calibrated = False
@@ -3006,3 +3007,20 @@ class MainWindow(QMainWindow):
         """Handle motor position reached signal."""
         self.logger.info(f"Motor reached position: {position}mm")
         # Any additional handling when position is reached
+
+    def cleanup_motor_timers(self):
+        """Clean up all motor-related timers."""
+        # Clean up file timer if it's running
+        self.cleanup_file_timer()
+        
+        # Cancel any pending single-shot timers related to motor operations
+        # This is a more aggressive approach that will cancel ALL pending single-shot timers
+        # Only use if you're having persistent timer issues
+        for timer in QApplication.instance().findChildren(QTimer):
+            if timer.isSingleShot() and timer.isActive():
+                timer.stop()
+        
+        # If you have any other specific motor-related timers, stop them here
+        # Example:
+        # if hasattr(self, 'motor_operation_timer') and self.motor_operation_timer:
+        #     self.motor_operation_timer.stop()
