@@ -2555,20 +2555,22 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.logger.error(f"Failed to reset device status file: {e}")
 
-            # Clean up workers
+            # First stop all timers
+            self.cleanup_file_timer()
+            self.cleanup_motor_timers()
+            
+            # Then clean up workers
             if hasattr(self, 'arduino_worker') and self.arduino_worker:
                 self.cleanup_arduino_worker()
                 
             if hasattr(self, 'motor_worker') and self.motor_worker:
                 self.cleanup_motor_worker()
-                
-            # Clean up any active timers
-            self.cleanup_file_timer()
-            self.cleanup_motor_timers()
             
-            # Shutdown logging system
-            shutdown_logging()
+            # Finally shutdown logging system
+            # Add a small delay to allow final logs to be processed
+            QTimer.singleShot(100, shutdown_logging)
             
+            # Accept the event immediately to prevent UI freezing
             event.accept()
         except Exception as e:
             self.logger.error(f"Error during shutdown: {e}")
