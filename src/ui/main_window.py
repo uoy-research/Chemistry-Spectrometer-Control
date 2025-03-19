@@ -1107,7 +1107,32 @@ class MainWindow(QMainWindow):
         """Clean up motor worker resources."""
         try:
             if self.motor_worker:
+                # First, stop any active timers in the worker
+                if hasattr(self.motor_worker, '_calibration_check_timer') and self.motor_worker._calibration_check_timer:
+                    self.motor_worker._calibration_check_timer.stop()
+                
+                # Disconnect all signals from the worker
+                if hasattr(self.motor_worker, 'position_updated'):
+                    self.motor_worker.position_updated.disconnect()
+                if hasattr(self.motor_worker, 'error_occurred'):
+                    self.motor_worker.error_occurred.disconnect()
+                if hasattr(self.motor_worker, 'status_changed'):
+                    self.motor_worker.status_changed.disconnect()
+                if hasattr(self.motor_worker, 'calibration_state_changed'):
+                    self.motor_worker.calibration_state_changed.disconnect()
+                if hasattr(self.motor_worker, 'position_reached'):
+                    self.motor_worker.position_reached.disconnect()
+                if hasattr(self.motor_worker, 'movement_completed'):
+                    self.motor_worker.movement_completed.disconnect()
+                
+                # Properly stop the worker thread
                 self.motor_worker.cleanup()
+                
+                # Wait for thread to finish (with timeout)
+                if not self.motor_worker.wait(1000):  # 1 second timeout
+                    self.logger.warning("Motor worker thread did not terminate gracefully, forcing termination")
+                    self.motor_worker.terminate()
+                    
                 self.motor_worker = None
         except Exception as e:
             self.logger.error(f"Error cleaning up motor worker: {e}")
