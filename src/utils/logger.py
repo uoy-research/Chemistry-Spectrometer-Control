@@ -28,6 +28,10 @@ class ThreadSafeHandler(logging.Handler):
     def __init__(self, target_handler):
         super().__init__()
         self.target_handler = target_handler
+        # Copy level and filters from target handler
+        self.setLevel(target_handler.level)
+        for filter in target_handler.filters:
+            self.addFilter(filter)
         
     def emit(self, record):
         # Put the record in the queue instead of directly emitting
@@ -35,6 +39,9 @@ class ThreadSafeHandler(logging.Handler):
             # Only queue if the thread is running
             if _log_thread_running:
                 try:
+                    # Store the target handler in the record to ensure
+                    # we only emit to this handler later
+                    record._target_handler = self.target_handler
                     _log_queue.put(record, block=False)  # Non-blocking put
                 except Exception:
                     # If queue is full or any other error, emit directly
@@ -55,13 +62,22 @@ def _process_log_queue():
             # Get records with a timeout to allow thread to exit
             try:
                 record = _log_queue.get(block=True, timeout=0.2)
-                # Process the record with the actual handlers
-                for handler in logging.getLogger().handlers:
-                    if not isinstance(handler, ThreadSafeHandler):
-                        try:
-                            handler.emit(record)
-                        except Exception:
-                            pass  # Ignore handler errors
+                
+                # Use the stored target handler if available
+                if hasattr(record, '_target_handler'):
+                    try:
+                        record._target_handler.emit(record)
+                    except Exception:
+                        pass  # Ignore handler errors
+                else:
+                    # Fallback to all non-ThreadSafeHandlers
+                    for handler in logging.getLogger().handlers:
+                        if not isinstance(handler, ThreadSafeHandler):
+                            try:
+                                handler.emit(record)
+                            except Exception:
+                                pass  # Ignore handler errors
+                
                 _log_queue.task_done()
             except Empty:
                 # Timeout or queue empty, just continue
@@ -87,9 +103,13 @@ def setup_logging(debug=False):
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     
-    # Clear existing handlers
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    # Clear existing handlers from ALL loggers to prevent duplicates
+    for logger_name in logging.root.manager.loggerDict:
+        logger_obj = logging.getLogger(logger_name)
+        logger_obj.handlers = []
+    
+    # Clear root logger handlers
+    root_logger.handlers = []
     
     # Create a stream handler for console output
     console_handler = logging.StreamHandler()
@@ -103,9 +123,10 @@ def setup_logging(debug=False):
     # Add ONLY the thread-safe handler to the root logger
     root_logger.addHandler(thread_safe_handler)
     
-    # Create logger
+    # Disable propagation for the SSBubble logger to prevent duplicate logs
     logger = logging.getLogger('SSBubble')
     logger.setLevel(log_level)
+    logger.propagate = False  # Prevent propagation to root logger
     
     # Start the log processing thread if not already running
     if _log_thread is None or not _log_thread.is_alive():
@@ -139,13 +160,22 @@ def shutdown_logging():
         while not _log_queue.empty() and (time.time() - start_time) < timeout:
             try:
                 record = _log_queue.get(block=False)  # Non-blocking get
-                # Process directly without using thread-safe handlers
-                for handler in logging.getLogger().handlers:
-                    if not isinstance(handler, ThreadSafeHandler):
-                        try:
-                            handler.emit(record)
-                        except Exception:
-                            pass  # Ignore errors during shutdown
+                
+                # Use the stored target handler if available
+                if hasattr(record, '_target_handler'):
+                    try:
+                        record._target_handler.emit(record)
+                    except Exception:
+                        pass  # Ignore errors during shutdown
+                else:
+                    # Process directly without using thread-safe handlers
+                    for handler in logging.getLogger().handlers:
+                        if not isinstance(handler, ThreadSafeHandler):
+                            try:
+                                handler.emit(record)
+                            except Exception:
+                                pass  # Ignore errors during shutdown
+                
                 _log_queue.task_done()
             except Exception:
                 break  # Break on any error
