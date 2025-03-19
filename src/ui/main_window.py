@@ -2479,6 +2479,7 @@ class MainWindow(QMainWindow):
     def emergency_stop(self):
         """Handle emergency stop."""
         if self.motor_worker:  # Check if motor worker exists
+            self.motor_worker.emergency_stop()
             self.motor_worker.stop()
         self.arduino_worker.depressurize()
         QMessageBox.warning(self, "Emergency Stop",

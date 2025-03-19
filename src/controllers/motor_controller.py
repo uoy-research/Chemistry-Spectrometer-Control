@@ -292,7 +292,7 @@ class MotorController:
                         # self.instrument.serial.timeout = 0.5  # 500ms timeout
 
                         try:
-                            self.instrument.write_register(2, ord('s'))
+                            self.instrument.write_register(2, ord('e'))
                             self.serial_connected = True
                             self.logger.info(
                                 "Motor stop command sent successfully")

@@ -1,6 +1,6 @@
 {
-    "arduino_port": 4,
-    "motor_port": 5,
+    "arduino_port": 11,
+    "motor_port": 10,
     "macro_file": "macros.json",
     "log_level": "INFO",
     "update_interval": 250,
