@@ -138,10 +138,18 @@ class MotorController:
                 self._current_position = position
 
                 self._consecutive_errors = 0
+                
+                # Only log position changes greater than threshold to reduce log volume
+                if not hasattr(self, '_last_logged_position') or abs(position - getattr(self, '_last_logged_position', 0)) > 0.5:
+                    self._last_logged_position = position
+                    # self.logger.debug(f"Position: {position}mm")  # Comment out frequent position logging
+                
                 return float(position)
 
         except Exception as e:
-            self.logger.error(f"Error getting position: {e}")
+            # Reduce logging frequency for repeated errors
+            if self._consecutive_errors == 0 or self._consecutive_errors % 5 == 0:
+                self.logger.error(f"Error getting position: {e}")
             self.serial_connected = False
             self._consecutive_errors += 1
             return self._current_position

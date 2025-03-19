@@ -1046,36 +1046,34 @@ class MotorWorker(QThread):
             # Debug mode - read register 13 for debug messages
             if self._debug_mode:
                 try:
-                    # Print a very visible message when reading debug register
-                    print("\n" + "="*50)
-                    print("ATTEMPTING TO READ DEBUG REGISTER 13")
-                    print("="*50 + "\n")
+                    # Reduce debug logging frequency
+                    if not hasattr(self, '_last_debug_time') or time.time() - getattr(self, '_last_debug_time', 0) > 5.0:
+                        self._last_debug_time = time.time()
+                        
+                        # Print a very visible message when reading debug register
+                        # print("\n" + "="*50)  # Comment out excessive console output
+                        # print("ATTEMPTING TO READ DEBUG REGISTER 13")
+                        # print("="*50 + "\n")
 
-                    self.logger.info("Reading debug register 13...")
+                        self.logger.info("Reading debug register 13...")
 
-                    # Make sure we're using the right controller
-                    if hasattr(self.controller, 'instrument') and self.controller.instrument:
-                        debug_value = self.controller.instrument.read_register(
-                            13, functioncode=3)
-                        print(
-                            f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
-                        self.logger.info(
-                            f"Debug register value: 0x{debug_value:X}")
+                        # Make sure we're using the right controller
+                        if hasattr(self.controller, 'instrument') and self.controller.instrument:
+                            debug_value = self.controller.instrument.read_register(
+                                13, functioncode=3)
+                            # print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")  # Comment out excessive console output
+                            self.logger.info(f"Debug register value: 0x{debug_value:X}")
 
-                        if debug_value != 0:
-                            debug_message = self._decode_debug_value(
-                                debug_value)
-                            # Use INFO level instead of DEBUG to ensure visibility
-                            print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")
-                            self.logger.info(f"Motor Debug: {debug_message}")
-                            # Reset the register after reading
-                            self.controller.instrument.write_register(13, 0)
-                    else:
-                        self.logger.warning(
-                            "Controller has no instrument attribute or it's None")
+                            if debug_value != 0:
+                                debug_message = self._decode_debug_value(debug_value)
+                                # Use INFO level instead of DEBUG to ensure visibility
+                                # print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")  # Comment out excessive console output
+                                self.logger.info(f"Motor Debug: {debug_message}")
+                                # Reset the register after reading
+                                self.controller.instrument.write_register(13, 0)
                 except Exception as e:
                     # Use ERROR level to make sure we see any issues
-                    print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
+                    # print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")  # Comment out excessive console output
                     self.logger.error(f"Failed to read debug register: {e}")
 
             if position is not None:
@@ -1084,7 +1082,12 @@ class MotorWorker(QThread):
 
                 # Update position
                 self._current_position = position
-                self.position_updated.emit(position)
+                
+                # Only emit position updates when there's a significant change
+                # This reduces the number of signals sent to the UI thread
+                if not hasattr(self, '_last_emitted_position') or abs(position - getattr(self, '_last_emitted_position', 0)) > 0.05:
+                    self._last_emitted_position = position
+                    self.position_updated.emit(position)
 
                 # Check if we've reached the target
                 if self._target_position is not None:

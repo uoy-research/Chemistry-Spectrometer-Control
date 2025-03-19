@@ -22,6 +22,7 @@ import os
 
 from utils.config import Config
 from utils.timing_logger import setup_timing_logger, get_timing_logger  # Add import
+from utils.logger import shutdown_logging
 from workers.arduino_worker import ArduinoWorker
 from workers.motor_worker import MotorWorker
 from .widgets.plot_widget import PlotWidget
@@ -2554,7 +2555,20 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.logger.error(f"Failed to reset device status file: {e}")
 
-            # Existing cleanup code...
+            # Clean up workers
+            if hasattr(self, 'arduino_worker') and self.arduino_worker:
+                self.cleanup_arduino_worker()
+                
+            if hasattr(self, 'motor_worker') and self.motor_worker:
+                self.cleanup_motor_worker()
+                
+            # Clean up any active timers
+            self.cleanup_file_timer()
+            self.cleanup_motor_timers()
+            
+            # Shutdown logging system
+            shutdown_logging()
+            
             event.accept()
         except Exception as e:
             self.logger.error(f"Error during shutdown: {e}")
