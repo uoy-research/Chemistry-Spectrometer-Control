@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QCheckBox, QLineEdit, QDoubleSpinBox, QSizePolicy,
     QFileDialog, QFormLayout, QComboBox, QDialog, QInputDialog
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QSize, QRect, QMetaObject, Q_ARG, QCoreApplication
 from PyQt6.QtGui import QFont
 from datetime import datetime
 import logging
@@ -1112,19 +1112,60 @@ class MainWindow(QMainWindow):
                 if hasattr(self.motor_worker, '_calibration_check_timer') and self.motor_worker._calibration_check_timer:
                     self.motor_worker._calibration_check_timer.stop()
                 
-                # Disconnect all signals from the worker
-                if hasattr(self.motor_worker, 'position_updated'):
-                    self.motor_worker.position_updated.disconnect()
-                if hasattr(self.motor_worker, 'error_occurred'):
-                    self.motor_worker.error_occurred.disconnect()
-                if hasattr(self.motor_worker, 'status_changed'):
-                    self.motor_worker.status_changed.disconnect()
-                if hasattr(self.motor_worker, 'calibration_state_changed'):
-                    self.motor_worker.calibration_state_changed.disconnect()
-                if hasattr(self.motor_worker, 'position_reached'):
-                    self.motor_worker.position_reached.disconnect()
-                if hasattr(self.motor_worker, 'movement_completed'):
-                    self.motor_worker.movement_completed.disconnect()
+                # Disconnect all signals from the worker - use try/except for each
+                try:
+                    if hasattr(self.motor_worker, 'position_updated'):
+                        try:
+                            self.motor_worker.position_updated.disconnect()
+                        except TypeError:
+                            pass  # Signal wasn't connected
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting position_updated signal: {e}")
+                
+                try:
+                    if hasattr(self.motor_worker, 'error_occurred'):
+                        try:
+                            self.motor_worker.error_occurred.disconnect()
+                        except TypeError:
+                            pass
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting error_occurred signal: {e}")
+                
+                try:
+                    if hasattr(self.motor_worker, 'status_changed'):
+                        try:
+                            self.motor_worker.status_changed.disconnect()
+                        except TypeError:
+                            pass
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting status_changed signal: {e}")
+                
+                try:
+                    if hasattr(self.motor_worker, 'calibration_state_changed'):
+                        try:
+                            self.motor_worker.calibration_state_changed.disconnect()
+                        except TypeError:
+                            pass
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting calibration_state_changed signal: {e}")
+                
+                try:
+                    if hasattr(self.motor_worker, 'position_reached'):
+                        try:
+                            self.motor_worker.position_reached.disconnect()
+                        except TypeError:
+                            pass
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting position_reached signal: {e}")
+                
+                try:
+                    if hasattr(self.motor_worker, 'movement_completed'):
+                        try:
+                            self.motor_worker.movement_completed.disconnect()
+                        except TypeError:
+                            pass
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting movement_completed signal: {e}")
                 
                 # Properly stop the worker thread
                 self.motor_worker.cleanup()
@@ -2479,7 +2520,7 @@ class MainWindow(QMainWindow):
         # Existing error handling...
 
         # Update status file if error affects device connections
-        if any(term in message.lower() for term in ["connection", "disconnected", "calibration"]):
+        if any(term in message.lower() for term in ["connect", "connection", "disconnected", "calibration"]):
             self.update_device_status()
 
         # Only show message box for critical errors, not connection issues
@@ -3014,13 +3055,8 @@ class MainWindow(QMainWindow):
         self.cleanup_file_timer()
         
         # Cancel any pending single-shot timers related to motor operations
-        # This is a more aggressive approach that will cancel ALL pending single-shot timers
-        # Only use if you're having persistent timer issues
-        for timer in QApplication.instance().findChildren(QTimer):
+        # Use QCoreApplication instead of QApplication for better compatibility
+        from PyQt6.QtCore import QCoreApplication
+        for timer in QCoreApplication.instance().findChildren(QTimer):
             if timer.isSingleShot() and timer.isActive():
                 timer.stop()
-        
-        # If you have any other specific motor-related timers, stop them here
-        # Example:
-        # if hasattr(self, 'motor_operation_timer') and self.motor_operation_timer:
-        #     self.motor_operation_timer.stop()

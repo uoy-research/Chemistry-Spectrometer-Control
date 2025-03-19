@@ -893,8 +893,8 @@ class MotorWorker(QThread):
 
             # First try to connect the controller
             if not self.controller.start():
-                self.error_occurred.emit(
-                    "Failed to connect to motor controller")
+                #self.error_occurred.emit(
+                #    "Failed to connect to motor controller")
                 self.logger.error("Failed to connect to motor controller")
                 return False
 
