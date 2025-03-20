@@ -576,20 +576,7 @@ class MotorController:
         try:
             if self.running:
                 self.logger.info("Emergency stop initiated.")
-                # Handle mock mode
-                if isinstance(self.controller, MockMotorController):
-                    if self.controller.stop_motor():
-                        self._target_position = None
-                        self.status_changed.emit("Motor emergency stopped")
-                        self.logger.info("Emergency stop executed successfully")
-                        # Reset calibration state
-                        self._is_calibrated = False
-                        self.calibration_state_changed.emit(False)
-                    else:
-                        self.error_occurred.emit("Emergency stop failed")
-                    return
 
-                # Real motor emergency stop code...
                 success = False
                 max_retries = 10
 
