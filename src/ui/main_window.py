@@ -2298,8 +2298,10 @@ class MainWindow(QMainWindow):
             # Update UI and stop recording
             self.update_sequence_info("Complete", 0, 0, 0)
             self.update_sequence_status("Complete")
-            if self.saving:
-                self.on_beginSaveButton_clicked(False)
+
+            # Don't stop recording if saving is enabled, must be stopped explicitly by cleanup sequence
+            #if self.saving:
+            #    self.on_beginSaveButton_clicked(False)
 
             # Restart sequence monitoring
             if self.arduino_worker and self.arduino_worker.running and self.arduino_worker.mode == 1:
