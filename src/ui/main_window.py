@@ -1660,6 +1660,14 @@ class MainWindow(QMainWindow):
                     # Stop all timers first
                     self.cleanup_file_timer()
 
+                    # Stop recording if it's active before disconnecting
+                    if self.saving:
+                        self.logger.info("Stopping data recording due to Arduino disconnection")
+                        self.plot_widget.stop_recording()
+                        self.beginSaveButton.setText("Begin Saving")
+                        self.beginSaveButton.setChecked(False)
+                        self.saving = False
+
                     # Uncheck all valve controls before disconnecting
                     self.uncheck_all_valve_controls()
 
