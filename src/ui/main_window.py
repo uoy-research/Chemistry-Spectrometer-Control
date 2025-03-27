@@ -2299,9 +2299,18 @@ class MainWindow(QMainWindow):
             self.update_sequence_info("Complete", 0, 0, 0)
             self.update_sequence_status("Complete")
 
-            # Don't stop recording if saving is enabled, must be stopped explicitly by cleanup sequence
-            #if self.saving:
-            #    self.on_beginSaveButton_clicked(False)
+            # Start a 15-minute timer to stop saving if no new sequence is received
+            if self.saving:
+                # Cancel any existing save timer first
+                if hasattr(self, 'save_stop_timer') and self.save_stop_timer is not None:
+                    self.save_stop_timer.stop()
+                    
+                # Create new timer for 15 minutes (900000 ms)
+                self.save_stop_timer = QTimer()
+                self.save_stop_timer.setSingleShot(True)
+                self.save_stop_timer.timeout.connect(self.stop_saving_timeout)
+                self.save_stop_timer.start(900000)  # 15 minutes
+                self.logger.info("Started 15-minute timer to stop saving if no new sequence is received")
 
             # Restart sequence monitoring
             if self.arduino_worker and self.arduino_worker.running and self.arduino_worker.mode == 1:
@@ -2551,6 +2560,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle application shutdown."""
         try:
+            # Stop saving if it's currently active
+            if self.saving:
+                self.logger.info("Stopping data recording during application shutdown")
+                self.plot_widget.stop_recording()
+                self.saving = False
+
             # Write disconnected status before cleanup
             try:
                 with open(Path("C:/ssbubble/device_status.txt"), 'w') as f:
@@ -2599,6 +2614,12 @@ class MainWindow(QMainWindow):
         [2025,2,22,18,58,10,861]
         """
         try:
+            # Cancel any active save stop timer when a new sequence is loaded
+            if hasattr(self, 'save_stop_timer') and self.save_stop_timer is not None:
+                self.save_stop_timer.stop()
+                self.save_stop_timer = None
+                self.logger.info("Cancelled save stop timer due to new sequence")
+            
             # Init steps
             self.steps = []
             self.motor_flag = False
@@ -3104,9 +3125,22 @@ class MainWindow(QMainWindow):
         # Clean up file timer if it's running
         self.cleanup_file_timer()
         
+        # Clean up save stop timer if it exists
+        if hasattr(self, 'save_stop_timer') and self.save_stop_timer is not None:
+            self.save_stop_timer.stop()
+            self.save_stop_timer = None
+            self.logger.info("Save stop timer cleaned up")
+        
         # Cancel any pending single-shot timers related to motor operations
         # Use QCoreApplication instead of QApplication for better compatibility
         from PyQt6.QtCore import QCoreApplication
         for timer in QCoreApplication.instance().findChildren(QTimer):
             if timer.isSingleShot() and timer.isActive():
                 timer.stop()
+
+    def stop_saving_timeout(self):
+        """Stop saving after the timeout period if saving is still active."""
+        if self.saving:
+            self.logger.info("15-minute timeout reached - stopping data recording")
+            self.on_beginSaveButton_clicked(False)
+            self.saving = False
