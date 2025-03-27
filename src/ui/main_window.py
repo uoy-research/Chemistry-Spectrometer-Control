@@ -1285,7 +1285,7 @@ class MainWindow(QMainWindow):
         """
         try:
             # Get start time - use delayed start time if exists, otherwise use current time
-            if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay:
+            if hasattr(self, 'sequence_start_delay') and self.sequence_start_delay != None:
                 start_time = self.sequence_start_delay.timestamp()
             else:
                 start_time = time.time()
