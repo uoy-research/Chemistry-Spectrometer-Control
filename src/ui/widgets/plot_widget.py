@@ -232,7 +232,7 @@ class PlotWidget(QWidget):
             self.csv_writer = csv.writer(self.save_file)
             
             # Write header
-            header = ['Time'] + [f'Sensor{i+1}' for i in range(4)]
+            header = ['Time', 'Rig', 'Inlet', 'Tube', 'Outlet']
             self.logger.debug(f"Writing CSV header: {header}")
             self.csv_writer.writerow(header)
             
