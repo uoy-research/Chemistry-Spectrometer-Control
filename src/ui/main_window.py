@@ -652,9 +652,10 @@ class MainWindow(QMainWindow):
         monitor_layout = QGridLayout(monitor_group)
         monitor_layout.setContentsMargins(0, 0, 0, 0)
 
+        enum_pressure_sensors = ["Rig", "Inlet", "Tube", "Outlet"]
         # Create pressure radio buttons
         for i in range(1, 5):
-            radio = QRadioButton(f"Pressure {i}")
+            radio = QRadioButton(enum_pressure_sensors[i-1])
             font = QFont()
             font.setPointSize(10)
             radio.setFont(font)
@@ -2341,13 +2342,13 @@ class MainWindow(QMainWindow):
                 valve_states[2] = 1  # Open inlet valve
                 valve_states[3] = 1  # Open outlet valve
                 valve_states[4] = 1  # Open short valve
-                valve_states[5] = 1  # Open long valve
             elif step.step_type == 'f':  # Flow
                 valve_states[2] = 1  # Open outlet valve
             elif step.step_type == 'e':  # Evacuate
                 valve_states[3] = 1  # Open vent valve
                 valve_states[4] = 1  # Open short valve
             elif step.step_type == 'c':  # Close valves 3 to 6
+                valve_states[1] = 0
                 valve_states[2] = 0
                 valve_states[3] = 0
                 valve_states[4] = 0
@@ -2581,15 +2582,17 @@ class MainWindow(QMainWindow):
         
         Expected format:
         ["step_type1","step_type2",...]  # Valid types: d,p,v,b,f,e,c
-        ["pos1","pos2",...] or ["None",...]  # Positions in mm or "None"
         ["time1","time2",...]  # Times in milliseconds
+        ["pos1","pos2",...] or ["None",...]  # Positions in mm or "None"
+        ["speed"]  # Global motor speed (fast, medium, slow)
         save_path  # Path or "None"
         [year,month,day,hour,minute,second,millisecond] or "None" # Start delay timestamp
         
         Example:
         ["b","p","d","b","v"]
+        ["1000","1000","1000","1000","1000"]    
         ["10","200","0","250","None"]
-        ["1000","1000","1000","1000","1000"]
+        ["fast"]
         C:\\ssbubble\\data
         [2025,2,22,18,58,10,861]
         """
@@ -2608,7 +2611,7 @@ class MainWindow(QMainWindow):
                 return False
 
             # Parse start delay timestamp from fifth line
-            start_delay_str = sequence[4].strip()
+            start_delay_str = sequence[5].strip() if len(sequence) > 5 else "None"
             start_delay = None
             
             if start_delay_str != "None":
@@ -2633,17 +2636,34 @@ class MainWindow(QMainWindow):
             self.sequence_start_delay = start_delay
 
             # Get the save path from the fourth line
-            seq_save_path = sequence[3].strip()
+            seq_save_path = sequence[4].strip() if len(sequence) > 4 else "None"
+
+            # Get the global motor speed from the third line
+            global_motor_speed = None
+            if len(sequence) > 3:
+                try:
+                    # Parse motor speed - expecting format like ["fast"]
+                    speed_str = sequence[3].strip()
+                    # Remove brackets and quotes
+                    speed_str = speed_str.strip('[]').replace('"', '').strip()
+                    if speed_str:
+                        global_motor_speed = speed_str.lower()
+                        self.logger.info(f"Global motor speed set to: {global_motor_speed}")
+                except Exception as e:
+                    self.logger.error(f"Error parsing motor speed: {e}")
+                    # Continue with default speed if there's an error
 
             # Convert lists into steps - handle double quoted format
             step_types = sequence[0].strip().strip('[]').replace('"', '').split(',')
-            motor_positions = sequence[1].strip().strip('[]').replace('"', '').split(',')
-            time_lengths = sequence[2].strip().strip('[]').replace('"', '').split(',')
+            
+            # IMPORTANT: Swap the order of time_lengths and motor_positions to match the new format
+            time_lengths = sequence[1].strip().strip('[]').replace('"', '').split(',')
+            motor_positions = sequence[2].strip().strip('[]').replace('"', '').split(',')
 
             # Clean any whitespace
             step_types = [s.strip() for s in step_types]
-            motor_positions = [p.strip() for p in motor_positions]
             time_lengths = [t.strip() for t in time_lengths]
+            motor_positions = [p.strip() for p in motor_positions]
 
             # Validate step types
             valid_step_types = set(self.step_types.keys())  # d,p,v,b,f,e,c
@@ -2659,7 +2679,7 @@ class MainWindow(QMainWindow):
                     self.logger.error("Time lengths must be positive numbers")
                     return False
             except ValueError:
-                self.logger.error("Invalid time lengths in sequence file - must be integers")
+                self.logger.error(f"Invalid time lengths in sequence file - must be integers. Values: {time_lengths}")
                 return False
 
             # Handle motor positions
@@ -2671,25 +2691,36 @@ class MainWindow(QMainWindow):
                 if any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
             except ValueError:
-                self.logger.error("Invalid motor positions in sequence file - must be numbers or 'None'")
+                self.logger.error(f"Invalid motor positions in sequence file - must be numbers or 'None'. Values: {motor_positions}")
                 return False
 
             # Validate sequence lengths match
             if not (len(step_types) == len(motor_positions) == len(time_lengths)):
-                self.logger.error("Sequence lists have different lengths")
+                self.logger.error(f"Sequence lists have different lengths: steps={len(step_types)}, times={len(time_lengths)}, positions={len(motor_positions)}")
                 return False
 
             # Parse steps
             for i in range(len(step_types)):
                 step_type = step_types[i]
                 motor_position = motor_positions[i]
-                if motor_position is not None:
+                if motor_position is not None and self.motor_worker:
                     motor_position = min(motor_position, self.motor_worker.max_position)
                 time_length = time_lengths[i]
 
                 # Create step object
                 step = Step(step_type, time_length, motor_position)
                 self.steps.append(step)
+
+            # Apply global motor speed if specified and motor is connected
+            if global_motor_speed and self.motor_worker and self.motor_worker.running:
+                # Set the motor speed combo box
+                if global_motor_speed in ['fast', 'medium', 'slow']:
+                    # Convert to title case for the combo box
+                    speed_text = global_motor_speed.title()
+                    self.motor_speed_combo.setCurrentText(speed_text)
+                    # This will trigger the on_motor_speed_changed slot
+                else:
+                    self.logger.warning(f"Invalid motor speed: {global_motor_speed}. Using current speed.")
 
             # Check if saving already
             if not self.saving:
