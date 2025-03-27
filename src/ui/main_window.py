@@ -2742,6 +2742,7 @@ class MainWindow(QMainWindow):
                 elif seq_save_path == "None":   # No save path means stop saving
                     self.savePathEdit.setText("")
                     self.prev_save_path = None
+                    self.on_beginSaveButton_clicked(False)
                     self.saving = False
             else:
                 if seq_save_path != self.prev_save_path:
