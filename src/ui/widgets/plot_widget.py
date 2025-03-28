@@ -219,10 +219,17 @@ class PlotWidget(QWidget):
         try:
             self.logger.info(f"Attempting to start recording to {filepath}")
             
-            # Check if already recording
+            # Check if already recording to the same file
+            if self.recording and self.save_file and self.save_file.name == filepath:
+                self.logger.info("Already recording to the same file - continuing")
+                return True
+            
+            # Check if already recording to a different file
             if self.recording:
-                self.logger.warning("Already recording - stopping current recording")
+                self.logger.warning("Already recording to a different file - stopping current recording")
                 self.stop_recording()
+            else:
+                self.start_time = time.time()  # Reset start time for recording
             
             # Verify file path
             if not filepath:
@@ -238,7 +245,7 @@ class PlotWidget(QWidget):
             self.csv_writer.writerow(header)
             
             self.recording = True
-            self.start_time = time.time()  # Reset start time for recording
+            # Do not reset start_time here to maintain time continuity across sequences
             
             # Verify recording state
             self.logger.info(f"Recording started successfully - recording={self.recording}, has_writer={self.csv_writer is not None}")
@@ -266,15 +273,21 @@ class PlotWidget(QWidget):
                     self.save_file = None
                     self.csv_writer = None
 
-    def clear_plot(self):
-        """Clear all plot data and reset."""
+    def clear_plot(self, reset_time=False):
+        """Clear all plot data and optionally reset the time.
+        
+        Args:
+            reset_time: If True, resets the start_time. Default is False to maintain time continuity.
+        """
         try:
             # Clear data arrays
             self.times = np.array([])
             self.pressures = [np.array([]) for _ in range(4)]
             
-            # Reset start time
-            self.start_time = time.time()
+            # Only reset start time if explicitly requested
+            if reset_time:
+                self.start_time = time.time()
+                self.logger.info("Plot time was reset")
             
             # Clear line data
             for line in self.lines:

@@ -2895,14 +2895,16 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Error updating step time: {e}")
 
     def cleanup_file_timer(self):
-        """Clean up file check timer."""
-        try:
-            if hasattr(self, 'file_timer') and self.file_timer is not None:
-                self.file_timer.stop()
-                self.file_timer = None
-                self.logger.info("File check timer cleaned up")
-        except Exception as e:
-            self.logger.error(f"Error cleaning up file timer: {e}")
+        """Clean up file monitoring timer."""
+        if hasattr(self, 'file_check_timer') and self.file_check_timer:
+            self.file_check_timer.stop()
+            self.file_check_timer.deleteLater()
+            self.file_check_timer = None
+            
+        # When the 15-minute timer elapses, stop recording
+        if self.plot_widget and self.plot_widget.recording:
+            self.plot_widget.stop_recording()
+            self.log_widget.log_info("Recording stopped: 15-minute sequence timer elapsed")
 
     def cleanup_arduino_worker(self):
         """Clean up Arduino worker resources."""
@@ -3003,26 +3005,16 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Error setting up sequence monitoring: {e}")
 
     def cleanup_file_timer(self):
-        """Clean up file check timer."""
-        try:
-            # Clean up the delay timer if it exists
-            if hasattr(self, 'delay_timer') and self.delay_timer is not None:
-                self.delay_timer.stop()
-                self.delay_timer = None
-                self.logger.info("Sequence monitoring delay timer cleaned up")
-
-            # Clean up the file check timer
-            if hasattr(self, 'file_timer') and self.file_timer is not None:
-                self.file_timer.stop()
-                self.file_timer = None
-                self.logger.info("File check timer cleaned up")
-
-            # Reset sequence-related UI elements
-            if hasattr(self, 'sequence_status_label'):
-                self.sequence_status_label.setText("Status: Waiting for file")
-
-        except Exception as e:
-            self.logger.error(f"Error cleaning up file timer: {e}")
+        """Clean up file monitoring timer."""
+        if hasattr(self, 'file_check_timer') and self.file_check_timer:
+            self.file_check_timer.stop()
+            self.file_check_timer.deleteLater()
+            self.file_check_timer = None
+            
+        # When the 15-minute timer elapses, stop recording
+        if self.plot_widget and self.plot_widget.recording:
+            self.plot_widget.stop_recording()
+            self.log_widget.log_info("Recording stopped: 15-minute sequence timer elapsed")
 
     def uncheck_all_valve_controls(self):
         """Uncheck all valve buttons and macros."""
