@@ -48,7 +48,8 @@ class PlotWidget(QWidget):
         # Initialize data
         self.times = np.array([])
         self.pressures = [np.array([]) for _ in range(4)]
-        self.lines = [self.ax.plot([], [], label=f'Sensor {i+1}')[0]
+        self.labels = ['Rig', 'Inlet', 'Tube', 'Outlet']
+        self.lines = [self.ax.plot([], [], label=f'{self.labels[i]}')[0]
                       for i in range(4)]
 
         # Track sensor visibility
