@@ -288,7 +288,7 @@ class MotorWorker(QThread):
         self._command_processing = False
 
         # Reduce position polling frequency when idle
-        self._idle_update_interval = 0.5  # 500ms when idle
+        self._idle_update_interval = 0.1  # 100ms when idle
         self._active_update_interval = 0.01  # 10ms when active
         self._last_command_time = 0
         self._idle_timeout = 5.0  # Switch to idle mode after 5 seconds of no commands
@@ -893,7 +893,7 @@ class MotorWorker(QThread):
 
             # First try to connect the controller
             if not self.controller.start():
-                #self.error_occurred.emit(
+                # self.error_occurred.emit(
                 #    "Failed to connect to motor controller")
                 self.logger.error("Failed to connect to motor controller")
                 return False
@@ -1033,150 +1033,3 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Failed to set motor acceleration: {e}")
             return False
-
-    def _check_motor_status(self):
-        """Check motor status and update UI with improved position tracking."""
-        if not self.running or not self.controller:
-            return
-
-        try:
-            # Get current position
-            position = self.controller.get_position()
-
-            # Debug mode - read register 13 for debug messages
-            if self._debug_mode:
-                try:
-                    # Reduce debug logging frequency
-                    if not hasattr(self, '_last_debug_time') or time.time() - getattr(self, '_last_debug_time', 0) > 5.0:
-                        self._last_debug_time = time.time()
-                        
-                        # Print a very visible message when reading debug register
-                        # print("\n" + "="*50)  # Comment out excessive console output
-                        # print("ATTEMPTING TO READ DEBUG REGISTER 13")
-                        # print("="*50 + "\n")
-
-                        self.logger.info("Reading debug register 13...")
-
-                        # Make sure we're using the right controller
-                        if hasattr(self.controller, 'instrument') and self.controller.instrument:
-                            debug_value = self.controller.instrument.read_register(
-                                13, functioncode=3)
-                            # print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")  # Comment out excessive console output
-                            self.logger.info(f"Debug register value: 0x{debug_value:X}")
-
-                            if debug_value != 0:
-                                debug_message = self._decode_debug_value(debug_value)
-                                # Use INFO level instead of DEBUG to ensure visibility
-                                # print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")  # Comment out excessive console output
-                                self.logger.info(f"Motor Debug: {debug_message}")
-                                # Reset the register after reading
-                                self.controller.instrument.write_register(13, 0)
-                except Exception as e:
-                    # Use ERROR level to make sure we see any issues
-                    # print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")  # Comment out excessive console output
-                    self.logger.error(f"Failed to read debug register: {e}")
-
-            if position is not None:
-                # Store previous position before updating
-                previous_position = self._current_position
-
-                # Update position
-                self._current_position = position
-                
-                # Only emit position updates when there's a significant change
-                # This reduces the number of signals sent to the UI thread
-                if not hasattr(self, '_last_emitted_position') or abs(position - getattr(self, '_last_emitted_position', 0)) > 0.05:
-                    self._last_emitted_position = position
-                    self.position_updated.emit(position)
-
-                # Check if we've reached the target
-                if self._target_position is not None:
-                    # Check if we're within tolerance of target
-                    if abs(position - self._target_position) < 0.01:
-                        # Position reached
-                        if self.timing_mode and self._last_command_time > 0:
-                            # Log timing event
-                            elapsed = time.time() - self._last_command_time
-                            self.timing_logger.info(
-                                f"MOTOR_POSITION_REACHED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
-
-                        # Store the reached position before clearing target
-                        reached_position = self._target_position
-                        self._target_position = None
-                        self._last_command_time = 0
-                        self.status_changed.emit(
-                            f"Position reached: {position:.2f}mm")
-
-                        # Emit signal for position reached - ensure this signal is defined
-                        if hasattr(self, 'position_reached'):
-                            self.position_reached.emit(reached_position)
-                            self.movement_completed.emit(True)
-
-                    # Also check if we've passed the target (in case we missed the exact point)
-                    elif previous_position is not None:
-                        # If we were approaching target and now we're moving away from it
-                        approaching_before = abs(
-                            previous_position - self._target_position) > abs(position - self._target_position)
-                        # Within 0.5mm
-                        if not approaching_before and abs(position - self._target_position) < 0.5:
-                            # We likely passed the target
-                            if self.timing_mode and self._last_command_time > 0:
-                                elapsed = time.time() - self._last_command_time
-                                self.timing_logger.info(
-                                    f"MOTOR_POSITION_PASSED - Position: {position}mm, Target: {self._target_position}mm, Time: {elapsed:.3f}s")
-
-                            reached_position = self._target_position
-                            self._target_position = None
-                            self._last_command_time = 0
-                            self.status_changed.emit(
-                                f"Position passed: {position:.2f}mm")
-
-                            if hasattr(self, 'position_reached'):
-                                self.position_reached.emit(reached_position)
-                                self.movement_completed.emit(True)
-
-        except Exception as e:
-            self.logger.error(f"Error checking motor status: {e}")
-
-    def _decode_debug_value(self, value):
-        """Decode debug values from register 13."""
-        debug_codes = {
-            0xC0DE: "Calibration command received",
-            0xCAFE: "Calibration started",
-            0xBEEF: "Top position found",
-            0xDEAD: "Calibration timeout"
-        }
-        return debug_codes.get(value, f"Unknown debug code: 0x{value:X}")
-
-    def _read_debug_register(self):
-        """Read the debug register and log its value."""
-        if not self.running or not self.controller:
-            return
-
-        try:
-            # Print a very visible message when reading debug register
-            print("\n" + "="*50)
-            print("ATTEMPTING TO READ DEBUG REGISTER 13")
-            print("="*50 + "\n")
-
-            # Make sure we're using the right controller
-            if hasattr(self.controller, 'instrument') and self.controller.instrument:
-                debug_value = self.controller.instrument.read_register(
-                    13, functioncode=3)
-                print(f"\n>>> DEBUG REGISTER VALUE: 0x{debug_value:X} <<<\n")
-                self.logger.info(f"Debug register value: 0x{debug_value:X}")
-
-                if debug_value != 0:
-                    debug_message = self._decode_debug_value(debug_value)
-                    # Use INFO level instead of DEBUG to ensure visibility
-                    print(f"\n>>> MOTOR DEBUG: {debug_message} <<<\n")
-                    self.logger.info(f"Motor Debug: {debug_message}")
-                    # Reset the register after reading
-                    self.controller.instrument.write_register(13, 0)
-            else:
-                self.logger.warning(
-                    "Controller has no instrument attribute or it's None")
-        except Exception as e:
-            # Use ERROR level to make sure we see any issues
-            print(f"\n>>> ERROR READING DEBUG REGISTER: {e} <<<\n")
-            self.logger.error(f"Failed to read debug register: {e}")
