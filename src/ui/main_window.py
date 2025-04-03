@@ -1863,12 +1863,12 @@ class MainWindow(QMainWindow):
                                                         self.motor_worker.controller.POSITION_MAX}mm?",
                                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
 
-                    if response == QMessageBox.StandardButton.Cancel:
-                        return
-                    target = self.motor_worker.controller.POSITION_MAX
-
-                self.motor_worker.move_to(target)
-                self.logger.info(f"Moving motor to position {target}mm")
+                    if response != QMessageBox.StandardButton.Yes:
+                        return                  
+                    else:
+                        target = self.motor_worker.controller.POSITION_MAX
+                        self.motor_worker.move_to(target)
+                        self.logger.info(f"Moving motor to position {target}mm")
         except ValueError:
             self.handle_error("Invalid target position")
 
