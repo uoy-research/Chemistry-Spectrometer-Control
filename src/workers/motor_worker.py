@@ -329,6 +329,11 @@ class MotorWorker(QThread):
         self._current_position = 0.0
         self._previous_position = 0.0
 
+        # Add position update timer
+        self._position_timer = QTimer()
+        self._position_timer.timeout.connect(self._check_position)
+        self._position_timer.setInterval(int(update_interval * 1000))  # Convert to milliseconds
+
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
         try:
@@ -878,6 +883,9 @@ class MotorWorker(QThread):
                 self.logger.error("Failed to connect to motor controller")
                 return False
 
+            # Start position update timer
+            self._position_timer.start()
+
             # Start the thread regardless of mock/real mode
             super().start()  # Start the QThread
             return True
@@ -923,25 +931,23 @@ class MotorWorker(QThread):
             if self.running:
                 self._running = False
 
-                # Try to stop the motor first
-                try:
-                    self.controller.stop_motor()  # Send stop command to motor
-                    self.logger.info("Motor stop command sent during cleanup")
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to stop motor during cleanup: {e}")
-
-                # Stop position update timer if it exists
-                if hasattr(self, '_position_timer') and self._position_timer is not None:
+                # Stop position update timer
+                if self._position_timer is not None:
                     self._position_timer.stop()
                     self._position_timer = None
 
-                self.controller.stop()  # Stop the controller connection
-                self.wait()  # Wait for thread to finish
+                # Try to stop the motor first
+                try:
+                    self.controller.stop_motor()
+                    self.logger.info("Motor stop command sent during cleanup")
+                except Exception as e:
+                    self.logger.error(f"Failed to stop motor during cleanup: {e}")
+
+                self.controller.stop()
+                self.wait()
 
             with self._instance_lock:
-                MotorWorker._instance_count = max(
-                    0, MotorWorker._instance_count - 1)
+                MotorWorker._instance_count = max(0, MotorWorker._instance_count - 1)
 
             self.logger.info(f"Motor worker {self._instance_id} cleaned up")
 
@@ -1013,3 +1019,20 @@ class MotorWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Failed to set motor acceleration: {e}")
             return False
+
+    def _check_position(self):
+        """Check current motor position and emit updates."""
+        if not self._paused and self.controller.running:
+            try:
+                position = self.controller.get_position()
+                if position is not None:
+                    self._current_position = position
+                    self.position_updated.emit(position)
+
+                    # Check if target position is reached
+                    if self._target_position is not None:
+                        if abs(position - self._target_position) < 0.1:  # Within 0.1mm tolerance
+                            self.position_reached.emit(position)
+                            self._target_position = None
+            except Exception as e:
+                self.logger.error(f"Error checking position: {e}")
