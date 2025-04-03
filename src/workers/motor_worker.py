@@ -359,11 +359,6 @@ class MotorWorker(QThread):
         self.logger.info(f"MotorWorker {self._instance_id} started")
         self.status_changed.emit("Motor worker started")
 
-        # Start the debug timer if in debug mode
-        if self._debug_mode:
-            self._debug_timer.start()
-            self.logger.info("Debug register monitoring started")
-
         # Main worker loop
         while self._running:
             if not self._paused:
