@@ -3130,22 +3130,13 @@ class MainWindow(QMainWindow):
     def _setup_motor_worker(self):
         """Set up the motor worker thread."""
         try:
-            # Get debug mode from command line args
-            debug_mode = hasattr(self.args, 'debug') and self.args.debug
-
-            # Create motor worker with debug mode if enabled
+            # Create motor worker
             self.motor_worker = MotorWorker(
                 port=int(self.config.get('motor', 'port')),
                 update_interval=0.1,
                 mock=(self.config.get('motor', 'mode') == '2'),
                 timing_mode=self.timing_mode,
-                debug_mode=debug_mode
             )
-
-            # Log debug mode status
-            if debug_mode:
-                self.logger.info(
-                    "Motor debug mode enabled - monitoring register 13")
 
             # Connect signals
             self.motor_worker.position_updated.connect(

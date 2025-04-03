@@ -239,7 +239,7 @@ class MotorWorker(QThread):
     _instance_count = 0
     _instance_lock = threading.Lock()  # Add thread safety
 
-    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False, debug_mode: bool = False):
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False):
         """Initialize worker.
 
         Args:
@@ -247,7 +247,6 @@ class MotorWorker(QThread):
             update_interval: Position update interval in seconds (default 0.1)
             mock: Use mock controller for testing
             timing_mode: Enable timing logs for events
-            debug_mode: Enable debug register monitoring
         """
         super().__init__()
         with self._instance_lock:
@@ -325,15 +324,6 @@ class MotorWorker(QThread):
         else:
             self.timing_logger = None
 
-        self._debug_mode = debug_mode
-
-        # Add a dedicated timer for debug register reading
-        if self._debug_mode:
-            self._debug_timer = QTimer()
-            self._debug_timer.timeout.connect(self._read_debug_register)
-            # Read debug register every 500ms
-            self._debug_timer.setInterval(500)
-
         # Initialize target position tracking
         self._target_position = None
         self._current_position = 0.0
@@ -362,7 +352,6 @@ class MotorWorker(QThread):
         # Main worker loop
         while self._running:
             if not self._paused:
-                self._check_motor_status()
                 self._check_command_queue()
 
             # Adaptive sleep based on activity
@@ -372,10 +361,6 @@ class MotorWorker(QThread):
             else:
                 # Active mode - faster updates
                 time.sleep(self._active_update_interval)
-
-        # Clean up
-        if self._debug_mode and hasattr(self, '_debug_timer'):
-            self._debug_timer.stop()
 
         self.logger.info(f"MotorWorker {self._instance_id} stopped")
         self.status_changed.emit("Motor worker stopped")
