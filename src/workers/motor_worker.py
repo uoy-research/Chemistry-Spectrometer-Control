@@ -1022,6 +1022,10 @@ class MotorWorker(QThread):
 
     def _check_position(self):
         """Check current motor position and emit updates."""
+        # Skip position check if updates are paused
+        if self._pause_updates:
+            return
+        
         if not self._paused and self.controller.running:
             try:
                 position = self.controller.get_position()
