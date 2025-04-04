@@ -1843,19 +1843,11 @@ class MainWindow(QMainWindow):
         try:
             target = float(self.target_motor_pos_edit.text())
             if self.motor_worker.running:
-                if self.timing_mode:
-                    self.timing_logger.info(
-                        f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
-
-                if not self.motor_worker.move_to(target):
-                    self.handle_error("Failed to move motor to target")
-                    return
-
                 if target < 0:
                     QMessageBox.warning(self, "Invalid Position",
-                                        "Invalid target position. Position must be non-negative (0 is home position at top).")
+                                        "Invalid target position. Position must be non-negative.")
                     return
-                if target > self.motor_worker.controller.POSITION_MAX:
+                elif target > self.motor_worker.controller.POSITION_MAX:
                     response = QMessageBox.question(self, "Position Limit Exceeded",
                                                     f"Target position {target}mm exceeds maximum allowed position of {
                                                         self.motor_worker.controller.POSITION_MAX}mm.\n\n"
@@ -1869,6 +1861,15 @@ class MainWindow(QMainWindow):
                         target = self.motor_worker.controller.POSITION_MAX
                         self.motor_worker.move_to(target)
                         self.logger.info(f"Moving motor to position {target}mm")
+                        if self.timing_mode:
+                            self.timing_logger.info(
+                                f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
+                else:
+                    self.motor_worker.move_to(target)
+                    self.logger.info(f"Moving motor to position {target}mm")
+                    if self.timing_mode:
+                        self.timing_logger.info(
+                            f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
         except ValueError:
             self.handle_error("Invalid target position")
 
