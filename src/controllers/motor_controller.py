@@ -213,8 +213,8 @@ class MotorController:
     def set_sequence_mode(self, enabled: bool):
         """Enable or disable sequence mode for continuous movement."""
         self._in_sequence = enabled
-        self.logger.info(
-            f"Sequence mode {'enabled' if enabled else 'disabled'}")
+        #self.logger.info(
+        #    f"Sequence mode {'enabled' if enabled else 'disabled'}")
 
     def move_to(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
         """Wrapper for set_position to maintain compatibility."""
@@ -248,8 +248,8 @@ class MotorController:
 
             # Debug output
             self.logger.info(
-                f"Setting position to {position}mm (steps: {position_steps})")
-            self.logger.info(f"High word: {high}, Low word: {low}")
+                f"Setting position to {position}mm")
+            #self.logger.info(f"High word: {high}, Low word: {low}")
 
             # Use command lock for high-priority operations
             with self._command_lock:
@@ -261,8 +261,8 @@ class MotorController:
                         self.instrument.serial.reset_output_buffer()
 
                         # Send all commands in a single batch when possible
-                        self.logger.info(
-                            "Writing registers for command register & position command")
+                        #self.logger.info(
+                        #    "Writing registers for command register & position command")
                         self.instrument.write_registers(
                             2, [ord('x'), high, low])
 
@@ -449,7 +449,7 @@ class MotorController:
     def set_position_offset(self, offset: float):
         """Set the position offset value."""
         self._position_offset = offset
-        self.logger.info(f"Position offset set to {offset}")
+        #self.logger.info(f"Position offset set to {offset}")
         # Update current position with new offset
         if self.running:
             try:
@@ -477,7 +477,7 @@ class MotorController:
 
             # Write speed to register 9
             self.instrument.write_register(9, speed)
-            # self.logger.info(f"Motor speed set to {speed}")
+            self.logger.info(f"Motor speed set to {speed}")
             return True
 
         except Exception as e:
@@ -538,6 +538,7 @@ class MotorController:
 
             # Write acceleration to register 10
             self.instrument.write_register(10, accel)
+            self.logger.info(f"Motor acceleration set to {accel}")
             return True
 
         except Exception as e:
