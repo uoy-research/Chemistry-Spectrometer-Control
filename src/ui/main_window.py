@@ -2819,7 +2819,7 @@ class MainWindow(QMainWindow):
                     self.on_beginSaveButton_clicked(False)
                     self.saving = False
             else:
-                if seq_save_path != self.prev_save_path & seq_save_path != "None":
+                if seq_save_path != self.prev_save_path and seq_save_path != "None":
                     # New save path given, stop saving and restart with new path
                     self.on_beginSaveButton_clicked(
                         False)  # Stop current recording
