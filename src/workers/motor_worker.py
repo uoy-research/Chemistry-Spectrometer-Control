@@ -288,7 +288,7 @@ class MotorWorker(QThread):
 
         # Reduce position polling frequency when idle
         self._idle_update_interval = 0.1  # 100ms when idle
-        self._active_update_interval = 0.01  # 10ms when active
+        self._active_update_interval = 0.05  # 50ms when active
         self._last_command_time = 0
         self._idle_timeout = 5.0  # Switch to idle mode after 5 seconds of no commands
 
@@ -488,8 +488,8 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)
-            self.logger.info(
-                f"Received move command to position: {position}mm")
+            #self.logger.info(
+            #    f"Received move command to position: {position}mm")
             self._pending_position = position
             self._target_position = position  # Make sure target is set
             self._retry_count = 0
@@ -497,8 +497,9 @@ class MotorWorker(QThread):
             # Log timing event when command is sent
             if self.timing_mode:
                 self._last_command_time = time.time()  # Store command time
-                self.timing_logger.info(
-                    f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
+                #self.timing_logger.info(
+                #
+                #    f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
 
             # Add command to queue for real motor
             self._command_queue.put({
@@ -514,7 +515,7 @@ class MotorWorker(QThread):
             return True
         except Exception as e:
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
-            self.logger.error(f"Exception in move_to: {str(e)}")
+            #self.logger.error(f"Exception in move_to: {str(e)}")
             return False
 
     def _try_move(self):
@@ -529,9 +530,9 @@ class MotorWorker(QThread):
             if success:
                 self._target_position = actual_target
                 # Log timing event if target was limited
-                if self.timing_mode and actual_target != self._pending_position:
-                    self.timing_logger.info(
-                        f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
+                #if self.timing_mode and actual_target != self._pending_position:
+                #    self.timing_logger.info(
+                #        f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
                     self.status_changed.emit(
                         f"Moving to limited position: {actual_target}mm")
@@ -541,8 +542,8 @@ class MotorWorker(QThread):
 
         except Exception as e:
             # Log the error and retry
-            self.logger.error(
-                f"Move attempt {self._retry_count + 1} failed: {str(e)}")
+            #self.logger.error(
+            #    f"Move attempt {self._retry_count + 1} failed: {str(e)}")
             self._handle_move_failure(str(e))
 
     def _handle_move_failure(self, error_msg: str = None):

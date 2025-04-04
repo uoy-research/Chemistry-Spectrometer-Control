@@ -1860,13 +1860,13 @@ class MainWindow(QMainWindow):
                     else:
                         target = self.motor_worker.controller.POSITION_MAX
                         self.motor_worker.move_to(target)
-                        self.logger.info(f"Moving motor to position {target}mm")
+                        #self.logger.info(f"Moving motor to position {target}mm")
                         if self.timing_mode:
                             self.timing_logger.info(
                                 f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
                 else:
                     self.motor_worker.move_to(target)
-                    self.logger.info(f"Moving motor to position {target}mm")
+                    #self.logger.info(f"Moving motor to position {target}mm")
                     if self.timing_mode:
                         self.timing_logger.info(
                             f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
@@ -1878,7 +1878,8 @@ class MainWindow(QMainWindow):
         """Handle motor to bottom button click."""
         if self.motor_worker.running:
             if self.motor_worker.to_bottom():
-                self.logger.info("Moving motor to bottom position")
+                pass
+                #self.logger.info("Moving motor to bottom position")
             else:
                 self.handle_error("Failed to move motor to bottom")
 
@@ -1887,7 +1888,8 @@ class MainWindow(QMainWindow):
         """Handle motor to top button click."""
         if self.motor_worker.running:
             if self.motor_worker.to_top():
-                self.logger.info("Moving motor to top position")
+                pass
+                #self.logger.info("Moving motor to top position")
             else:
                 self.handle_error("Failed to move motor to top")
 

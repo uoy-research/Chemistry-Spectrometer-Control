@@ -149,7 +149,7 @@ class MotorController:
         except Exception as e:
             # Reduce logging frequency for repeated errors
             if self._consecutive_errors == 0 or self._consecutive_errors % 5 == 0:
-                self.logger.error(f"Error getting position: {e}")
+                self.logger.error(f"Error getting position")
             self.serial_connected = False
             self._consecutive_errors += 1
             return self._current_position
