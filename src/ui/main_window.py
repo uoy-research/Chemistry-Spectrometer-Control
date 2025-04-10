@@ -2397,9 +2397,8 @@ class MainWindow(QMainWindow):
             return
 
         # Handle motor position if specified
-        if hasattr(step, 'motor_position') and step.motor_position != 0:
-            self.motorTargetSpinBox.setValue(step.motor_position)
-            self.on_motorMoveToTargetButton_clicked()
+        if hasattr(step, 'motor_position') and step.motor_position >= 0:
+            self.motor_worker.move_to(step.motor_position)
 
     def disable_other_valve_controls(self, active_macro_num: int):
         """Disable all valve controls except the active macro button.
