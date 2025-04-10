@@ -11,9 +11,10 @@ const int testCoil = 19;
 const int depressuriseCoil = 18;
 const int resetCoil = 17;
 
-const int SWITCH = 0; const int IN = 1; const int OUT = 2; const int VENT = 3; const int SHORT = 4;
+const int GAS1 = 0; const int GAS2 = 1; const int IN = 2; const int OUT = 3; const int VENT = 4; const int SHORT = 5;
 const int LEDS[] = {32, 34, 36, 38, 40, 42, 44, 46};
 const int VALVES[] = {8, 26, 9, 10, 22, 52, 28, 30};
+//____________________1,  X, 2,  3,  4,  5, 
 const int test_led = 12;
 
 const int valveCoil[] = {0, 1, 2, 3, 4, 5, 6, 7}; //coil addresses for valves
@@ -25,7 +26,7 @@ const int STATUS_LEDS[] = {5, 6, 7, 11, 12, 13, 23, 50};
 const unsigned long pollTime = 500; //default time between pressure readings
 
 //TTL Pins, T4 and T5 not working??
-const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24;
+const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24; const int T6 = 27;
 
 //Analog pins - pressure1 is external
 //pins for Chym setup
@@ -168,6 +169,7 @@ void declarePins(){
     pinMode(T3, INPUT);
     pinMode(T4, INPUT);
     pinMode(T5, INPUT);
+    pinMode(T6, INPUT);
 
     //analog pins as inputs
     pinMode(Pressure1, INPUT);
@@ -204,11 +206,12 @@ void addCoils(){
 void handleTTL(){
   if (simpleTTL == 1){ //simple TTL control, currently unreachable
     //set valves based on TTL inputs
-    setValve(IN, digitalRead(T1));
-    setValve(OUT, digitalRead(T2));
-    setValve(SHORT, digitalRead(T3));
-    setValve(VENT, digitalRead(T4));
-    setValve(SWITCH, digitalRead(T5));
+    setValve(GAS1, digitalRead(T1));
+    setValve(GAS2, digitalRead(T2));
+    setValve(IN, digitalRead(T3));
+    setValve(OUT, digitalRead(T4));
+    setValve(VENT, digitalRead(T5));
+    setValve(SHORT, digitalRead(T6));
   }
   else
   {
@@ -218,7 +221,8 @@ void handleTTL(){
       case 0:
         setValve(IN, 0);
         setValve(OUT, 0);
-        setValve(SWITCH, 0);
+        setValve(GAS1, 0);
+        setValve(GAS2, 0);
         setValve(VENT, 0);
         setValve(SHORT, 0);
         break;
@@ -244,7 +248,8 @@ void reset(){
     for (int i = 0; i < 8; i++) {
         mb.setCoil(valveCoil[i], 0);
     }
-    setValve(SWITCH, 0);
+    setValve(GAS1, 0);
+    setValve(GAS2, 0);
     setValve(IN, 0);
     setValve(OUT, 0);
     setValve(VENT, 0);
@@ -277,7 +282,8 @@ void depressurise(){
     //depressurise the system
     Serial.println("LOG: Depressurising system");
     if(convertToBar(analogRead(Pressure3)) > 0.1){
-        setValve(SWITCH, 0);
+        setValve(GAS1, 0);
+        setValve(GAS2, 0);
         setValve(IN, 0);
         setValve(OUT, 1);
         setValve(VENT, 0);
@@ -293,7 +299,8 @@ void depressurise(){
         setValve(OUT, 0);
     }
     else{
-        setValve(SWITCH, 0);
+        setValve(GAS1, 0);
+        setValve(GAS2, 0);
         setValve(IN, 0);
         setValve(OUT, 0);
         setValve(VENT, 0);
