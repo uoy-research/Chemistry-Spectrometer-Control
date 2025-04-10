@@ -30,6 +30,7 @@ from .widgets.log_widget import LogWidget
 from .dialogs.valve_macro_editor import ValveMacroEditor
 from .dialogs.motor_macro_editor import MotorMacroEditor
 from .dialogs.dev_panel import DevPanel
+from ..utils.config_manager import ConfigManager
 
 
 class Step:
@@ -155,6 +156,8 @@ class MainWindow(QMainWindow):
 
         # Setup timing logger
         self.timing_logger = setup_timing_logger(timing_mode)
+
+        self.config_manager = ConfigManager()
 
     def initialize_control_states(self):
         """Initialize the enabled/disabled states of all controls."""
@@ -2359,62 +2362,44 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(self.steps[0].time_length, self.next_step)
 
     def execute_step(self, step):
-        """Execute a single sequence step."""
-        try:
-            # Check if Arduino worker exists and is running
-            if not self.arduino_worker or not self.arduino_worker.running:
-                raise RuntimeError("Arduino not connected")
+        """Execute a single step in the sequence."""
+        if not step:
+            return
 
-            # Get current valve states first
-            current_valve_states = [0] * 8  # Default to all closed
-            try:
-                # Get current states from Arduino if possible
-                # If not available, use default closed states
-                if hasattr(self.arduino_worker, 'get_valve_states'):
-                    current_valve_states = self.arduino_worker.get_valve_states()
-            except Exception as e:
-                self.logger.warning(f"Could not get current valve states: {e}")
+        if self.arduino_worker and self.arduino_worker.running:
+            # init valve states
+            valve_states = [0] * 8
 
-            # Initialize new valve states with current states
-            valve_states = current_valve_states.copy()
+            # get current valve states
+            valve_states = self.arduino_worker.get_valve_states()
 
-            # Update only the valves that are explicitly set in the step
-            if step.step_type == 'p':  # Pressurize
-                valve_states[1] = 1  # Open inlet valve
-            elif step.step_type == 'v':  # Vent
-                valve_states[3] = 1  # Open vent valve
-            elif step.step_type == 'b':  # Bubble
-                valve_states[2] = 1  # Open inlet valve
-                valve_states[3] = 1  # Open outlet valve
-                valve_states[4] = 1  # Open short valve
-            elif step.step_type == 'f':  # Flow
-                valve_states[2] = 1  # Open outlet valve
-            elif step.step_type == 'e':  # Evacuate
-                valve_states[3] = 1  # Open vent valve
-                valve_states[4] = 1  # Open short valve
-            elif step.step_type == 'c':  # Close valves 3 to 6
-                valve_states[1] = 0
-                valve_states[2] = 0
-                valve_states[3] = 0
-                valve_states[4] = 0
-                valve_states[5] = 0
-            elif step.step_type == 'd':  # Delay
-                # For delay, don't change any valve states
-                pass
+            # Get valve states from configuration
+            config_valve_states = self.config_manager.get_step_valve_states(step.step_type)
+            
+            if config_valve_states is not None:
+                # Update valve states based on configuration
+                for valve_num, state in config_valve_states.items():
+                    if state == 'ignore':
+                        continue  # Skip valves that should maintain their current state
+                    elif state == 'open':
+                        valve_states[valve_num - 1] = 1
+                    elif state == 'close':
+                        valve_states[valve_num - 1] = 0
 
-            # Set valve states
-            self.arduino_worker.set_valves(valve_states)
+                # set valve states
+                self.arduino_worker.set_valves(valve_states)
+            else:
+                # Fallback to default behavior if configuration is not found
+                self.log_widget.append(f"Warning: No configuration found for step type '{step.step_type}'")
+                return
+        else:
+            self.log_widget.append(f"Warning: Arduino not connected")
+            return
 
-            # Move motor if required
-            if self.motor_flag and self.motor_worker and step.motor_position is not None:
-                self.motor_worker.move_to(step.motor_position)
-
-            self.logger.info(f"Executing step: {
-                             self.step_types[step.step_type]}")
-
-        except Exception as e:
-            self.logger.error(f"Error executing step: {e}")
-            self.handle_error("Failed to execute sequence step")
+        # Handle motor position if specified
+        if hasattr(step, 'motor_position') and step.motor_position != 0:
+            self.motorTargetSpinBox.setValue(step.motor_position)
+            self.on_motorMoveToTargetButton_clicked()
 
     def disable_other_valve_controls(self, active_macro_num: int):
         """Disable all valve controls except the active macro button.
