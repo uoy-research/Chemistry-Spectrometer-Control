@@ -691,19 +691,12 @@ class MainWindow(QMainWindow):
         self.savePathEdit.setFont(font)
         monitor_layout.addWidget(self.savePathEdit, 3, 0, 1, 2)
 
-        self.bubbleTimeLabel = QLabel("Bubble Time (s)")
-        font = QFont()
-        font.setPointSize(10)
-        self.bubbleTimeLabel.setFont(font)
-        self.bubbleTimeLabel.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTrailing | Qt.AlignmentFlag.AlignVCenter)
-        monitor_layout.addWidget(self.bubbleTimeLabel, 4, 0, 1, 1)
-
         self.bubbleTimeDoubleSpinBox = QDoubleSpinBox()
         self.bubbleTimeDoubleSpinBox.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTrailing | Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeDoubleSpinBox.setMinimum(0.0)
         self.bubbleTimeDoubleSpinBox.setValue(5.00)
+        self.bubbleTimeDoubleSpinBox.setSuffix(" s")  # Add suffix for seconds
         monitor_layout.addWidget(self.bubbleTimeDoubleSpinBox, 4, 1, 1, 1)
 
         self.quickBubbleButton = QPushButton("Quick Bubble")
@@ -712,15 +705,31 @@ class MainWindow(QMainWindow):
         font.setPointSize(10)
         self.quickBubbleButton.setFont(font)
         self.quickBubbleButton.setCheckable(True)
-        monitor_layout.addWidget(self.quickBubbleButton, 5, 0, 1, 2)
+        monitor_layout.addWidget(self.quickBubbleButton, 4, 0, 1, 1)
 
-        self.switchGasButton = QPushButton("Switch Gas")
-        self.switchGasButton.setMinimumSize(QSize(0, 25))
+        self.switchGas1Button = QPushButton("Switch pH2")
+        self.switchGas1Button.setMinimumSize(QSize(0, 25))
         font = QFont()
         font.setPointSize(10)
-        self.switchGasButton.setFont(font)
-        self.switchGasButton.setCheckable(True)
-        monitor_layout.addWidget(self.switchGasButton, 6, 0, 1, 1)
+        self.switchGas1Button.setFont(font)
+        self.switchGas1Button.setCheckable(True)
+        monitor_layout.addWidget(self.switchGas1Button, 5, 0, 1, 1)
+
+        self.switchGas2Button = QPushButton("Switch H2")
+        self.switchGas2Button.setMinimumSize(QSize(0, 25))
+        font = QFont()
+        font.setPointSize(10)
+        self.switchGas2Button.setFont(font)
+        self.switchGas2Button.setCheckable(True)
+        monitor_layout.addWidget(self.switchGas2Button, 5, 1, 1, 1)
+
+        self.switchGas3Button = QPushButton("Switch N2")
+        self.switchGas3Button.setMinimumSize(QSize(0, 25))
+        font = QFont()
+        font.setPointSize(10)
+        self.switchGas3Button.setFont(font)
+        self.switchGas3Button.setCheckable(True)
+        monitor_layout.addWidget(self.switchGas3Button, 6, 0, 1, 1)
 
         self.buildPressureButton = QPushButton("Build Pressure")
         self.buildPressureButton.setMinimumSize(QSize(0, 25))
@@ -935,7 +944,9 @@ class MainWindow(QMainWindow):
 
                 # Quick action buttons
                 self.quickBubbleButton.clicked.disconnect()
-                self.switchGasButton.clicked.disconnect()
+                self.switchGas1Button.clicked.disconnect()
+                self.switchGas2Button.clicked.disconnect()
+                self.switchGas3Button.clicked.disconnect()
                 self.buildPressureButton.clicked.disconnect()
                 self.quickVentButton.clicked.disconnect()
                 self.slowVentButton.clicked.disconnect()
@@ -985,8 +996,13 @@ class MainWindow(QMainWindow):
             self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
             self.buildPressureButton.clicked.connect(
                 self.on_buildPressureButton_clicked)
-            self.switchGasButton.clicked.connect(
-                self.on_switchGasButton_clicked)
+            self.switchGas1Button.clicked.connect(
+                self.on_switchGas1Button_clicked)
+            self.switchGas2Button.clicked.connect(
+                self.on_switchGas2Button_clicked)
+            self.switchGas3Button.clicked.connect(
+                self.on_switchGas3Button_clicked)
+
 
             # Motor control buttons
             self.motor_connect_btn.clicked.connect(
@@ -1488,7 +1504,7 @@ class MainWindow(QMainWindow):
 
         if checked:
             # Configure valves for quick venting
-            valve_states = [0] * 8  # Initialize all valves closed
+            valve_states = self.arduino_worker.get_valve_states()
             valve_states[1] = 0     # Close inlet (Valve 2)
             valve_states[2] = 1     # Open outlet (Valve 3)
             valve_states[3] = 0     # Open vent (Valve 4)
@@ -1503,8 +1519,13 @@ class MainWindow(QMainWindow):
 
             self.logger.info("Quick vent started")
         else:
-            # Close all valves
-            self.arduino_worker.set_valves([0] * 8)
+            # Close valves 3-6
+            valve_states = self.arduino_worker.get_valve_states()
+            valve_states[2] = 0
+            valve_states[3] = 0
+            valve_states[4] = 0
+            valve_states[5] = 0
+            self.arduino_worker.set_valves(valve_states)
 
             # Update valve button states
             self.Valve4Button.setChecked(False)  # Vent
@@ -1520,19 +1541,28 @@ class MainWindow(QMainWindow):
 
         if checked:
             # Configure valves for slow venting
-            valve_states = [0] * 8  # Initialize all valves closed
+            valve_states = self.arduino_worker.get_valve_states()
             valve_states[1] = 0     # Close inlet (Valve 2)
+            valve_states[2] = 1     # Open outlet (Valve 3)
             valve_states[3] = 1     # Open vent (Valve 4)
+            valve_states[4] = 0     # Close short (Valve 5)
             self.arduino_worker.set_valves(valve_states)
 
             # Update valve button states
             self.Valve2Button.setChecked(False)  # Inlet
+            self.Valve3Button.setChecked(True)  # Outlet
             self.Valve4Button.setChecked(True)   # Vent
+            self.Valve5Button.setChecked(False)   # Short
 
             self.logger.info("Slow vent started")
         else:
-            # Close all valves
-            self.arduino_worker.set_valves([0] * 8)
+            # Close valves 3-6
+            valve_states = self.arduino_worker.get_valve_states()
+            valve_states[2] = 0
+            valve_states[3] = 0
+            valve_states[4] = 0
+            valve_states[5] = 0
+            self.arduino_worker.set_valves(valve_states)
 
             # Update valve button states
             self.Valve4Button.setChecked(False)  # Vent
@@ -1543,23 +1573,58 @@ class MainWindow(QMainWindow):
     def on_buildPressureButton_clicked(self, checked: bool):
         """Handle build pressure button click."""
         if self.arduino_worker.running:
-            valve_states = [0] * 8
+            valve_states = self.arduino_worker.get_valve_states()
             valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
+            valve_states[2] = 0 if checked else 0  # Valve 3 (outlet)
+            valve_states[3] = 0 if checked else 0  # Valve 4 (vent)
+            valve_states[4] = 0 if checked else 0  # Valve 5 (short)
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Pressure build {'started' if checked else 'stopped'}")
 
     @pyqtSlot(bool)
-    def on_switchGasButton_clicked(self, checked: bool):
+    def on_switchGas1Button_clicked(self, checked: bool):
         """Handle switch gas button click."""
         if self.arduino_worker.running:
-            valve_states = [0] * 8
-            valve_states[0] = 1 if checked else 0  # Valve 1 (switch)
+            valve_states = self.arduino_worker.get_valve_states()
+            valve_states[0] = 0 
+            valve_states[1] = 0 
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Gas switch {'started' if checked else 'stopped'}")
+            self.switchGas1Button.setChecked(True)
+            self.switchGas2Button.setChecked(False)
+            self.switchGas3Button.setChecked(False)
+
 
     @pyqtSlot(bool)
+    def on_switchGas2Button_clicked(self, checked: bool):
+        """Handle switch gas button click."""
+        if self.arduino_worker.running:
+            valve_states = self.arduino_worker.get_valve_states()
+            valve_states[0] = 0 
+            valve_states[1] = 1 
+            self.arduino_worker.set_valves(valve_states)
+            self.logger.info(
+                f"Gas switch {'started' if checked else 'stopped'}")
+            self.switchGas1Button.setChecked(False)
+            self.switchGas2Button.setChecked(True)
+            self.switchGas3Button.setChecked(False)
+
+    @pyqtSlot(bool)
+    def on_switchGas3Button_clicked(self, checked: bool):
+        """Handle switch gas button click."""
+        if self.arduino_worker.running:
+            valve_states = self.arduino_worker.get_valve_states()
+            valve_states[0] = 1 
+            valve_states[1] = 1 
+            self.arduino_worker.set_valves(valve_states)
+            self.logger.info(
+                f"Gas switch {'started' if checked else 'stopped'}")
+            self.switchGas1Button.setChecked(False)
+            self.switchGas2Button.setChecked(False)
+            self.switchGas3Button.setChecked(True)
+
     def on_quickBubbleButton_clicked(self, checked: bool):
         """Handle quick bubble button click."""
         if not self.arduino_worker.running:
@@ -1568,9 +1633,11 @@ class MainWindow(QMainWindow):
         if checked:
             duration = self.bubbleTimeDoubleSpinBox.value()
             # Open inlet and outlet valves
-            valve_states = [0] * 8
+            valve_states = self.arduino_worker.get_valve_states()
             valve_states[1] = 1  # Valve 2 (inlet)
             valve_states[2] = 1  # Valve 3 (outlet)
+            valve_states[3] = 1  # Valve 4 (vent)
+            valve_states[4] = 0  # Valve 5 (short)
             self.arduino_worker.set_valves(valve_states)
 
             # Start timer to close valves after duration
@@ -1611,7 +1678,9 @@ class MainWindow(QMainWindow):
 
         # Set enabled state for quick action buttons
         self.quickBubbleButton.setEnabled(enabled)
-        self.switchGasButton.setEnabled(enabled)
+        self.switchGas1Button.setEnabled(enabled)
+        self.switchGas2Button.setEnabled(enabled)
+        self.switchGas3Button.setEnabled(enabled)
         self.buildPressureButton.setEnabled(enabled)
         self.quickVentButton.setEnabled(enabled)
         self.slowVentButton.setEnabled(enabled)
@@ -1623,7 +1692,9 @@ class MainWindow(QMainWindow):
             self.quickVentButton,
             self.slowVentButton,
             self.buildPressureButton,
-            self.switchGasButton,
+            self.switchGas1Button,
+            self.switchGas2Button,
+            self.switchGas3Button,
             self.quickBubbleButton
         ]
 
@@ -2419,7 +2490,9 @@ class MainWindow(QMainWindow):
 
         # Disable quick action buttons
         self.quickBubbleButton.setEnabled(False)
-        self.switchGasButton.setEnabled(False)
+        self.switchGas1Button.setEnabled(False)
+        self.switchGas2Button.setEnabled(False)
+        self.switchGas3Button.setEnabled(False)
         self.buildPressureButton.setEnabled(False)
         self.quickVentButton.setEnabled(False)
         self.slowVentButton.setEnabled(False)
@@ -2440,7 +2513,9 @@ class MainWindow(QMainWindow):
 
             # Enable quick action buttons
             self.quickBubbleButton.setEnabled(True)
-            self.switchGasButton.setEnabled(True)
+            self.switchGas1Button.setEnabled(True)
+            self.switchGas2Button.setEnabled(True)
+            self.switchGas3Button.setEnabled(True)
             self.buildPressureButton.setEnabled(True)
             self.quickVentButton.setEnabled(True)
             self.slowVentButton.setEnabled(True)
@@ -3062,7 +3137,9 @@ class MainWindow(QMainWindow):
 
             # Uncheck quick action buttons
             self.quickBubbleButton.setChecked(False)
-            self.switchGasButton.setChecked(False)
+            self.switchGas1Button.setChecked(False)
+            self.switchGas2Button.setChecked(False)
+            self.switchGas3Button.setChecked(False)
             self.buildPressureButton.setChecked(False)
             self.quickVentButton.setChecked(False)
             self.slowVentButton.setChecked(False)
