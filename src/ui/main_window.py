@@ -30,7 +30,7 @@ from .widgets.log_widget import LogWidget
 from .dialogs.valve_macro_editor import ValveMacroEditor
 from .dialogs.motor_macro_editor import MotorMacroEditor
 from .dialogs.dev_panel import DevPanel
-from ..utils.config_manager import ConfigManager
+from utils.config_manager import ConfigManager
 
 
 class Step:

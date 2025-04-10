@@ -38,29 +38,19 @@ step_types:
     valves:
       1: ignore
       2: ignore
-      3: ignore
-      4: ignore
-      5: ignore
+      3: close
+      4: open
+      5: close
       6: open    # Open vent valve
 
-  flow:
-    type: 'f'
+  quick vent:
+    type: 'q'
     valves:
       1: ignore
       2: ignore
-      3: ignore
-      4: open    # Open outlet valve
-      5: ignore
-      6: ignore
-
-  evacuate:
-    type: 'e'
-    valves:
-      1: ignore
-      2: ignore
-      3: ignore
-      4: ignore
-      5: open    # Open short valve
+      3: close
+      4: open
+      5: close   # Open short valve
       6: open    # Open vent valve
 
   close:
@@ -82,3 +72,44 @@ step_types:
       4: ignore
       5: ignore
       6: ignore 
+  
+  default:
+    type: 'f'
+    valves:
+      1: ignore
+      2: ignore
+      3: close
+      4: close
+      5: close
+      6: close
+
+  set gas ph2:
+    type: 'g'
+    valves:
+      1: close
+      2: close
+      3: ignore
+      4: ignore
+      5: ignore
+      6: ignore
+
+  set gas h2:
+    type: 'h'
+    valves:
+      1: close
+      2: open
+      3: ignore
+      4: ignore
+      5: ignore
+      6: ignore
+
+  set gas n2:
+    type: 'n'
+    valves:
+      1: open
+      2: close
+      3: ignore
+      4: ignore
+      5: ignore
+      6: ignore
+
