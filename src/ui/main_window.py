@@ -994,6 +994,7 @@ class MainWindow(QMainWindow):
             self.quickBubbleButton.clicked.connect(
                 self.on_quickBubbleButton_clicked)
             self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
+            self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
             self.buildPressureButton.clicked.connect(
                 self.on_buildPressureButton_clicked)
             self.switchGas1Button.clicked.connect(
@@ -1505,17 +1506,16 @@ class MainWindow(QMainWindow):
         if checked:
             # Configure valves for quick venting
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[1] = 0     # Close inlet (Valve 2)
-            valve_states[2] = 1     # Open outlet (Valve 3)
-            valve_states[3] = 0     # Open vent (Valve 4)
-            valve_states[4] = 1     # Open short (Valve 5)
+            valve_states[2] = 0     # Close inlet (Valve 3)
+            valve_states[3] = 1     # Open outlet (Valve 4)
+            valve_states[4] = 0     # Close vent (Valve 5)
+            valve_states[5] = 1     # Open short (Valve 6)
             self.arduino_worker.set_valves(valve_states)
 
-            # Update valve button states
-            self.Valve2Button.setChecked(False)  # Inlet
-            self.Valve3Button.setChecked(True)  # Outlet
-            self.Valve4Button.setChecked(False)   # Vent
-            self.Valve5Button.setChecked(True)   # Short
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
             self.logger.info("Quick vent started")
         else:
@@ -1527,9 +1527,10 @@ class MainWindow(QMainWindow):
             valve_states[5] = 0
             self.arduino_worker.set_valves(valve_states)
 
-            # Update valve button states
-            self.Valve4Button.setChecked(False)  # Vent
-            self.Valve5Button.setChecked(False)  # Short
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
             self.logger.info("Quick vent stopped")
 
@@ -1542,17 +1543,16 @@ class MainWindow(QMainWindow):
         if checked:
             # Configure valves for slow venting
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[1] = 0     # Close inlet (Valve 2)
-            valve_states[2] = 1     # Open outlet (Valve 3)
-            valve_states[3] = 1     # Open vent (Valve 4)
-            valve_states[4] = 0     # Close short (Valve 5)
+            valve_states[2] = 0     # Close inlet (Valve 3)
+            valve_states[3] = 1     # Open outlet (Valve 4)
+            valve_states[4] = 1     # Open vent (Valve 5)
+            valve_states[5] = 0     # Close short (Valve 6)
             self.arduino_worker.set_valves(valve_states)
 
-            # Update valve button states
-            self.Valve2Button.setChecked(False)  # Inlet
-            self.Valve3Button.setChecked(True)  # Outlet
-            self.Valve4Button.setChecked(True)   # Vent
-            self.Valve5Button.setChecked(False)   # Short
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
             self.logger.info("Slow vent started")
         else:
@@ -1564,8 +1564,10 @@ class MainWindow(QMainWindow):
             valve_states[5] = 0
             self.arduino_worker.set_valves(valve_states)
 
-            # Update valve button states
-            self.Valve4Button.setChecked(False)  # Vent
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
             self.logger.info("Slow vent stopped")
 
@@ -1574,13 +1576,18 @@ class MainWindow(QMainWindow):
         """Handle build pressure button click."""
         if self.arduino_worker.running:
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[1] = 1 if checked else 0  # Valve 2 (inlet)
-            valve_states[2] = 0 if checked else 0  # Valve 3 (outlet)
-            valve_states[3] = 0 if checked else 0  # Valve 4 (vent)
-            valve_states[4] = 0 if checked else 0  # Valve 5 (short)
+
+            valve_states[2] = 1 if checked else 0  # Valve 3 (inlet)
+            valve_states[3] = 0 if checked else 0  # Valve 4 (outlet)
+            valve_states[4] = 0 if checked else 0  # Valve 5 (vent)
+            valve_states[5] = 0 if checked else 0  # Valve 6 (short)
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Pressure build {'started' if checked else 'stopped'}")
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
     @pyqtSlot(bool)
     def on_switchGas1Button_clicked(self, checked: bool):
@@ -1595,6 +1602,10 @@ class MainWindow(QMainWindow):
             self.switchGas1Button.setChecked(True)
             self.switchGas2Button.setChecked(False)
             self.switchGas3Button.setChecked(False)
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
 
     @pyqtSlot(bool)
@@ -1610,6 +1621,10 @@ class MainWindow(QMainWindow):
             self.switchGas1Button.setChecked(False)
             self.switchGas2Button.setChecked(True)
             self.switchGas3Button.setChecked(False)
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
     @pyqtSlot(bool)
     def on_switchGas3Button_clicked(self, checked: bool):
@@ -1624,6 +1639,10 @@ class MainWindow(QMainWindow):
             self.switchGas1Button.setChecked(False)
             self.switchGas2Button.setChecked(False)
             self.switchGas3Button.setChecked(True)
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
 
     def on_quickBubbleButton_clicked(self, checked: bool):
         """Handle quick bubble button click."""
@@ -1634,15 +1653,19 @@ class MainWindow(QMainWindow):
             duration = self.bubbleTimeDoubleSpinBox.value()
             # Open inlet and outlet valves
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[1] = 1  # Valve 2 (inlet)
-            valve_states[2] = 1  # Valve 3 (outlet)
-            valve_states[3] = 1  # Valve 4 (vent)
-            valve_states[4] = 0  # Valve 5 (short)
+            valve_states[2] = 1  # Valve 2 (inlet)
+            valve_states[3] = 1  # Valve 3 (outlet)
+            valve_states[4] = 1  # Valve 4 (vent)
+            valve_states[5] = 0  # Valve 5 (short)
             self.arduino_worker.set_valves(valve_states)
 
             # Start timer to close valves after duration
             QTimer.singleShot(int(duration * 1000), self.stop_bubble)
             self.logger.info(f"Quick bubble started for {duration}s")
+            # Update valve button states to reflect macro settings
+            for i in range(6):
+                valve_button = getattr(self, f"Valve{i+1}Button")
+                valve_button.setChecked(bool(valve_states[i]))
         else:
             self.stop_bubble()
 
