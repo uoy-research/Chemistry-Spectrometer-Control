@@ -1851,13 +1851,6 @@ class MainWindow(QMainWindow):
                         # Set valve mode
                         self.set_valve_mode(mode)
 
-                        # If in automatic mode, start looking for sequence file after a delay
-                        if mode == 1:
-                            if self.motor_worker and self.motor_worker.running:
-                                self.motor_worker.set_sequence_mode(True)
-                                self.logger.info("Motor set to sequence mode")
-                            self.start_sequence_monitoring()  # Use new method instead of QTimer.singleShot
-
                         self.logger.info(
                             f"Connected to Arduino in mode {mode}")
                         
@@ -1906,6 +1899,12 @@ class MainWindow(QMainWindow):
         """Check if Arduino is connected and update device status if it is."""
         if self.arduino_worker and self.arduino_worker.running:
             self.update_device_status()
+            # If in automatic mode and connection is confirmed, start sequence monitoring
+            if self.arduino_auto_connect_radio.isChecked():
+                if self.motor_worker and self.motor_worker.running:
+                    self.motor_worker.set_sequence_mode(True)
+                    self.logger.info("Motor set to sequence mode")
+                self.start_sequence_monitoring()
             if hasattr(self, 'connection_check_timer'):
                 self.connection_check_timer.stop()
                 self.connection_check_timer.deleteLater()
