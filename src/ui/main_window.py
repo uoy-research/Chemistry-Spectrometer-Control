@@ -1817,7 +1817,8 @@ class MainWindow(QMainWindow):
                 # Create new worker instance
                 self.arduino_worker = ArduinoWorker(
                     port=self.arduino_port_spin.value(),
-                    mock=self.test_mode
+                    mock=self.test_mode,
+                    mode=mode
                 )
 
                 # Connect the readings signal to plot widget

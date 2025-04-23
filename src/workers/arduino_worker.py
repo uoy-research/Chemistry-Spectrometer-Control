@@ -109,7 +109,7 @@ class ArduinoWorker(QThread):
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
 
-    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False):
+    def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, mode: int = 0):
         """Initialize worker.
 
         Args:
@@ -121,11 +121,10 @@ class ArduinoWorker(QThread):
 
         self.port = port
         self.update_interval = update_interval
-        self.mode = 0  # Add mode tracking to worker
         if mock:
             self.controller = MockArduinoController(port=port)
         else:
-            self.controller = ArduinoController(port=port, verbose=True)
+            self.controller = ArduinoController(port=port, verbose=True, mode=mode)
 
         self._running = False
         self._paused = False
@@ -142,9 +141,6 @@ class ArduinoWorker(QThread):
         """
         self.logger.info("Starting Arduino worker thread...")
         if not self._running:
-            # Set worker mode to match controller mode
-            if self.controller:
-                self.mode = self.controller.mode  # Sync mode with controller
             super().start()
             return True
         return False
