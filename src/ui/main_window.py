@@ -2504,10 +2504,10 @@ class MainWindow(QMainWindow):
                 self.arduino_worker.set_valves(valve_states)
             else:
                 # Fallback to default behavior if configuration is not found
-                self.log_widget.append(f"Warning: No configuration found for step type '{step.step_type}'")
+                self.log_widget.add_message(f"Warning: No configuration found for step type '{step.step_type}'", logging.WARNING)
                 return
         else:
-            self.log_widget.append(f"Warning: Arduino not connected")
+            self.log_widget.add_message(f"Warning: Arduino not connected", logging.WARNING)
             return
 
         # Handle motor position if specified
