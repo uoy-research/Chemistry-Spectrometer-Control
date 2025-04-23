@@ -126,6 +126,7 @@ class ArduinoWorker(QThread):
         else:
             self.controller = ArduinoController(port=port, verbose=True, mode=mode)
 
+        self.mode = mode
         self._running = False
         self._paused = False
         self._valve_queue = []

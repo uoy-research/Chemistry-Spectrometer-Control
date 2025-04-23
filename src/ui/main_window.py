@@ -1769,6 +1769,10 @@ class MainWindow(QMainWindow):
                 try:
                     # Stop all timers first
                     self.cleanup_file_timer()
+                    if hasattr(self, 'connection_check_timer'):
+                        self.connection_check_timer.stop()
+                        self.connection_check_timer.deleteLater()
+                        delattr(self, 'connection_check_timer')
 
                     # Stop recording if it's active before disconnecting
                     if self.saving:
@@ -1827,8 +1831,6 @@ class MainWindow(QMainWindow):
 
                 # Set mode and start worker
                 if self.arduino_worker.controller:
-                    self.arduino_worker.controller.mode = mode
-                    self.arduino_worker.mode = mode  # Also set mode on worker
                     success = self.arduino_worker.start()
 
                     # Modified success check to handle test mode
@@ -1847,7 +1849,7 @@ class MainWindow(QMainWindow):
                             self.disable_quick_controls(True)
 
                         # Set valve mode
-                        self.set_valve_mode(mode == 1)
+                        self.set_valve_mode(mode)
 
                         # If in automatic mode, start looking for sequence file after a delay
                         if mode == 1:
@@ -1858,8 +1860,13 @@ class MainWindow(QMainWindow):
 
                         self.logger.info(
                             f"Connected to Arduino in mode {mode}")
-                        # Always update status after connection attempt in both real and test modes
-                        self.update_device_status()
+                        
+                        # Create a timer to check connection status and update device status
+                        self.connection_check_timer = QTimer()
+                        self.connection_check_timer.setSingleShot(True)
+                        self.connection_check_timer.timeout.connect(self._check_connection_and_update)
+                        self.connection_check_timer.start(1000)  # Check every second
+                        
                     else:
                         self.arduino_worker = None  # Clear failed worker
                         self.handle_error("Failed to connect to Arduino")
@@ -1894,6 +1901,19 @@ class MainWindow(QMainWindow):
                 self.arduino_warning_label.setText(
                     "Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
+
+    def _check_connection_and_update(self):
+        """Check if Arduino is connected and update device status if it is."""
+        if self.arduino_worker and self.arduino_worker.running:
+            self.update_device_status()
+            if hasattr(self, 'connection_check_timer'):
+                self.connection_check_timer.stop()
+                self.connection_check_timer.deleteLater()
+                delattr(self, 'connection_check_timer')
+        else:
+            # If not connected yet, check again in a second
+            if hasattr(self, 'connection_check_timer'):
+                self.connection_check_timer.start(1000)
 
     @pyqtSlot()
     def on_motorCalibrateButton_clicked(self):
