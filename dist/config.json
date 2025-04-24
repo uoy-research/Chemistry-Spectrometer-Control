@@ -1,0 +1,10 @@
+{
+    "arduino_port": 1,
+    "motor_port": 1,
+    "macro_file": "macros.json",
+    "log_level": "INFO",
+    "update_interval": 100,
+    "max_data_points": 1000,
+    "motor_update_interval": 0.1,
+    "dev_password": "DanT"
+}

@@ -7,14 +7,62 @@ block_cipher = None
 # Collect all submodules automatically
 hidden_imports = collect_submodules('src')
 hidden_imports.extend([
+    # UI packages
     'PyQt6',
     'PyQt6.QtCore',
     'PyQt6.QtGui',
     'PyQt6.QtWidgets',
+    'PyQt6.sip',
+    
+    # Data processing & visualization
     'numpy',
     'pyqtgraph',
+    'matplotlib',
+    'matplotlib.backends.backend_qtagg',  # Main Qt backend with AGG rendering
+    'matplotlib.backends.backend_qt',     # Base Qt backend
+    'matplotlib.backends.qt_compat',      # Qt compatibility layer
+    'matplotlib.backends.backend_agg',    # AGG rendering backend
+    'matplotlib.figure',
+    'matplotlib.cm',
+    'matplotlib.colors',
+    'matplotlib.dates',
+    'matplotlib.pyplot',
+    
+    # Hardware communication
     'serial',
-    'minimalmodbus'
+    'minimalmodbus',
+    
+    # Data formats & parsing
+    'yaml',
+    'PyYAML',
+    '_yaml',
+    'yaml.loader',
+    'yaml.dumper',
+    'yaml.reader',
+    'yaml.scanner',
+    'yaml.parser',
+    'yaml.composer',
+    'yaml.constructor',
+    'yaml.resolver',
+    'yaml.emitter',
+    'yaml.serializer',
+    'yaml.representer',
+    
+    # Other common dependencies
+    'pkg_resources.py2_warn',
+    'packaging',
+    'packaging.version',
+    'packaging.specifiers',
+    'packaging.requirements',
+    'appdirs',
+    'importlib_metadata',
+    'cycler',
+    'kiwisolver',
+    'PIL',
+    'PIL._imagingft',
+    'PIL._imagingtk',
+    'PIL._imaging',
+    'PIL._webp'
 ])
 
 # Define external data files
@@ -37,6 +85,9 @@ datas = [
     ('chem.ico', '.'),
 ]
 
+# Add matplotlib data files
+datas += collect_data_files('matplotlib')
+
 # Add external files if they exist
 for src, dst in external_files:
     if os.path.exists(src):
@@ -48,10 +99,10 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
-    hookspath=[],
+    hookspath=['hooks'],
     hooksconfig={},
-    runtime_hooks=[],
-    excludes=['tests', '__pycache__', 'PyQt6.uic.port_v2', 'PyQt6.uic.port_v3'],
+    runtime_hooks=['hooks/rthook_matplotlib.py'],
+    excludes=['tests', '__pycache__', 'PyQt6.uic.port_v2', 'PyQt6.uic.port_v3', 'PyQt5', 'PyQt5.QtCore', 'PyQt5.QtGui', 'PyQt5.QtWidgets', 'PyQt5.sip'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

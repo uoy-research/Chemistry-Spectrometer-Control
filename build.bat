@@ -1,5 +1,13 @@
 @echo off
-echo Starting build process...
+echo Starting build process with virtual environment...
+
+REM Check if python is available
+where python >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Error: Python not found in PATH
+    pause
+    exit /b 1
+)
 
 REM Check if icon exists
 if not exist chem.ico (
@@ -7,6 +15,30 @@ if not exist chem.ico (
     pause
     exit /b 1
 )
+
+REM Create and activate virtual environment
+echo Creating build virtual environment...
+if exist venv rmdir /s /q venv
+python -m venv venv
+call venv\Scripts\activate
+
+REM Install required packages in virtual environment
+echo Installing required packages...
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pip install pyinstaller matplotlib PyYAML pyyaml-include pillow cycler kiwisolver packaging fonttools contourpy
+
+REM Create temp script to copy matplotlib data files
+echo import matplotlib, os, shutil > temp_mpl.py
+echo source = os.path.join(os.path.dirname(matplotlib.__file__), 'mpl-data') >> temp_mpl.py
+echo dest = os.path.join('hooks', 'matplotlib-data-files') >> temp_mpl.py
+echo if os.path.exists(dest): shutil.rmtree(dest) >> temp_mpl.py
+echo shutil.copytree(source, dest) >> temp_mpl.py
+echo print(f'Matplotlib data files copied from {source} to {dest}') >> temp_mpl.py
+
+REM Run the temp script to copy matplotlib data files
+python temp_mpl.py
+del temp_mpl.py
 
 echo Checking C:\ssbubble directory...
 if not exist C:\ssbubble (
@@ -25,7 +57,12 @@ mkdir dist\SSBubble\data 2>nul
 echo Building SSBubble...
 pyinstaller --clean SSBubble.spec --log-level DEBUG
 
-if errorlevel 1 (
+set BUILD_STATUS=%errorlevel%
+
+REM Deactivate virtual environment
+call deactivate
+
+if %BUILD_STATUS% neq 0 (
     echo Build failed! Check the error messages above.
     pause
     exit /b 1
@@ -65,4 +102,5 @@ SSBubble.exe
 cd ..\..
 
 echo Build process complete.
+echo You can remove the venv directory if you don't need it anymore.
 pause 

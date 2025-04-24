@@ -58,7 +58,8 @@ class PlotWidget(QWidget):
         # Add legend with fixed position in top left
         self.ax.legend(
             loc='upper left',  # Position in upper left
-            bbox_to_anchor=(0.02, 0.98),  # Fine-tune the position (x=0.02, y=0.98)
+            # Fine-tune the position (x=0.02, y=0.98)
+            bbox_to_anchor=(0.02, 0.98),
             ncol=2,  # Arrange in 2 columns
             fontsize='small',  # Smaller font size
             framealpha=0.8,  # Slight transparency
@@ -110,9 +111,10 @@ class PlotWidget(QWidget):
         """Update plot with new readings and save if recording."""
         if readings is None:
             return
-        
+
         # Add comprehensive debug logging
-        self.logger.debug(f"Update plot called - recording={self.recording}, has_writer={self.csv_writer is not None}")
+        self.logger.debug(
+            f"Update plot called - recording={self.recording}, has_writer={self.csv_writer is not None}")
         self.logger.debug(f"Readings received: {readings}")
 
         current_time = time.time() - self.start_time
@@ -132,7 +134,8 @@ class PlotWidget(QWidget):
             except Exception as e:
                 self.logger.error(f"Error writing data: {e}")
                 # Add detailed error info
-                self.logger.error(f"CSV writer state: recording={self.recording}, writer={self.csv_writer}, file={self.save_file}")
+                self.logger.error(
+                    f"CSV writer state: recording={self.recording}, writer={self.csv_writer}, file={self.save_file}")
 
         # Remove old data points
         if len(self.times) > self.max_points:
@@ -185,7 +188,7 @@ class PlotWidget(QWidget):
         """Export plot data to CSV file."""
         try:
             from PyQt6.QtWidgets import QFileDialog
-            
+
             # Get save location
             filename, _ = QFileDialog.getSaveFileName(
                 self,
@@ -193,18 +196,20 @@ class PlotWidget(QWidget):
                 "",
                 "CSV Files (*.csv)"
             )
-            
+
             if filename:
                 with open(filename, 'w', newline='') as f:
                     writer = csv.writer(f)
                     # Write header
-                    writer.writerow(['Time', 'Sensor1', 'Sensor2', 'Sensor3', 'Sensor4'])
-                    
+                    writer.writerow(
+                        ['Time', 'Sensor1', 'Sensor2', 'Sensor3', 'Sensor4'])
+
                     # Write data rows
                     for i in range(len(self.times)):
-                        row = [self.times[i]] + [self.pressures[j][i] for j in range(4)]
+                        row = [self.times[i]] + [self.pressures[j][i]
+                                                 for j in range(4)]
                         writer.writerow(row)
-                        
+
                 self.logger.info(f"Data exported to {filename}")
 
         except Exception as e:
@@ -218,43 +223,47 @@ class PlotWidget(QWidget):
         """Start recording data to CSV file."""
         try:
             self.logger.info(f"Attempting to start recording to {filepath}")
-            
+
             # Check if already recording to the same file
             if self.recording and self.save_file and self.save_file.name == filepath:
-                self.logger.info("Already recording to the same file - continuing")
+                self.logger.info(
+                    "Already recording to the same file - continuing")
                 return True
-            
+
             # Check if already recording to a different file
             if self.recording:
-                self.logger.warning("Already recording to a different file - stopping current recording")
+                self.logger.warning(
+                    "Already recording to a different file - stopping current recording")
                 self.stop_recording()
             else:
                 self.start_time = time.time()  # Reset start time for recording
-            
+
             # Verify file path
             if not filepath:
                 self.logger.error("Empty file path provided")
                 return False
-            
+
             self.save_file = open(filepath, 'w', newline='')
             self.csv_writer = csv.writer(self.save_file)
-            
+
             # Write header
             header = ['Time', 'Rig', 'Inlet', 'Tube', 'Outlet']
             self.logger.debug(f"Writing CSV header: {header}")
             self.csv_writer.writerow(header)
-            
+
             self.recording = True
             # Do not reset start_time here to maintain time continuity across sequences
-            
+
             # Verify recording state
-            self.logger.info(f"Recording started successfully - recording={self.recording}, has_writer={self.csv_writer is not None}")
+            self.logger.info(
+                f"Recording started successfully - recording={self.recording}, has_writer={self.csv_writer is not None}")
             return True
-        
+
         except Exception as e:
             self.logger.error(f"Failed to start recording: {e}")
             # Add error state info
-            self.logger.error(f"Error state: recording={getattr(self, 'recording', None)}, writer={getattr(self, 'csv_writer', None)}")
+            self.logger.error(
+                f"Error state: recording={getattr(self, 'recording', None)}, writer={getattr(self, 'csv_writer', None)}")
             return False
 
     def stop_recording(self):
@@ -275,7 +284,7 @@ class PlotWidget(QWidget):
 
     def clear_plot(self, reset_time=False):
         """Clear all plot data and optionally reset the time.
-        
+
         Args:
             reset_time: If True, resets the start_time. Default is False to maintain time continuity.
         """
@@ -283,19 +292,19 @@ class PlotWidget(QWidget):
             # Clear data arrays
             self.times = np.array([])
             self.pressures = [np.array([]) for _ in range(4)]
-            
+
             # Only reset start time if explicitly requested
             if reset_time:
                 self.start_time = time.time()
                 self.logger.info("Plot time was reset")
-            
+
             # Clear line data
             for line in self.lines:
                 line.set_data([], [])
-            
+
             # Force redraw
             self.canvas.draw()
             self.logger.info("Plot data cleared")
-            
+
         except Exception as e:
             self.logger.error(f"Error clearing plot: {e}")

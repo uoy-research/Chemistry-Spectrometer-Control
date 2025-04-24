@@ -5,7 +5,6 @@ src/controllers/arduino_controller.py
 src/controllers/motor_controller.py
 src/models/__init__.py
 src/models/step.py
-src/models/valve_macro.py
 src/ssbubble.egg-info/PKG-INFO
 src/ssbubble.egg-info/SOURCES.txt
 src/ssbubble.egg-info/dependency_links.txt
@@ -15,13 +14,17 @@ src/ssbubble.egg-info/top_level.txt
 src/ui/__init__.py
 src/ui/main_window.py
 src/ui/dialogs/__init__.py
-src/ui/dialogs/macro_editor.py
+src/ui/dialogs/dev_panel.py
+src/ui/dialogs/motor_macro_editor.py
+src/ui/dialogs/valve_macro_editor.py
 src/ui/widgets/__init__.py
 src/ui/widgets/log_widget.py
 src/ui/widgets/plot_widget.py
 src/utils/__init__.py
 src/utils/config.py
+src/utils/config_manager.py
 src/utils/logger.py
+src/utils/timing_logger.py
 src/workers/__init__.py
 src/workers/arduino_worker.py
 src/workers/motor_worker.py
