@@ -1,5 +1,7 @@
 import os
 import yaml
+import sys
+import logging
 from typing import Dict, Optional, Literal
 
 ValveState = Literal['open', 'close', 'ignore']
@@ -9,8 +11,31 @@ class ConfigManager:
     Manages configuration settings for the application.
     """
     def __init__(self):
-        self.config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
+        # Setup logging
+        self.logger = logging.getLogger(__name__)
+        
+        # Get the base directory (where the executable is located)
+        if getattr(sys, 'frozen', False):
+            # If the application is run as a bundle (executable)
+            self.base_dir = os.path.dirname(sys.executable)
+            self.logger.info("Running as executable, base directory: %s", self.base_dir)
+        else:
+            # If the application is run from a Python interpreter
+            self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            self.logger.info("Running from Python interpreter, base directory: %s", self.base_dir)
+        
+        # Look for config in the executable directory first
+        self.config_dir = os.path.join(self.base_dir, 'config')
         self.valve_config_path = os.path.join(self.config_dir, 'valve_config.yaml')
+        self.logger.info("Looking for valve config at: %s", self.valve_config_path)
+        
+        # If not found, try the src/config directory
+        if not os.path.exists(self.valve_config_path):
+            self.logger.warning("Valve config not found in executable directory")
+            self.config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
+            self.valve_config_path = os.path.join(self.config_dir, 'valve_config.yaml')
+            self.logger.info("Looking for valve config in source directory: %s", self.valve_config_path)
+        
         self.valve_config = self._load_valve_config()
 
     def _load_valve_config(self) -> Dict:
@@ -20,14 +45,18 @@ class ConfigManager:
         try:
             if not os.path.exists(self.config_dir):
                 os.makedirs(self.config_dir)
+                self.logger.info("Created config directory: %s", self.config_dir)
             
             if not os.path.exists(self.valve_config_path):
+                self.logger.error("Valve configuration file not found at: %s", self.valve_config_path)
                 return {}
 
             with open(self.valve_config_path, 'r') as f:
-                return yaml.safe_load(f)
+                config = yaml.safe_load(f)
+                self.logger.info("Successfully loaded valve configuration from: %s", self.valve_config_path)
+                return config
         except Exception as e:
-            print(f"Error loading valve configuration: {e}")
+            self.logger.error("Error loading valve configuration: %s", str(e))
             return {}
 
     def _validate_valve_state(self, state: str) -> bool:
@@ -62,6 +91,7 @@ class ConfigManager:
             )
             
             if step_config is None:
+                self.logger.warning("No configuration found for step type: %s", step_type)
                 return None
                 
             valves = step_config.get('valves', {})
@@ -69,16 +99,19 @@ class ConfigManager:
             # Validate all valve states
             for valve_num, state in valves.items():
                 if not self._validate_valve_state(state):
-                    print(f"Warning: Invalid valve state '{state}' for valve {valve_num} in step type {step_type}")
+                    self.logger.error("Invalid valve state '%s' for valve %s in step type %s", 
+                                    state, valve_num, step_type)
                     return None
-                    
+            
+            self.logger.debug("Retrieved valve states for step type %s: %s", step_type, valves)
             return valves
         except Exception as e:
-            print(f"Error getting valve states for step type {step_type}: {e}")
+            self.logger.error("Error getting valve states for step type %s: %s", step_type, str(e))
             return None
 
     def reload_config(self):
         """
         Reload configuration from files.
         """
+        self.logger.info("Reloading valve configuration...")
         self.valve_config = self._load_valve_config() 

@@ -70,6 +70,7 @@ if %BUILD_STATUS% neq 0 (
 
 echo Copying configuration files...
 xcopy /y /i config\*.json dist\SSBubble\config\ 2>nul
+xcopy /y /i config\*.yaml dist\SSBubble\config\ 2>nul
 
 REM Copy macro files to C:\ssbubble if they don't exist there
 if exist valve_macro_data.json (

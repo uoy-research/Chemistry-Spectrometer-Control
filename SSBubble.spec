@@ -74,6 +74,7 @@ external_files = [
 # Add any existing files
 datas = [
     ('config/*', 'config/'),
+    ('config/valve_config.yaml', 'config/'),
     ('src/controllers/*.py', 'src/controllers/'),
     ('src/models/*.py', 'src/models/'),
     ('src/ui/*.py', 'src/ui/'),
