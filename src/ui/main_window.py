@@ -54,13 +54,17 @@ class MainWindow(QMainWindow):
     """
 
     step_types = {
-        'd': 'Delay',
-        'p': 'Pressurize',
-        'v': 'Vent',
+        'w': 'Wait',
+        'f': 'Default',
+        'v': 'Slow Vent',
         'b': 'Bubble',
-        'f': 'Flow',
-        'e': 'Evacuate',
-        'c': 'Close'
+        'd': 'Close All',
+        'p': 'Pressurise',
+        'c': 'Cleanup',
+        'q': 'Quick Vent',
+        'g': 'Set Gas pH2',
+        'h': 'Set Gas H2',
+        'n': 'Set Gas N2',
     }
 
     def __init__(self, test_mode=False, keep_sequence=False, timing_mode=False, args=None):
@@ -2512,7 +2516,10 @@ class MainWindow(QMainWindow):
 
         # Handle motor position if specified
         if hasattr(step, 'motor_position') and step.motor_position >= 0:
-            self.motor_worker.move_to(step.motor_position)
+            if self.motor_flag:
+                self.motor_worker.move_to(step.motor_position)
+            else:
+                self.logger.info("Skipping motor movement - motor not required for this sequence")
 
     def disable_other_valve_controls(self, active_macro_num: int):
         """Disable all valve controls except the active macro button.
@@ -2860,7 +2867,11 @@ class MainWindow(QMainWindow):
                 if any(pos is not None and pos < 0 for pos in motor_positions):
                     self.logger.error("Motor positions must be non-negative")
                     return False
-                if any(pos is not None for pos in motor_positions):
+                # Check if all non-None positions are equal to 364.40
+                if all(pos is None or pos == 364.40 for pos in motor_positions):
+                    self.motor_flag = False
+                    self.logger.info("Motor not required - all positions are at maximum (364.40)")
+                elif any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
             except ValueError:
                 self.logger.error(

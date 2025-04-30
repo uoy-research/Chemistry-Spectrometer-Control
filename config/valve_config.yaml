@@ -63,8 +63,8 @@ step_types:
       5: close
       6: close
 
-  delay:
-    type: 'd'
+  wait:
+    type: 'w'
     valves:
       1: ignore
       2: ignore
