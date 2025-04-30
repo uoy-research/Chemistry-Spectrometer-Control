@@ -2868,9 +2868,20 @@ class MainWindow(QMainWindow):
                     self.logger.error("Motor positions must be non-negative")
                     return False
                 # Check if all non-None positions are equal to 364.40
-                if all(pos is None or pos == 364.40 for pos in motor_positions):
-                    self.motor_flag = False
-                    self.logger.info("Motor not required - all positions are at maximum (364.40)")
+                if all(pos is None or abs(pos - 364.40) < 0.01 for pos in motor_positions):
+                    # If motor is not connected, it's not required
+                    if not self.motor_worker or not self.motor_worker.running:
+                        self.motor_flag = False
+                        self.logger.info("Motor not required - not connected and all positions are at maximum (364.40)")
+                    else:
+                        # Check current position
+                        current_pos = self.motor_worker.get_current_position()
+                        if abs(current_pos - 364.40) < 0.01:
+                            self.motor_flag = False
+                            self.logger.info("Motor not required - already at maximum position (364.40)")
+                        else:
+                            self.motor_flag = True
+                            self.logger.info("Motor required - needs to move to maximum position (364.40)")
                 elif any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
             except ValueError:
