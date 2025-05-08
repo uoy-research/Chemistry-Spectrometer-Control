@@ -126,8 +126,22 @@ class DevPanel(QDialog):
 
         self.setLayout(main_layout)
 
+    def check_motor_connection(self) -> bool:
+        """Check if motor is connected and running.
+        
+        Returns:
+            bool: True if motor is connected and running, False otherwise
+        """
+        if not self.parent.motor_worker or not self.parent.motor_worker.running:
+            self.parent.logger.error("Please connect the motor before using developer controls")
+            return False
+        return True
+
     def step_motor(self, step_char: str):
         """Step the motor by sending step command."""
+        if not self.check_motor_connection():
+            return
+            
         if self.parent.motor_worker.step_motor(step_char):
             self.parent.logger.info(f"Sent motor step command: {step_char}")
         else:
@@ -135,11 +149,18 @@ class DevPanel(QDialog):
 
     def toggle_motor_limits(self, enabled: bool):
         """Toggle motor limits."""
+        if not self.check_motor_connection():
+            self.limits_checkbox.setChecked(not enabled)  # Revert checkbox state
+            return
+            
         self.parent.motor_worker.set_limits_enabled(enabled)
         self.parent.logger.info(f"Motor limits {'enabled' if enabled else 'disabled'}")
 
     def set_motor_speed(self):
         """Set the motor speed."""
+        if not self.check_motor_connection():
+            return
+            
         speed = self.speed_spinbox.value()
         if self.parent.motor_worker.set_speed(speed):
             self.parent.logger.info(f"Motor speed set to {speed}")
@@ -155,6 +176,9 @@ class DevPanel(QDialog):
 
     def set_motor_accel(self):
         """Set the motor acceleration."""
+        if not self.check_motor_connection():
+            return
+            
         accel = self.accel_spinbox.value()
         if self.parent.motor_worker.set_acceleration(accel):
             self.parent.logger.info(f"Motor acceleration set to {accel}")
@@ -171,6 +195,10 @@ class DevPanel(QDialog):
     def closeEvent(self, event):
         """Re-enable motor limits and reset speed/acceleration when panel is closed."""
         try:
+            if not self.check_motor_connection():
+                super().closeEvent(event)
+                return
+                
             # Reset motor limits
             self.limits_checkbox.setChecked(True)  # Reset checkbox
             self.parent.motor_worker.set_limits_enabled(True)  # Force enable limits
