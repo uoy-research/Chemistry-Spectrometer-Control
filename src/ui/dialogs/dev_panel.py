@@ -150,7 +150,10 @@ class DevPanel(QDialog):
     def toggle_motor_limits(self, enabled: bool):
         """Toggle motor limits."""
         if not self.check_motor_connection():
+            # Block signals while resetting checkbox to prevent recursion
+            self.limits_checkbox.blockSignals(True)
             self.limits_checkbox.setChecked(not enabled)  # Revert checkbox state
+            self.limits_checkbox.blockSignals(False)
             return
             
         self.parent.motor_worker.set_limits_enabled(enabled)
