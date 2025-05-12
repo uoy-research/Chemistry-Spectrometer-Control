@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
     QPushButton, QComboBox, QLabel, QFileDialog
 )
-from PyQt6.QtCore import Qt, QDateTime, QRect
+from PyQt6.QtCore import Qt, QDateTime, QRect, pyqtSignal
 from PyQt6.QtGui import QTextCursor, QColor, QTextCharFormat, QFont
 import logging
 from typing import Dict, Optional
@@ -27,9 +27,10 @@ class LogHandler(logging.Handler):
         )
 
     def emit(self, record):
-        """Emit log record to widget."""
+        """Emit log record to widget using Qt signal for thread safety."""
         msg = self.format(record)
-        self.widget.add_message(msg, record.levelno)
+        # Use signal to ensure thread safety
+        self.widget.log_signal.emit(msg, record.levelno)
 
 
 class LogWidget(QWidget):
@@ -50,6 +51,8 @@ class LogWidget(QWidget):
         logging.CRITICAL: QColor(139, 0, 0)     # Dark Red
     }
 
+    log_signal = pyqtSignal(str, int)  # message, level
+
     def __init__(self, max_lines: int = 1000):
         """Initialize log widget."""
         super().__init__()
@@ -60,6 +63,7 @@ class LogWidget(QWidget):
 
         self.setup_ui()
         self.setup_logging()
+        self.log_signal.connect(self.add_message)  # Connect signal to slot
 
     def setup_ui(self):
         """Setup user interface."""
