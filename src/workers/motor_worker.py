@@ -226,6 +226,7 @@ class MotorWorker(QThread):
         status_changed(str): Emitted when worker status changes
         calibration_state_changed(bool): Emitted when motor calibration state changes
         position_reached(float): Emitted when motor position reaches a target
+        critical_error_occurred(str): Emitted when a critical error occurs
     """
 
     position_updated = pyqtSignal(float)
@@ -234,6 +235,7 @@ class MotorWorker(QThread):
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
     position_reached = pyqtSignal(float)  # Ensure this signal is defined
+    critical_error_occurred = pyqtSignal(str)  # New signal for critical errors
 
     # Class variables
     _instance_count = 0
@@ -332,7 +334,8 @@ class MotorWorker(QThread):
         # Add position update timer
         self._position_timer = QTimer()
         self._position_timer.timeout.connect(self._check_position)
-        self._position_timer.setInterval(int(update_interval * 1000))  # Convert to milliseconds
+        self._position_timer.setInterval(
+            int(update_interval * 1000))  # Convert to milliseconds
 
     def __del__(self):
         """Ensure instance count is decremented on deletion."""
@@ -488,7 +491,7 @@ class MotorWorker(QThread):
 
         try:
             position = float(position)
-            #self.logger.info(
+            # self.logger.info(
             #    f"Received move command to position: {position}mm")
             self._pending_position = position
             self._target_position = position  # Make sure target is set
@@ -497,7 +500,7 @@ class MotorWorker(QThread):
             # Log timing event when command is sent
             if self.timing_mode:
                 self._last_command_time = time.time()  # Store command time
-                #self.timing_logger.info(
+                # self.timing_logger.info(
                 #
                 #    f"MOTOR_COMMAND_SENT - Target Position: {position}mm")
 
@@ -515,7 +518,7 @@ class MotorWorker(QThread):
             return True
         except Exception as e:
             self.error_occurred.emit(f"Failed to move motor: {str(e)}")
-            #self.logger.error(f"Exception in move_to: {str(e)}")
+            # self.logger.error(f"Exception in move_to: {str(e)}")
             return False
 
     def _try_move(self):
@@ -530,7 +533,7 @@ class MotorWorker(QThread):
             if success:
                 self._target_position = actual_target
                 # Log timing event if target was limited
-                #if self.timing_mode and actual_target != self._pending_position:
+                # if self.timing_mode and actual_target != self._pending_position:
                 #    self.timing_logger.info(
                 #        f"MOTOR_COMMAND_LIMITED - Original: {self._pending_position}mm, Limited To: {actual_target}mm")
                 if actual_target != self._pending_position:
@@ -542,7 +545,7 @@ class MotorWorker(QThread):
 
         except Exception as e:
             # Log the error and retry
-            #self.logger.error(
+            # self.logger.error(
             #    f"Move attempt {self._retry_count + 1} failed: {str(e)}")
             self._handle_move_failure(str(e))
 
@@ -942,13 +945,15 @@ class MotorWorker(QThread):
                     self.controller.stop_motor()
                     self.logger.info("Motor stop command sent during cleanup")
                 except Exception as e:
-                    self.logger.error(f"Failed to stop motor during cleanup: {e}")
+                    self.logger.error(
+                        f"Failed to stop motor during cleanup: {e}")
 
                 self.controller.stop()
                 self.wait()
 
             with self._instance_lock:
-                MotorWorker._instance_count = max(0, MotorWorker._instance_count - 1)
+                MotorWorker._instance_count = max(
+                    0, MotorWorker._instance_count - 1)
 
             self.logger.info(f"Motor worker {self._instance_id} cleaned up")
 
@@ -1026,7 +1031,7 @@ class MotorWorker(QThread):
         # Skip position check if updates are paused
         if self._pause_updates:
             return
-        
+
         if not self._paused and self.controller.running:
             try:
                 position = self.controller.get_position()
@@ -1040,4 +1045,10 @@ class MotorWorker(QThread):
                             self.position_reached.emit(position)
                             self._target_position = None
             except Exception as e:
-                self.logger.error(f"Error checking position: {e}")
+                # Check for critical error from controller
+                if isinstance(e, MotorController.MotorCriticalError):
+                    self.logger.critical(f"Critical motor error: {e}")
+                    self.critical_error_occurred.emit(str(e))
+                    self.stop()
+                else:
+                    self.logger.error(f"Error checking position: {e}")

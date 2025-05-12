@@ -19,6 +19,9 @@ class MotorController:
     POSITION_MIN = 0.0     # Home position (top)
     STEPS_PER_MM = 6400.0
 
+    class MotorCriticalError(Exception):
+        pass
+
     def __init__(self, port: int, address: int = 11, verbose: bool = False, mode: int = 1):
         self.port = f"COM{port}"
         self.address = address
@@ -138,12 +141,12 @@ class MotorController:
                 self._current_position = position
 
                 self._consecutive_errors = 0
-                
+
                 # Only log position changes greater than threshold to reduce log volume
                 if not hasattr(self, '_last_logged_position') or abs(position - getattr(self, '_last_logged_position', 0)) > 0.5:
                     self._last_logged_position = position
                     # self.logger.debug(f"Position: {position}mm")  # Comment out frequent position logging
-                
+
                 return float(position)
 
         except Exception as e:
@@ -152,6 +155,11 @@ class MotorController:
                 self.logger.error(f"Error getting position")
             self.serial_connected = False
             self._consecutive_errors += 1
+            if self._consecutive_errors > self._max_consecutive_errors:
+                self.logger.critical(
+                    "Too many consecutive motor errors, raising MotorCriticalError.")
+                raise MotorController.MotorCriticalError(
+                    "Too many consecutive errors reading motor position.")
             return self._current_position
 
     def start_calibration(self) -> bool:
@@ -213,7 +221,7 @@ class MotorController:
     def set_sequence_mode(self, enabled: bool):
         """Enable or disable sequence mode for continuous movement."""
         self._in_sequence = enabled
-        #self.logger.info(
+        # self.logger.info(
         #    f"Sequence mode {'enabled' if enabled else 'disabled'}")
 
     def move_to(self, position: Union[int, float], wait: bool = False) -> Tuple[bool, float]:
@@ -249,7 +257,7 @@ class MotorController:
             # Debug output
             self.logger.info(
                 f"Setting position to {position}mm")
-            #self.logger.info(f"High word: {high}, Low word: {low}")
+            # self.logger.info(f"High word: {high}, Low word: {low}")
 
             # Use command lock for high-priority operations
             with self._command_lock:
@@ -261,7 +269,7 @@ class MotorController:
                         self.instrument.serial.reset_output_buffer()
 
                         # Send all commands in a single batch when possible
-                        #self.logger.info(
+                        # self.logger.info(
                         #    "Writing registers for command register & position command")
                         self.instrument.write_registers(
                             2, [ord('x'), high, low])
@@ -297,17 +305,22 @@ class MotorController:
                 max_retries = 10
                 for attempt in range(max_retries):
                     try:
-                        self.logger.info(f"Stop command attempt {attempt + 1}.")
-                        self.instrument.write_register(2, ord('e'))  # Send stop command
+                        self.logger.info(
+                            f"Stop command attempt {attempt + 1}.")
+                        self.instrument.write_register(
+                            2, ord('e'))  # Send stop command
                         self.serial_connected = True
-                        self.logger.info("Motor stop command sent successfully")
+                        self.logger.info(
+                            "Motor stop command sent successfully")
                         return True
                     except Exception as e:
-                        self.logger.error(f"Failed to send stop command on attempt {attempt + 1}: {e}")
+                        self.logger.error(
+                            f"Failed to send stop command on attempt {attempt + 1}: {e}")
                         if attempt == max_retries - 1:  # Last attempt
                             self.serial_connected = False
                             return False
-                        self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
+                        self.logger.warning(
+                            f"Stop attempt {attempt + 1} failed, retrying...")
                         time.sleep(0.1)  # Short delay between retries
 
                 return False
@@ -449,7 +462,7 @@ class MotorController:
     def set_position_offset(self, offset: float):
         """Set the position offset value."""
         self._position_offset = offset
-        #self.logger.info(f"Position offset set to {offset}")
+        # self.logger.info(f"Position offset set to {offset}")
         # Update current position with new offset
         if self.running:
             try:
@@ -583,14 +596,17 @@ class MotorController:
 
                 for attempt in range(max_retries):
                     try:
-                        self.logger.info(f"Attempting to stop motor, attempt {attempt + 1}.")
+                        self.logger.info(
+                            f"Attempting to stop motor, attempt {attempt + 1}.")
                         if self.controller.stop_motor():
                             success = True
                             break
                         else:
-                            self.logger.warning(f"Stop attempt {attempt + 1} failed, retrying...")
+                            self.logger.warning(
+                                f"Stop attempt {attempt + 1} failed, retrying...")
                     except Exception as e:
-                        self.logger.error(f"Error during stop attempt {attempt + 1}: {e}")
+                        self.logger.error(
+                            f"Error during stop attempt {attempt + 1}: {e}")
                         if attempt == max_retries - 1:  # Last attempt
                             raise
                     time.sleep(0.1)  # Short delay between retries
@@ -603,8 +619,10 @@ class MotorController:
                     self._is_calibrated = False
                     self.calibration_state_changed.emit(False)
                 else:
-                    self.error_occurred.emit(f"Emergency stop failed after {max_retries} attempts")
-                    self.logger.error(f"Emergency stop failed after {max_retries} attempts")
+                    self.error_occurred.emit(
+                        f"Emergency stop failed after {max_retries} attempts")
+                    self.logger.error(
+                        f"Emergency stop failed after {max_retries} attempts")
 
         except Exception as e:
             self.error_occurred.emit(f"Emergency stop failed: {str(e)}")

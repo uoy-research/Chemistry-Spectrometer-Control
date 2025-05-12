@@ -998,7 +998,8 @@ class MainWindow(QMainWindow):
             self.quickBubbleButton.clicked.connect(
                 self.on_quickBubbleButton_clicked)
             self.slowVentButton.clicked.connect(self.on_slowVentButton_clicked)
-            self.quickVentButton.clicked.connect(self.on_quickVentButton_clicked)
+            self.quickVentButton.clicked.connect(
+                self.on_quickVentButton_clicked)
             self.buildPressureButton.clicked.connect(
                 self.on_buildPressureButton_clicked)
             self.switchGas1Button.clicked.connect(
@@ -1007,7 +1008,6 @@ class MainWindow(QMainWindow):
                 self.on_switchGas2Button_clicked)
             self.switchGas3Button.clicked.connect(
                 self.on_switchGas3Button_clicked)
-
 
             # Motor control buttons
             self.motor_connect_btn.clicked.connect(
@@ -1055,6 +1055,8 @@ class MainWindow(QMainWindow):
                     self._update_motor_status)
                 self.motor_worker.calibration_state_changed.connect(
                     self._update_calibration_state)
+                self.motor_worker.critical_error_occurred.connect(
+                    self.handle_critical_motor_error)
 
                 # Make sure position_reached signal is connected
                 if hasattr(self.motor_worker, 'position_reached'):
@@ -1598,8 +1600,8 @@ class MainWindow(QMainWindow):
         """Handle switch gas button click."""
         if self.arduino_worker.running:
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[0] = 0 
-            valve_states[1] = 0 
+            valve_states[0] = 0
+            valve_states[1] = 0
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Gas switch {'started' if checked else 'stopped'}")
@@ -1611,14 +1613,13 @@ class MainWindow(QMainWindow):
                 valve_button = getattr(self, f"Valve{i+1}Button")
                 valve_button.setChecked(bool(valve_states[i]))
 
-
     @pyqtSlot(bool)
     def on_switchGas2Button_clicked(self, checked: bool):
         """Handle switch gas button click."""
         if self.arduino_worker.running:
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[0] = 0 
-            valve_states[1] = 1 
+            valve_states[0] = 0
+            valve_states[1] = 1
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Gas switch {'started' if checked else 'stopped'}")
@@ -1635,8 +1636,8 @@ class MainWindow(QMainWindow):
         """Handle switch gas button click."""
         if self.arduino_worker.running:
             valve_states = self.arduino_worker.get_valve_states()
-            valve_states[0] = 1 
-            valve_states[1] = 1 
+            valve_states[0] = 1
+            valve_states[1] = 1
             self.arduino_worker.set_valves(valve_states)
             self.logger.info(
                 f"Gas switch {'started' if checked else 'stopped'}")
@@ -1857,13 +1858,15 @@ class MainWindow(QMainWindow):
 
                         self.logger.info(
                             f"Connected to Arduino in mode {mode}")
-                        
+
                         # Create a timer to check connection status and update device status
                         self.connection_check_timer = QTimer()
                         self.connection_check_timer.setSingleShot(True)
-                        self.connection_check_timer.timeout.connect(self._check_connection_and_update)
-                        self.connection_check_timer.start(1000)  # Check every second
-                        
+                        self.connection_check_timer.timeout.connect(
+                            self._check_connection_and_update)
+                        self.connection_check_timer.start(
+                            1000)  # Check every second
+
                     else:
                         self.arduino_worker = None  # Clear failed worker
                         self.handle_error("Failed to connect to Arduino")
@@ -1977,17 +1980,17 @@ class MainWindow(QMainWindow):
                                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
 
                     if response != QMessageBox.StandardButton.Yes:
-                        return                  
+                        return
                     else:
                         target = self.motor_worker.controller.POSITION_MAX
                         self.motor_worker.move_to(target)
-                        #self.logger.info(f"Moving motor to position {target}mm")
+                        # self.logger.info(f"Moving motor to position {target}mm")
                         if self.timing_mode:
                             self.timing_logger.info(
                                 f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
                 else:
                     self.motor_worker.move_to(target)
-                    #self.logger.info(f"Moving motor to position {target}mm")
+                    # self.logger.info(f"Moving motor to position {target}mm")
                     if self.timing_mode:
                         self.timing_logger.info(
                             f"MOTOR_COMMAND_SENT - Target Position: {target}mm")
@@ -2000,7 +2003,7 @@ class MainWindow(QMainWindow):
         if self.motor_worker.running:
             if self.motor_worker.to_bottom():
                 pass
-                #self.logger.info("Moving motor to bottom position")
+                # self.logger.info("Moving motor to bottom position")
             else:
                 self.handle_error("Failed to move motor to bottom")
 
@@ -2010,7 +2013,7 @@ class MainWindow(QMainWindow):
         if self.motor_worker.running:
             if self.motor_worker.to_top():
                 pass
-                #self.logger.info("Moving motor to top position")
+                # self.logger.info("Moving motor to top position")
             else:
                 self.handle_error("Failed to move motor to top")
 
@@ -2492,8 +2495,9 @@ class MainWindow(QMainWindow):
             valve_states = self.arduino_worker.get_valve_states()
 
             # Get valve states from configuration
-            config_valve_states = self.config_manager.get_step_valve_states(step.step_type)
-            
+            config_valve_states = self.config_manager.get_step_valve_states(
+                step.step_type)
+
             if config_valve_states is not None:
                 # Update valve states based on configuration
                 for valve_num, state in config_valve_states.items():
@@ -2508,10 +2512,12 @@ class MainWindow(QMainWindow):
                 self.arduino_worker.set_valves(valve_states)
             else:
                 # Fallback to default behavior if configuration is not found
-                self.log_widget.add_message(f"Warning: No configuration found for step type '{step.step_type}'", logging.WARNING)
+                self.log_widget.add_message(
+                    f"Warning: No configuration found for step type '{step.step_type}'", logging.WARNING)
                 return
         else:
-            self.log_widget.add_message(f"Warning: Arduino not connected", logging.WARNING)
+            self.log_widget.add_message(
+                f"Warning: Arduino not connected", logging.WARNING)
             return
 
         # Handle motor position if specified
@@ -2519,7 +2525,8 @@ class MainWindow(QMainWindow):
             if self.motor_flag:
                 self.motor_worker.move_to(step.motor_position)
             else:
-                self.logger.info("Skipping motor movement - motor not required for this sequence")
+                self.logger.info(
+                    "Skipping motor movement - motor not required for this sequence")
 
     def disable_other_valve_controls(self, active_macro_num: int):
         """Disable all valve controls except the active macro button.
@@ -2872,16 +2879,19 @@ class MainWindow(QMainWindow):
                     # If motor is not connected, it's not required
                     if not self.motor_worker or not self.motor_worker.running:
                         self.motor_flag = False
-                        self.logger.info("Motor not required - not connected and all positions are at maximum (364.40)")
+                        self.logger.info(
+                            "Motor not required - not connected and all positions are at maximum (364.40)")
                     else:
                         # Check current position
                         current_pos = self.motor_worker.get_current_position()
                         if abs(current_pos - 364.40) < 0.01:
                             self.motor_flag = False
-                            self.logger.info("Motor not required - already at maximum position (364.40)")
+                            self.logger.info(
+                                "Motor not required - already at maximum position (364.40)")
                         else:
                             self.motor_flag = True
-                            self.logger.info("Motor required - needs to move to maximum position (364.40)")
+                            self.logger.info(
+                                "Motor required - needs to move to maximum position (364.40)")
                 elif any(pos is not None for pos in motor_positions):
                     self.motor_flag = True
             except ValueError:
@@ -3312,3 +3322,23 @@ class MainWindow(QMainWindow):
                 "15-minute timeout reached - stopping data recording")
             self.on_beginSaveButton_clicked(False)
             self.saving = False
+
+    def handle_critical_motor_error(self, message: str):
+        """Handle critical motor errors by stopping the sequence, cleaning up, and alerting the user."""
+        self.logger.critical(f"Critical motor error: {message}")
+        # Stop any running sequence
+        try:
+            if hasattr(self, 'step_timer') and self.step_timer:
+                self.step_timer.stop()
+        except Exception:
+            pass
+        # Clean up motor worker
+        try:
+            self.cleanup_motor_worker()
+        except Exception:
+            pass
+        # Show critical error dialog
+        QMessageBox.critical(self, "Critical Motor Error",
+                             f"A critical error occurred with the motor and the sequence has been stopped.\n\nError: {message}")
+        # Optionally, update UI to reflect stopped state
+        self.update_device_status()
