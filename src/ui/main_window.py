@@ -3169,7 +3169,7 @@ class MainWindow(QMainWindow):
             timing_mode=self.timing_mode  # Pass timing mode to worker
         )
         self.setup_connections()
-        self.logger.info(f"Motor port updated to COM{port}")
+        #self.logger.info(f"Motor port updated to COM{port}")
 
     def start_sequence_monitoring(self):
         """Start sequence file monitoring after delay."""

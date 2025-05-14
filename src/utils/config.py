@@ -118,6 +118,6 @@ class Config:
             config_path = self.get_config_dir() / CONFIG_FILE
             with open(config_path, 'w') as f:
                 json.dump(data, f, indent=4)
-                logging.info(f"Saved configuration to {config_path}")
+                #logging.info(f"Saved configuration to {config_path}")
         except Exception as e:
             logging.error(f"Error saving config: {e}")
