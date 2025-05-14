@@ -2407,7 +2407,7 @@ class MainWindow(QMainWindow):
         """Internal method to execute sequence after any delay."""
         try:
             # Clear plot before starting new sequence
-            self.plot_widget.clear_plot()
+            # self.plot_widget.clear_plot()
 
             # Only start recording if not already recording
             if self.saving and not self.plot_widget.recording:
