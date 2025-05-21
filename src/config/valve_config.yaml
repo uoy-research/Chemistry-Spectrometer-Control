@@ -1,0 +1,67 @@
+macros:
+  macro_1:
+    label: awdawd
+    timer: 1.0
+    valves:
+    - Ignore
+    - Ignore
+    - Closed
+    - Open
+    - Closed
+    - Open
+    - Closed
+    - Closed
+  macro_2:
+    label: awdawdawd
+    timer: 1.5
+    valves:
+    - Ignore
+    - Ignore
+    - Open
+    - Closed
+    - Open
+    - Closed
+    - Closed
+    - Closed
+  macro_3:
+    label: Valve Macro 3
+    timer: 0.9
+    valves:
+    - Ignore
+    - Ignore
+    - Open
+    - Closed
+    - Closed
+    - Open
+    - Closed
+    - Closed
+  macro_4:
+    label: Valve Macro 4
+    timer: 1.0
+    valves:
+    - Ignore
+    - Ignore
+    - Open
+    - Open
+    - Open
+    - Open
+    - Closed
+    - Closed
+  motor_macro_1:
+    label: wdawd
+    position: 400
+  motor_macro_2:
+    label: Motor Macro 2
+    position: 45
+  motor_macro_3:
+    label: Motor Macro 3
+    position: 364
+  motor_macro_4:
+    label: Motor Macro 4
+    position: 73
+  motor_macro_5:
+    label: Motor Macro 5
+    position: 57
+  motor_macro_6:
+    label: Motor Macro 6
+    position: 4

@@ -2699,9 +2699,40 @@ class MainWindow(QMainWindow):
         sender = self.sender()
         if sender.text() == "Valve Macros":
             editor = ValveMacroEditor(self)
+            # Connect the macro_updated signal
+            editor.macro_updated.connect(self.update_macro_labels)
         else:  # Motor Macros
             editor = MotorMacroEditor(self)
+            # Connect the macro_updated signal
+            editor.macro_updated.connect(self.update_macro_labels)
         editor.exec()
+
+    def update_macro_labels(self):
+        """Update macro button labels from JSON files using only the Label field."""
+        try:
+            # Load valve macro labels
+            valve_json_path = Path("C:/ssbubble/valve_macro_data.json")
+            if valve_json_path.exists():
+                with open(valve_json_path, 'r') as f:
+                    valve_data = json.load(f)
+                    for i, macro in enumerate(valve_data):
+                        if i < 4:  # Only update first 4 valve macros
+                            button = getattr(self, f"valveMacro{i+1}Button")
+                            button.setText(macro.get("Label", f"Macro {i+1}"))
+
+            # Load motor macro labels
+            motor_json_path = Path("C:/ssbubble/motor_macro_data.json")
+            if motor_json_path.exists():
+                with open(motor_json_path, 'r') as f:
+                    motor_data = json.load(f)
+                    for i, macro in enumerate(motor_data):
+                        if i < 6:  # Only update first 6 motor macros
+                            button = getattr(self, f"motor_macro{i+1}_button")
+                            button.setText(macro.get("Label", f"Macro {i+1}"))
+
+            # self.logger.info("Macro labels updated (Label field only)")
+        except Exception as e:
+            self.logger.error(f"Error updating macro labels: {e}")
 
     def move_motor(self):
         """Move motor to specified position."""

@@ -1,9 +1,13 @@
 from PyQt6 import QtWidgets, QtCore
 import json
 from pathlib import Path
+from utils.config_manager import ConfigManager
 
 
 class ValveMacroEditor(QtWidgets.QDialog):
+    # Add signal for macro updates
+    macro_updated = QtCore.pyqtSignal()
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -115,10 +119,15 @@ class ValveMacroEditor(QtWidgets.QDialog):
         with open(json_path, 'w') as f:
             json.dump(data, f, indent=4)
 
-        # Update the main window's buttons with the new labels
-        for i in range(4):
-            macro_data = data[i]
-            button = getattr(self.parent, f'valveMacro{i+1}Button')
-            button.setText(macro_data['Label'])
+        # Also update the config YAML
+        config_manager = ConfigManager()
+        for i, macro in enumerate(data):
+            # Macro numbers are 1-based
+            config_manager.update_valve_macro(i+1, macro)
+        config_manager.save_config()
 
+        # Emit signal that macros were updated BEFORE closing
+        self.macro_updated.emit()
+
+        # Call parent's closeEvent last
         super().closeEvent(event)
