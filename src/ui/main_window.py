@@ -1957,6 +1957,14 @@ class MainWindow(QMainWindow):
             if self.motor_worker and self.motor_worker.running:
                 self.motor_worker.emergency_stop()
                 self.logger.info("Motor stopped by user")
+
+            # If Arduino is running and in auto mode, disconnect it
+            if self.arduino_worker and self.arduino_worker.running:
+                # Check for auto or ttl mode arduino
+                if (hasattr(self.arduino_worker, 'mode') and (self.arduino_worker.mode == 1 or self.arduino_worker.mode == 2)):
+                    self.logger.info(
+                        "Auto or TTL mode active: disconnecting Arduino after motor stop.")
+                    self.on_ardConnectButton_clicked()
         except Exception as e:
             self.logger.error(f"Error stopping motor: {e}")
             self.handle_error("Failed to stop motor")
