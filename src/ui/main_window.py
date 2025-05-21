@@ -1770,8 +1770,10 @@ class MainWindow(QMainWindow):
     def on_ardConnectButton_clicked(self):
         """Handle Arduino connect button click."""
         try:
+            self.logger.info("Arduino connect/disconnect button clicked.")
             # Check if we're disconnecting
             if self.arduino_worker and self.arduino_worker.running:
+                self.logger.info("Disconnecting Arduino worker...")
                 try:
                     # Stop all timers first
                     self.cleanup_file_timer()
@@ -1814,13 +1816,18 @@ class MainWindow(QMainWindow):
                     self.arduino_auto_connect_radio.setEnabled(True)
                     self.arduino_ttl_radio.setEnabled(True)
                     self.arduino_manual_radio.setEnabled(True)
+                    self.logger.info(
+                        "Arduino mode radio buttons enabled after disconnect.")
                     return
                 except Exception as e:
                     self.logger.error(f"Error disconnecting Arduino: {str(e)}")
+                    QMessageBox.critical(
+                        self, "Arduino Disconnect Error", str(e))
                     return
 
             # Create new Arduino worker when connecting
             try:
+                self.logger.info("Attempting to connect Arduino worker...")
                 # Determine connection mode
                 if self.arduino_auto_connect_radio.isChecked():
                     mode = 1  # Auto mode
@@ -1828,6 +1835,17 @@ class MainWindow(QMainWindow):
                     mode = 2  # TTL mode
                 else:
                     mode = 0  # Manual mode
+                self.logger.info(f"Arduino connection mode selected: {mode}")
+
+                # Defensive: ensure no old worker exists
+                if self.arduino_worker is not None:
+                    self.logger.warning(
+                        "Old Arduino worker still exists before connect. Forcing cleanup.")
+                    try:
+                        self.arduino_worker.stop()
+                    except Exception:
+                        pass
+                    self.arduino_worker = None
 
                 # Create new worker instance
                 self.arduino_worker = ArduinoWorker(
@@ -1835,6 +1853,7 @@ class MainWindow(QMainWindow):
                     mock=self.test_mode,
                     mode=mode
                 )
+                self.logger.info("ArduinoWorker instance created.")
 
                 # Connect the readings signal to plot widget
                 self.arduino_worker.readings_updated.connect(
@@ -1843,6 +1862,8 @@ class MainWindow(QMainWindow):
                 # Set mode and start worker
                 if self.arduino_worker.controller:
                     success = self.arduino_worker.start()
+                    self.logger.info(
+                        f"Arduino worker start() returned: {success}")
 
                     # Modified success check to handle test mode
                     if success or self.test_mode:
@@ -1854,6 +1875,8 @@ class MainWindow(QMainWindow):
                         self.arduino_auto_connect_radio.setEnabled(False)
                         self.arduino_ttl_radio.setEnabled(False)
                         self.arduino_manual_radio.setEnabled(False)
+                        self.logger.info(
+                            "Arduino mode radio buttons disabled after connect.")
 
                         # Enable/disable controls based on mode
                         if mode == 0:  # Manual mode
@@ -1892,6 +1915,9 @@ class MainWindow(QMainWindow):
 
             except Exception as e:
                 self.arduino_worker = None  # Clear failed worker
+                self.logger.error(
+                    f"Exception during Arduino connect: {str(e)}")
+                QMessageBox.critical(self, "Arduino Connect Error", str(e))
                 self.handle_error(f"Failed to connect to Arduino: {str(e)}")
                 self.arduino_connect_btn.setText("Connect")
                 if not self.test_mode:
@@ -1905,6 +1931,7 @@ class MainWindow(QMainWindow):
             if self.arduino_worker:
                 self.arduino_worker.stop()
                 self.arduino_worker = None
+            QMessageBox.critical(self, "Arduino Connection Error", str(e))
             self.handle_error(
                 "An unexpected error occurred while connecting to Arduino")
             self.arduino_connect_btn.setText("Connect")
