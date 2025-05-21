@@ -1809,6 +1809,11 @@ class MainWindow(QMainWindow):
                     self.set_valve_mode(False)
                     self.logger.info("Disconnected from Arduino")
                     self.update_device_status()  # Update after disconnect
+
+                    # Enable the mode radio buttons after disconnect
+                    self.arduino_auto_connect_radio.setEnabled(True)
+                    self.arduino_ttl_radio.setEnabled(True)
+                    self.arduino_manual_radio.setEnabled(True)
                     return
                 except Exception as e:
                     self.logger.error(f"Error disconnecting Arduino: {str(e)}")
@@ -1844,6 +1849,11 @@ class MainWindow(QMainWindow):
                         self.arduino_connect_btn.setText("Disconnect")
                         self.arduino_warning_label.setText("")
                         self.arduino_warning_label.setVisible(False)
+
+                        # Disable the mode radio buttons after connect
+                        self.arduino_auto_connect_radio.setEnabled(False)
+                        self.arduino_ttl_radio.setEnabled(False)
+                        self.arduino_manual_radio.setEnabled(False)
 
                         # Enable/disable controls based on mode
                         if mode == 0:  # Manual mode
