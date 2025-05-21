@@ -699,6 +699,7 @@ class MainWindow(QMainWindow):
         self.bubbleTimeDoubleSpinBox.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTrailing | Qt.AlignmentFlag.AlignVCenter)
         self.bubbleTimeDoubleSpinBox.setMinimum(0.0)
+        self.bubbleTimeDoubleSpinBox.setMaximum(10000.0)
         self.bubbleTimeDoubleSpinBox.setValue(5.00)
         self.bubbleTimeDoubleSpinBox.setSuffix(" s")  # Add suffix for seconds
         monitor_layout.addWidget(self.bubbleTimeDoubleSpinBox, 4, 1, 1, 1)
@@ -3169,7 +3170,7 @@ class MainWindow(QMainWindow):
             timing_mode=self.timing_mode  # Pass timing mode to worker
         )
         self.setup_connections()
-        #self.logger.info(f"Motor port updated to COM{port}")
+        # self.logger.info(f"Motor port updated to COM{port}")
 
     def start_sequence_monitoring(self):
         """Start sequence file monitoring after delay."""
