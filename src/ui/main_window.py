@@ -1778,6 +1778,15 @@ class MainWindow(QMainWindow):
                 self.logger.info("Disconnecting Arduino worker...")
                 try:
                     self.cleanup_file_timer()
+                    # Stop sequence file check timer if present
+                    if hasattr(self, 'file_timer') and self.file_timer:
+                        self.file_timer.stop()
+                        self.file_timer.deleteLater()
+                        delattr(self, 'file_timer')
+                    if hasattr(self, 'file_check_timer') and self.file_check_timer:
+                        self.file_check_timer.stop()
+                        self.file_check_timer.deleteLater()
+                        delattr(self, 'file_check_timer')
                     if hasattr(self, 'connection_check_timer'):
                         self.connection_check_timer.stop()
                         self.connection_check_timer.deleteLater()
