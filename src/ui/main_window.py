@@ -2269,6 +2269,7 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer = None
                     self.reset_valves()
                     self.active_valve_macro = None
+                    self.enable_all_valve_controls()
                     return
 
                 macro = self.load_valve_macro(macro_num)
