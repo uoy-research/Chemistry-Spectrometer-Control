@@ -60,7 +60,12 @@ class ValveMacroEditor(QtWidgets.QDialog):
                 for j, state in enumerate(macro_data["Valves"][:6], start=2):
                     combo = QtWidgets.QComboBox()
                     combo.addItems(["Open", "Closed", "Ignore"])
-                    combo.setCurrentText("Closed" if state == 0 else "Open")
+                    if state == 1:
+                        combo.setCurrentText("Open")
+                    elif state == 0:
+                        combo.setCurrentText("Closed")
+                    else:
+                        combo.setCurrentText("Ignore")
                     self.table.setCellWidget(i, j, combo)
                 
                 # Timer SpinBox
@@ -103,7 +108,12 @@ class ValveMacroEditor(QtWidgets.QDialog):
             valve_states = []
             for col in range(2, 8):
                 state = self.table.cellWidget(row, col).currentText()
-                valve_states.append(1 if state == "Open" else 0)
+                if state == "Open":
+                    valve_states.append(1)
+                elif state == "Closed":
+                    valve_states.append(0)
+                else:  # "Ignore"
+                    valve_states.append("Ignore")
             valve_states.extend([0, 0])  # Add states for valves 7-8
             timer_spinbox = self.table.cellWidget(row, 8)
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0
