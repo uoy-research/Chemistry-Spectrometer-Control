@@ -161,6 +161,8 @@ class ArduinoWorker(QThread):
         self.logger.info("Arduino controller started successfully")
         self.status_changed.emit("Arduino worker running")
 
+        last_valve_check = time.time()
+
         while self._running:
             if not self._paused:
                 # Process valve commands
@@ -179,6 +181,13 @@ class ArduinoWorker(QThread):
                         pass
                 else:
                     self.error_occurred.emit("Failed to get pressure readings")
+
+                # Periodically verify valve states (every 1 second)
+                now = time.time()
+                if now - last_valve_check > 1.0:
+                    if hasattr(self.controller, 'verify_valve_states'):
+                        self.controller.verify_valve_states()
+                    last_valve_check = now
 
             # Sleep for update interval
             time.sleep(self.update_interval)

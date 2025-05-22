@@ -36,11 +36,6 @@ class ArduinoController:
         # Initialize valve state tracking
         self._valve_states = [0] * 8
         
-        # Setup valve state verification timer
-        self.valve_check_timer = QTimer()
-        self.valve_check_timer.timeout.connect(self._verify_valve_states)
-        self.valve_check_timer.setInterval(1000)  # Check every 1 second
-        
         # Setup logging
         self._setup_logging()
         
@@ -87,11 +82,6 @@ class ArduinoController:
                 
                 self.running = True
                 self.logger.info(f"Connected to Arduino on COM{self.port}")
-                
-                # Start valve state verification timer
-                if self.running:
-                    self.valve_check_timer.start()
-                    self.logger.debug("Started valve state verification timer")
                 
                 return True
             except Exception as e:
@@ -161,11 +151,6 @@ class ArduinoController:
 
     def stop(self):
         """Stop the Arduino connection."""
-        # Stop valve check timer
-        if self.valve_check_timer.isActive():
-            self.valve_check_timer.stop()
-            self.logger.debug("Stopped valve state verification timer")
-
         if self.arduino and hasattr(self.arduino, 'serial'):
             try:
                 # Disable TTL if enabled
@@ -223,15 +208,13 @@ class ArduinoController:
         # Always return the local copy
         return self._valve_states.copy()
 
-    def _verify_valve_states(self):
-        """Verify that local valve states match hardware states."""
+    def verify_valve_states(self):
+        """Verify that local valve states match hardware states. Call this from the worker thread's run loop."""
         if not self.running:
             return
-            
         try:
             # Read current states from Arduino
             actual_states = self.arduino.read_bits(0, 8, 1)
-            
             # Compare with local states
             if actual_states != self._valve_states:
                 self.logger.warning(f"Valve state mismatch detected! Local: {self._valve_states}, Actual: {actual_states}")
@@ -239,6 +222,5 @@ class ArduinoController:
                 self._valve_states = actual_states
             else:
                 self.logger.info("Valve states: %s", actual_states)
-                
         except Exception as e:
             self.logger.error(f"Error verifying valve states: {e}")
