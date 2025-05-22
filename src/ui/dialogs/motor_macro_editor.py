@@ -1,7 +1,4 @@
 from PyQt6 import QtWidgets, QtCore
-import json
-import os
-from pathlib import Path
 from utils.config_manager import ConfigManager
 
 
@@ -12,6 +9,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+        self.config_manager = ConfigManager()
 
         self.setWindowTitle("Motor Macro Editor")
         self.setGeometry(100, 100, 390, 230)
@@ -29,7 +27,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
         self.mainLayout.addWidget(self.table)
         self.setLayout(self.mainLayout)
 
-        # Load data from JSON file if it exists
+        # Load data from config
         self.load_data()
 
         # Resize all columns to fit
@@ -38,30 +36,33 @@ class MotorMacroEditor(QtWidgets.QDialog):
         self.table.setColumnWidth(2, 100)  # Position column
 
     def load_data(self):
-        json_path = Path("C:/ssbubble/motor_macro_data.json")
-        if json_path.exists():
-            try:
-                with open(json_path, 'r') as f:
-                    data = json.load(f)
-                for i, macro in enumerate(data):
-                    # Macro No.
-                    item = QtWidgets.QTableWidgetItem(macro["Macro No."])
-                    item.setFlags(item.flags() & ~
-                                  QtCore.Qt.ItemFlag.ItemIsEditable)
-                    self.table.setItem(i, 0, item)
-                    # Label
-                    label_text = macro.get("Label", "")
-                    label_item = QtWidgets.QTableWidgetItem(label_text)
-                    self.table.setItem(i, 1, label_item)
-                    # Position SpinBox
-                    position_spinbox = QtWidgets.QSpinBox()
-                    position_spinbox.setRange(0, 400)
-                    position_val = macro.get("Position", 0)
-                    position_spinbox.setValue(position_val)
-                    self.table.setCellWidget(i, 2, position_spinbox)
-            except Exception:
-                self.set_default_values()
-        else:
+        try:
+            motor_macros = self.config_manager.motor_macros
+            for i in range(6):
+                macro_num = str(i + 1)
+                macro_data = motor_macros.get(macro_num, {
+                    "Label": f"Motor Macro {i+1}",
+                    "Position": 0
+                })
+                
+                # Macro No.
+                item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                self.table.setItem(i, 0, item)
+                
+                # Label
+                label_text = macro_data.get("Label", f"Motor Macro {i+1}")
+                label_item = QtWidgets.QTableWidgetItem(label_text)
+                self.table.setItem(i, 1, label_item)
+                
+                # Position SpinBox
+                position_spinbox = QtWidgets.QSpinBox()
+                position_spinbox.setRange(0, 400)
+                position_val = macro_data.get("Position", 0)
+                position_spinbox.setValue(position_val)
+                self.table.setCellWidget(i, 2, position_spinbox)
+        except Exception as e:
+            self.parent.logger.error(f"Error loading motor macros: {e}")
             self.set_default_values()
 
     def set_default_values(self):
@@ -75,42 +76,33 @@ class MotorMacroEditor(QtWidgets.QDialog):
             self.table.setItem(i, 1, label_item)
             # Position SpinBox
             position_spinbox = QtWidgets.QSpinBox()
-            position_spinbox.setRange(0, 2500000)
+            position_spinbox.setRange(0, 400)
             position_spinbox.setValue(0)
             self.table.setCellWidget(i, 2, position_spinbox)
 
     def get_macro_data(self):
         data = []
         for row in range(self.table.rowCount()):
-            macro_number = self.table.item(row, 0).text()
             label_text = self.table.item(row, 1).text()
             position_spinbox = self.table.cellWidget(row, 2)
             position_value = position_spinbox.value() if position_spinbox else 0
             data.append({
-                "Macro No.": macro_number,
                 "Label": label_text,
                 "Position": position_value
             })
         return data
 
     def closeEvent(self, event):
-        # Save data to JSON
-        data = self.get_macro_data()
-        json_path = Path("C:/ssbubble/motor_macro_data.json")
-        json_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Update macros in config manager
+            for i, macro in enumerate(self.get_macro_data()):
+                # Macro numbers are 1-based
+                self.config_manager.update_motor_macro(i+1, macro)
 
-        with open(json_path, 'w') as f:
-            json.dump(data, f, indent=4)
-
-        # Also update the config YAML
-        config_manager = ConfigManager()
-        for i, macro in enumerate(data):
-            # Macro numbers are 1-based
-            config_manager.update_motor_macro(i+1, macro)
-        config_manager.save_config()
-
-        # Emit signal that macros were updated BEFORE closing
-        self.macro_updated.emit()
+            # Emit signal that macros were updated BEFORE closing
+            self.macro_updated.emit()
+        except Exception as e:
+            self.parent.logger.error(f"Error saving motor macros: {e}")
 
         # Call parent's closeEvent last
         super().closeEvent(event)

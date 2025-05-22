@@ -2624,7 +2624,7 @@ class MainWindow(QMainWindow):
             self.slowVentButton.setEnabled(True)
 
     def load_valve_macro(self, macro_num: int) -> dict:
-        """Load valve macro data from JSON file.
+        """Load valve macro data from config manager.
 
         Args:
             macro_num: Macro number (1-4)
@@ -2633,13 +2633,10 @@ class MainWindow(QMainWindow):
             dict: Macro data or None if not found
         """
         try:
-            json_path = Path("C:/ssbubble/valve_macro_data.json")
-            if json_path.exists():
-                with open(json_path, 'r') as f:
-                    data = json.load(f)
-                    for macro in data:
-                        if macro["Macro No."] == f"Macro {macro_num}":
-                            return macro
+            config_manager = ConfigManager()
+            macro = config_manager.valve_macros.get(str(macro_num))
+            if macro:
+                return macro
         except Exception as e:
             self.logger.error(f"Error loading valve macro {macro_num}: {e}")
         return None
@@ -2753,29 +2750,32 @@ class MainWindow(QMainWindow):
         editor.exec()
 
     def update_macro_labels(self):
-        """Update macro button labels from JSON files using only the Label field."""
+        """Update macro button labels from config files."""
         try:
-            # Load valve macro labels
-            valve_json_path = Path("C:/ssbubble/valve_macro_data.json")
-            if valve_json_path.exists():
-                with open(valve_json_path, 'r') as f:
-                    valve_data = json.load(f)
-                    for i, macro in enumerate(valve_data):
-                        if i < 4:  # Only update first 4 valve macros
-                            button = getattr(self, f"valveMacro{i+1}Button")
-                            button.setText(macro.get("Label", f"Macro {i+1}"))
+            # Load valve macro labels from config manager
+            config_manager = ConfigManager()
+            valve_macros = config_manager.valve_macros
+            for i in range(4):
+                macro_num = str(i + 1)
+                macro_data = valve_macros.get(macro_num, {
+                    "Label": f"Macro {i+1}",
+                    "Valves": [0] * 8,
+                    "Timer": 1.0
+                })
+                button = getattr(self, f"valveMacro{i+1}Button")
+                button.setText(macro_data.get("Label", f"Macro {i+1}"))
 
-            # Load motor macro labels
-            motor_json_path = Path("C:/ssbubble/motor_macro_data.json")
-            if motor_json_path.exists():
-                with open(motor_json_path, 'r') as f:
-                    motor_data = json.load(f)
-                    for i, macro in enumerate(motor_data):
-                        if i < 6:  # Only update first 6 motor macros
-                            button = getattr(self, f"motor_macro{i+1}_button")
-                            button.setText(macro.get("Label", f"Macro {i+1}"))
+            # Load motor macro labels from config manager
+            motor_macros = config_manager.motor_macros
+            for i in range(6):
+                macro_num = str(i + 1)
+                macro_data = motor_macros.get(macro_num, {
+                    "Label": f"Motor Macro {i+1}",
+                    "Position": 0
+                })
+                button = getattr(self, f"motor_macro{i+1}_button")
+                button.setText(macro_data.get("Label", f"Motor Macro {i+1}"))
 
-            # self.logger.info("Macro labels updated (Label field only)")
         except Exception as e:
             self.logger.error(f"Error updating macro labels: {e}")
 
