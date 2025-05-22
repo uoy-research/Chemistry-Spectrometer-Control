@@ -113,7 +113,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
                 elif state == "Closed":
                     valve_states.append(0)
                 else:  # "Ignore"
-                    valve_states.append("Ignore")
+                    valve_states.append(2)
             valve_states.extend([0, 0])  # Add states for valves 7-8
             timer_spinbox = self.table.cellWidget(row, 8)
             timer_value = timer_spinbox.value() if timer_spinbox else 1.0

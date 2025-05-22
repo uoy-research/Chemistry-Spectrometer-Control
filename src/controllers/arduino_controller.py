@@ -221,6 +221,7 @@ class ArduinoController:
                 # Update local states to match actual states
                 self._valve_states = actual_states
             else:
-                self.logger.info("Valve states: %s", actual_states)
+                # self.logger.info("Valve states: %s", actual_states)
+                pass
         except Exception as e:
             self.logger.error(f"Error verifying valve states: {e}")

@@ -2293,17 +2293,16 @@ class MainWindow(QMainWindow):
                     # Create new valve states based on macro settings
                     valve_states = [0] * 8
                     for i, state in enumerate(macro["Valves"]):
-                        if state == "Open":
+                        if state == 1:
                             valve_states[i] = 1
-                        elif state == "Closed":
+                        elif state == 0:
                             valve_states[i] = 0
-                        elif state == "Ignore":
+                        elif state == 2:
                             valve_states[i] = self.pre_macro_states[i]
 
                     # Send valve states to Arduino
                     self.arduino_worker.set_valves(valve_states)
-                    self.logger.info(f"Sent valve states for macro {
-                                     macro_num}: {valve_states}")
+                    self.logger.info(f"Sent valve states for macro {macro_num}: {valve_states}")
 
                     # Update valve button states to reflect macro settings
                     for i in range(6):
@@ -2356,8 +2355,7 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer.timeout.connect(reset_valves)
                         self.active_macro_timer.start(int(timer * 1000))
 
-                    self.logger.info(f"Executed valve macro {
-                                     macro_num}: {macro['Label']}")
+                    self.logger.info(f"Executed valve macro {macro_num}: {macro['Label']}")
                 else:
                     self.handle_error(f"Valve macro {macro_num} not found")
                     macro_button.setChecked(False)
