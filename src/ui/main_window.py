@@ -1746,9 +1746,9 @@ class MainWindow(QMainWindow):
         Args:
             enabled (bool): True to enable buttons, False to disable
         """
-        if self.arduino_worker and self.arduino_worker.running:  # Check if worker exists
+        if self.arduino_worker and self.arduino_worker.running and getattr(self.arduino_worker, 'controller', None) is not None:
             # Only enable valve buttons if Arduino is connected and in manual mode
-            if self.arduino_worker.controller.mode == 0:  # Manual mode
+            if getattr(self.arduino_worker.controller, 'mode', None) == 0:  # Manual mode
                 # Toggle all individual valve buttons 1-6
                 for i in range(1, 7):  # Changed from 6 to 7 to include valve 6
                     if hasattr(self, f'Valve{i}Button'):
@@ -1775,14 +1775,11 @@ class MainWindow(QMainWindow):
             if self.arduino_worker and self.arduino_worker.running:
                 self.logger.info("Disconnecting Arduino worker...")
                 try:
-                    # Stop all timers first
                     self.cleanup_file_timer()
                     if hasattr(self, 'connection_check_timer'):
                         self.connection_check_timer.stop()
                         self.connection_check_timer.deleteLater()
                         delattr(self, 'connection_check_timer')
-
-                    # Stop recording if it's active before disconnecting
                     if self.saving:
                         self.logger.info(
                             "Stopping data recording due to Arduino disconnection")
@@ -1790,29 +1787,20 @@ class MainWindow(QMainWindow):
                         self.beginSaveButton.setText("Begin Saving")
                         self.beginSaveButton.setChecked(False)
                         self.saving = False
-
-                    # Uncheck all valve controls before disconnecting
                     self.uncheck_all_valve_controls()
-
                     self.arduino_worker.stop()
-                    self.arduino_worker = None  # Clear the worker
+                    self.arduino_worker = None
                     self.arduino_connect_btn.setText("Connect")
                     if not self.test_mode:
                         self.arduino_warning_label.setText(
                             "Warning: Arduino not connected")
                         self.arduino_warning_label.setVisible(True)
-
-                    # Disable all valve controls on disconnect
                     self.dev_checkbox.setEnabled(False)
                     self.dev_checkbox.setChecked(False)
                     self.disable_valve_controls(True)
-
-                    # Reset to manual mode when disconnecting
                     self.set_valve_mode(False)
                     self.logger.info("Disconnected from Arduino")
-                    self.update_device_status()  # Update after disconnect
-
-                    # Enable the mode radio buttons after disconnect
+                    self.update_device_status()
                     self.arduino_auto_connect_radio.setEnabled(True)
                     self.arduino_ttl_radio.setEnabled(True)
                     self.arduino_manual_radio.setEnabled(True)
@@ -1828,7 +1816,6 @@ class MainWindow(QMainWindow):
             # Create new Arduino worker when connecting
             try:
                 self.logger.info("Attempting to connect Arduino worker...")
-                # Determine connection mode
                 if self.arduino_auto_connect_radio.isChecked():
                     mode = 1  # Auto mode
                 elif self.arduino_ttl_radio.isChecked():
@@ -1836,8 +1823,6 @@ class MainWindow(QMainWindow):
                 else:
                     mode = 0  # Manual mode
                 self.logger.info(f"Arduino connection mode selected: {mode}")
-
-                # Defensive: ensure no old worker exists
                 if self.arduino_worker is not None:
                     self.logger.warning(
                         "Old Arduino worker still exists before connect. Forcing cleanup.")
@@ -1846,75 +1831,21 @@ class MainWindow(QMainWindow):
                     except Exception:
                         pass
                     self.arduino_worker = None
-
-                # Create new worker instance
                 self.arduino_worker = ArduinoWorker(
                     port=self.arduino_port_spin.value(),
                     mock=self.test_mode,
                     mode=mode
                 )
                 self.logger.info("ArduinoWorker instance created.")
-
-                # Connect the readings signal to plot widget
                 self.arduino_worker.readings_updated.connect(
                     self.plot_widget.update_plot)
-
-                # Set mode and start worker
-                if self.arduino_worker.controller:
-                    success = self.arduino_worker.start()
-                    self.logger.info(
-                        f"Arduino worker start() returned: {success}")
-
-                    # Modified success check to handle test mode
-                    if success or self.test_mode:
-                        self.arduino_connect_btn.setText("Disconnect")
-                        self.arduino_warning_label.setText("")
-                        self.arduino_warning_label.setVisible(False)
-
-                        # Disable the mode radio buttons after connect
-                        self.arduino_auto_connect_radio.setEnabled(False)
-                        self.arduino_ttl_radio.setEnabled(False)
-                        self.arduino_manual_radio.setEnabled(False)
-                        self.logger.info(
-                            "Arduino mode radio buttons disabled after connect.")
-
-                        # Enable/disable controls based on mode
-                        if mode == 0:  # Manual mode
-                            self.dev_checkbox.setEnabled(True)
-                            self.disable_quick_controls(False)
-                        else:
-                            self.dev_checkbox.setEnabled(False)
-                            self.disable_valve_controls(True)
-                            self.disable_quick_controls(True)
-
-                        # Set valve mode
-                        self.set_valve_mode(mode)
-
-                        self.logger.info(
-                            f"Connected to Arduino in mode {mode}")
-
-                        # Create a timer to check connection status and update device status
-                        self.connection_check_timer = QTimer()
-                        self.connection_check_timer.setSingleShot(True)
-                        self.connection_check_timer.timeout.connect(
-                            self._check_connection_and_update)
-                        self.connection_check_timer.start(
-                            1000)  # Check every second
-
-                    else:
-                        self.arduino_worker = None  # Clear failed worker
-                        self.handle_error("Failed to connect to Arduino")
-                        if not self.test_mode:
-                            self.arduino_warning_label.setText(
-                                "Warning: Arduino not connected")
-                            self.arduino_warning_label.setVisible(True)
-                else:
-                    self.handle_error(
-                        "Failed to initialize Arduino controller")
-                    self.arduino_worker = None
-
+                # Connect new status and error slots for robust UI update
+                self.arduino_worker.status_changed.connect(self.on_arduino_status_changed)
+                self.arduino_worker.error_occurred.connect(self.on_arduino_error_occurred)
+                # Only start the worker, do not update UI yet
+                self.arduino_worker.start()
             except Exception as e:
-                self.arduino_worker = None  # Clear failed worker
+                self.arduino_worker = None
                 self.logger.error(
                     f"Exception during Arduino connect: {str(e)}")
                 QMessageBox.critical(self, "Arduino Connect Error", str(e))
@@ -1924,7 +1855,6 @@ class MainWindow(QMainWindow):
                     self.arduino_warning_label.setText(
                         "Warning: Arduino not connected")
                     self.arduino_warning_label.setVisible(True)
-
         except Exception as e:
             self.logger.error(
                 f"Uncaught exception in Arduino connection: {str(e)}")
@@ -1939,6 +1869,68 @@ class MainWindow(QMainWindow):
                 self.arduino_warning_label.setText(
                     "Warning: Arduino not connected")
                 self.arduino_warning_label.setVisible(True)
+
+    @pyqtSlot(str)
+    def on_arduino_status_changed(self, status: str):
+        """Handle status updates from ArduinoWorker."""
+        status_lower = status.lower()
+        if "running" in status_lower or "connected" in status_lower:
+            # Now update UI to connected state
+            self.arduino_connect_btn.setText("Disconnect")
+            self.arduino_warning_label.setText("")
+            self.arduino_warning_label.setVisible(False)
+            # Disable the mode radio buttons after connect
+            self.arduino_auto_connect_radio.setEnabled(False)
+            self.arduino_ttl_radio.setEnabled(False)
+            self.arduino_manual_radio.setEnabled(False)
+            # Enable/disable controls based on mode
+            if self.arduino_worker.mode == 0:  # Manual mode
+                self.dev_checkbox.setEnabled(True)
+                self.disable_quick_controls(False)
+            else:
+                self.dev_checkbox.setEnabled(False)
+                self.disable_valve_controls(True)
+                self.disable_quick_controls(True)
+            self.set_valve_mode(self.arduino_worker.mode)
+            self.logger.info(f"Connected to Arduino in mode {self.arduino_worker.mode}")
+            # Create a timer to check connection status and update device status
+            self.connection_check_timer = QTimer()
+            self.connection_check_timer.setSingleShot(True)
+            self.connection_check_timer.timeout.connect(
+                self._check_connection_and_update)
+            self.connection_check_timer.start(1000)
+        elif "stopped" in status_lower or "disconnected" in status_lower:
+            # Update UI to disconnected state
+            self.arduino_connect_btn.setText("Connect")
+            if not self.test_mode:
+                self.arduino_warning_label.setText("Warning: Arduino not connected")
+                self.arduino_warning_label.setVisible(True)
+            self.dev_checkbox.setEnabled(False)
+            self.dev_checkbox.setChecked(False)
+            self.disable_valve_controls(True)
+            self.set_valve_mode(False)
+            self.arduino_auto_connect_radio.setEnabled(True)
+            self.arduino_ttl_radio.setEnabled(True)
+            self.arduino_manual_radio.setEnabled(True)
+            self.logger.info("Arduino disconnected or stopped.")
+            self.update_device_status()
+
+    @pyqtSlot(str)
+    def on_arduino_error_occurred(self, message: str):
+        """Handle error messages from ArduinoWorker."""
+        self.arduino_connect_btn.setText("Connect")
+        if not self.test_mode:
+            self.arduino_warning_label.setText("Warning: Arduino not connected")
+            self.arduino_warning_label.setVisible(True)
+        self.dev_checkbox.setEnabled(False)
+        self.dev_checkbox.setChecked(False)
+        self.disable_valve_controls(True)
+        self.set_valve_mode(False)
+        self.arduino_auto_connect_radio.setEnabled(True)
+        self.arduino_ttl_radio.setEnabled(True)
+        self.arduino_manual_radio.setEnabled(True)
+        self.logger.error(f"Arduino error: {message}")
+        QMessageBox.critical(self, "Arduino Error", message)
 
     def _check_connection_and_update(self):
         """Check if Arduino is connected and update device status if it is."""
@@ -3315,15 +3307,15 @@ class MainWindow(QMainWindow):
                 # In test mode, check both worker and controller mode
                 arduino_status = '1' if (self.arduino_worker and
                                          self.arduino_worker.running and
-                                         (self.arduino_worker.mode == 1 or
-                                          self.arduino_worker.controller.mode == 1)) else '0'
-                self.logger.debug(f"Test mode - Arduino worker mode: {self.arduino_worker.mode if self.arduino_worker else 'None'}, "
-                                  f"Controller mode: {self.arduino_worker.controller.mode if self.arduino_worker and self.arduino_worker.controller else 'None'}")
+                                         (getattr(self.arduino_worker, 'mode', None) == 1 or
+                                          (getattr(self.arduino_worker, 'controller', None) is not None and getattr(self.arduino_worker.controller, 'mode', None) == 1))) else '0'
+                self.logger.debug(f"Test mode - Arduino worker mode: {getattr(self.arduino_worker, 'mode', None) if self.arduino_worker else 'None'}, "
+                                  f"Controller mode: {getattr(self.arduino_worker.controller, 'mode', None) if self.arduino_worker and getattr(self.arduino_worker, 'controller', None) is not None else 'None'}")
             else:
                 # Normal mode - check worker mode
                 arduino_status = '1' if (self.arduino_worker and
                                          self.arduino_worker.running and
-                                         self.arduino_worker.mode == 1) else '0'
+                                         getattr(self.arduino_worker, 'mode', None) == 1) else '0'
 
             # Get Motor status (1 if connected and calibrated)
             motor_status = '1' if (self.motor_worker and
