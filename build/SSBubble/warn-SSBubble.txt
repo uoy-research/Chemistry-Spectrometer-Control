@@ -16,7 +16,7 @@ IMPORTANT: Do NOT post this list to the issue-tracker. Use it as a basis for
 
 missing module named _frozen_importlib_external - imported by importlib._bootstrap (delayed), importlib (optional), importlib.abc (optional), zipimport (top-level)
 excluded module named _frozen_importlib - imported by importlib (optional), importlib.abc (optional), zipimport (top-level)
-missing module named posix - imported by posixpath (optional), shutil (conditional), importlib._bootstrap_external (conditional), os (conditional, optional), _pyrepl.unix_console (delayed, optional)
+missing module named posix - imported by os (conditional, optional), posixpath (optional), shutil (conditional), importlib._bootstrap_external (conditional), _pyrepl.unix_console (delayed, optional)
 missing module named resource - imported by posix (top-level), fsspec.asyn (conditional, optional)
 missing module named pwd - imported by posixpath (delayed, conditional, optional), shutil (delayed, optional), tarfile (optional), pathlib._local (optional), subprocess (delayed, conditional, optional), http.server (delayed, optional), netrc (delayed, conditional), getpass (delayed, optional), psutil (optional), setuptools._distutils.util (delayed, conditional, optional), setuptools._distutils.archive_util (optional), setuptools._vendor.backports.tarfile (optional)
 missing module named grp - imported by shutil (delayed, optional), tarfile (optional), pathlib._local (optional), subprocess (delayed, conditional, optional), setuptools._distutils.archive_util (optional), setuptools._vendor.backports.tarfile (optional)
@@ -273,8 +273,8 @@ missing module named numpy_distutils - imported by numpy.f2py.diagnose (delayed,
 missing module named charset_normalizer - imported by numpy.f2py.crackfortran (optional)
 missing module named numpy.random.RandomState - imported by numpy.random (top-level), numpy.random._generator (top-level)
 missing module named numpy._distributor_init_local - imported by numpy (optional), numpy._distributor_init (optional)
-missing module named collections.Mapping - imported by collections (optional), pytz.lazy (optional)
 missing module named _suggestions - imported by traceback (delayed, optional)
+missing module named collections.Mapping - imported by collections (optional), pytz.lazy (optional)
 missing module named pytest - imported by matplotlib.testing (delayed, conditional, optional), matplotlib.testing._markers (top-level), matplotlib.testing.compare (delayed, conditional), matplotlib.testing.conftest (top-level), matplotlib.testing.decorators (delayed), pandas._testing._io (delayed), pandas._testing (delayed), fsspec.conftest (top-level)
 missing module named 'scipy.stats' - imported by pandas.core.nanops (delayed, conditional), pandas.plotting._matplotlib.misc (delayed, conditional), pandas.plotting._matplotlib.hist (delayed)
 missing module named 'pyarrow.compute' - imported by pandas.core.arrays.arrow.accessors (conditional), pandas.core.arrays._arrow_string_mixins (conditional), pandas.core.arrays.string_arrow (conditional), pandas.core.reshape.merge (delayed, conditional), pandas.core.arrays.arrow.array (conditional)
