@@ -12,8 +12,8 @@ class MotorMacroEditor(QtWidgets.QDialog):
         self.config_manager = ConfigManager()
 
         self.setWindowTitle("Motor Macro Editor")
-        self.setGeometry(100, 100, 390, 230)
-        self.setFixedSize(390, 230)
+        self.setGeometry(100, 100, 390, 170)
+        self.setFixedSize(390, 170)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)

@@ -12,8 +12,8 @@ class ValveMacroEditor(QtWidgets.QDialog):
         self.config_manager = ConfigManager()
 
         self.setWindowTitle("Valve Macro Editor")
-        self.setGeometry(100, 100, 700, 190)
-        self.setFixedSize(673, 170)
+        self.setGeometry(100, 100, 750, 170)
+        self.setFixedSize(750, 170)
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
