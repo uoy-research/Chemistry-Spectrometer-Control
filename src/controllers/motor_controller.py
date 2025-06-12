@@ -511,6 +511,8 @@ class MotorController:
                 'r': -1mm
                 'f': -10mm
                 'v': -50mm
+                '6': Move to PTF Bore position
+                'h': Move to PTF Halbach position
 
         Returns:
             bool: True if command sent successfully

@@ -448,6 +448,10 @@ class MainWindow(QMainWindow):
                 not disabled and self.motor_calibrated)
             self.motor_to_bottom_button.setEnabled(
                 not disabled and self.motor_calibrated)
+            self.motor_ptf_bore_button.setEnabled(
+                not disabled and self.motor_calibrated)
+            self.motor_ptf_halbach_button.setEnabled(
+                not disabled and self.motor_calibrated)
 
             # Macro buttons 1-4
             for i in range(1, 5):  # Changed from range(1, 7) to range(1, 5)
@@ -889,6 +893,22 @@ class MainWindow(QMainWindow):
         self.motor_to_bottom_button.setFont(font)
         motor_macro_layout.addWidget(self.motor_to_bottom_button, 0, 1, 1, 1)
 
+        # Add PTF Bore button
+        self.motor_ptf_bore_button = QPushButton("PTF Bore")
+        self.motor_ptf_bore_button.setMinimumSize(QSize(0, 35))
+        font = QFont()
+        font.setPointSize(10)
+        self.motor_ptf_bore_button.setFont(font)
+        motor_macro_layout.addWidget(self.motor_ptf_bore_button, 1, 0, 1, 1)
+
+        # Add PTF Halbach button
+        self.motor_ptf_halbach_button = QPushButton("PTF Halbach")
+        self.motor_ptf_halbach_button.setMinimumSize(QSize(0, 35))
+        font = QFont()
+        font.setPointSize(10)
+        self.motor_ptf_halbach_button.setFont(font)
+        motor_macro_layout.addWidget(self.motor_ptf_halbach_button, 1, 1, 1, 1)
+
         # Create macro buttons 1-4
         for i in range(1, 5):  # Changed from range(1, 7) to range(1, 5)
             btn = QPushButton(f"Macro {i}")
@@ -899,7 +919,7 @@ class MainWindow(QMainWindow):
             font.setPointSize(10)
             btn.setFont(font)
             setattr(self, f"motor_macro{i}_button", btn)
-            row = (i + 1) // 2
+            row = (i + 3) // 2  # Adjusted row calculation to account for new buttons
             col = (i - 1) % 2
             motor_macro_layout.addWidget(btn, row, col, 1, 1)
 
@@ -990,6 +1010,8 @@ class MainWindow(QMainWindow):
                 self.motor_move_to_target_button.clicked.disconnect()
                 self.motor_to_bottom_button.clicked.disconnect()
                 self.motor_to_top_button.clicked.disconnect()
+                self.motor_ptf_bore_button.clicked.disconnect()
+                self.motor_ptf_halbach_button.clicked.disconnect()
 
                 # Motor macro buttons
                 for i in range(1, 5):
@@ -1050,6 +1072,8 @@ class MainWindow(QMainWindow):
                 self.on_motorToBottomButton_clicked)
             self.motor_to_top_button.clicked.connect(
                 self.on_motorToTopButton_clicked)
+            self.motor_ptf_bore_button.clicked.connect(self.on_motorPtfBoreButton_clicked)
+            self.motor_ptf_halbach_button.clicked.connect(self.on_motorPtfHalbachButton_clicked)
 
             # Motor macro buttons
             for i in range(1, 5):
@@ -2052,22 +2076,26 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def on_motorToBottomButton_clicked(self):
         """Handle motor to bottom button click."""
-        if self.motor_worker.running:
-            if self.motor_worker.to_bottom():
-                pass
-                # self.logger.info("Moving motor to bottom position")
-            else:
-                self.handle_error("Failed to move motor to bottom")
+        if self.motor_worker and self.motor_worker.running:
+            self.motor_worker.to_bottom()
 
     @pyqtSlot()
     def on_motorToTopButton_clicked(self):
         """Handle motor to top button click."""
-        if self.motor_worker.running:
-            if self.motor_worker.to_top():
-                pass
-                # self.logger.info("Moving motor to top position")
-            else:
-                self.handle_error("Failed to move motor to top")
+        if self.motor_worker and self.motor_worker.running:
+            self.motor_worker.to_top()
+
+    @pyqtSlot()
+    def on_motorPtfBoreButton_clicked(self):
+        """Handle PTF Bore button click."""
+        if self.motor_worker and self.motor_worker.running:
+            self.motor_worker.step_motor('6')
+
+    @pyqtSlot()
+    def on_motorPtfHalbachButton_clicked(self):
+        """Handle PTF Halbach button click."""
+        if self.motor_worker and self.motor_worker.running:
+            self.motor_worker.step_motor('h')
 
     @pyqtSlot(int)
     def on_motorMacroButton_clicked(self, macro_num: int):
