@@ -70,7 +70,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
                 
                 # Timer SpinBox
                 timer_spinbox = QtWidgets.QDoubleSpinBox()
-                timer_spinbox.setRange(0.1, 3600)
+                timer_spinbox.setRange(0.1, 50000.0)
                 timer_spinbox.setSingleStep(0.1)
                 timer_val = macro_data.get("Timer", 1.0)
                 timer_spinbox.setValue(timer_val)
@@ -95,7 +95,7 @@ class ValveMacroEditor(QtWidgets.QDialog):
                 self.table.setCellWidget(i, j, combo)
             # Timer SpinBox
             timer_spinbox = QtWidgets.QDoubleSpinBox()
-            timer_spinbox.setRange(0.1, 3600)
+            timer_spinbox.setRange(0.1, 50000.0)
             timer_spinbox.setSingleStep(0.1)
             timer_spinbox.setValue(1.0)
             self.table.setCellWidget(i, 8, timer_spinbox)
