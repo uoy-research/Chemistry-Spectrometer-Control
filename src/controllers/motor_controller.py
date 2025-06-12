@@ -34,6 +34,7 @@ class MotorController:
         self.motor_position = 0
         self.target_position = 0
         self._is_calibrated = False
+        self._initial_offset = 0.0  # Initialize offset to 0
         self._setup_logging()
         self._consecutive_errors = 0  # Add counter for consecutive errors
         self._max_consecutive_errors = 5  # Maximum allowed consecutive errors
@@ -120,6 +121,31 @@ class MotorController:
             self.logger.error(f"Failed to connect to motor: {e}")
             return False
 
+    def reset_state(self):
+        """Reset all state variables when disconnecting."""
+        self._current_position = 0.0
+        self.motor_position = 0
+        self.target_position = 0
+        self._is_calibrated = False
+        self._initial_offset = 0.0
+        self._consecutive_errors = 0
+        self._error_state = False
+        self._in_sequence = False
+        self.running = False
+        self.serial_connected = False
+
+    def stop(self):
+        """Stop the motor controller and reset state."""
+        try:
+            if self.instrument:
+                self.instrument.write_bit(3, 0)  # Reset init flag
+                self.instrument.write_register(9, 4000)  # Reset speed
+                self.instrument.write_register(10, 23250)  # Reset acceleration
+            self.reset_state()
+        except Exception as e:
+            self.logger.error(f"Error stopping motor controller: {e}")
+            self.reset_state()  # Still reset state even if error occurs
+
     def get_position(self) -> Optional[float]:
         """Get current motor position."""
         # Skip position reading if high-priority command is in progress
@@ -158,6 +184,7 @@ class MotorController:
             if self._consecutive_errors > self._max_consecutive_errors:
                 self.logger.critical(
                     "Too many consecutive motor errors, raising MotorCriticalError.")
+                self.reset_state()  # Reset state before raising error
                 raise MotorController.MotorCriticalError(
                     "Too many consecutive errors reading motor position.")
             return self._current_position
@@ -417,30 +444,6 @@ class MotorController:
         finally:
             if hasattr(self, 'instrument') and self.instrument:
                 self.instrument.serial.close()
-
-    def stop(self):
-        """Stop the motor controller and clean up."""
-        self._error_state = True  # Set error state when stopping
-        try:
-            if self.serial_connected:
-                self.stop_motor()
-                try:
-                    self.instrument.write_bit(3, 0)
-                except Exception as e:
-                    self.logger.warning(f"Failed to clear init flag: {e}")
-
-            if self.instrument is not None:
-                try:
-                    self.instrument.serial.close()
-                except Exception as e:
-                    self.logger.warning(f"Failed to close serial port: {e}")
-
-            self.running = False
-            self.serial_connected = False
-            self.logger.info("Motor controller stopped")
-
-        except Exception as e:
-            self.logger.error(f"Error stopping motor controller: {e}")
 
     def disassemble(self, combined):
         """Disassemble a 32-bit value into high and low 16-bit words."""

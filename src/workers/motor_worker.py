@@ -945,39 +945,35 @@ class MotorWorker(QThread):
         self.controller.set_limits_enabled(enabled)
 
     def cleanup(self):
-        """Clean up worker resources."""
+        """Clean up resources and stop the worker."""
         try:
-            if self.running:
-                self._running = False
+            # Stop any active timers
+            if hasattr(self, '_calibration_check_timer') and self._calibration_check_timer:
+                self._calibration_check_timer.stop()
 
-                # Stop position update timer
-                if self._position_timer is not None:
-                    self._position_timer.stop()
-                    self._position_timer = None
-
-                # Stop retry timer if active
-                if self._retry_timer is not None:
-                    self._retry_timer.stop()
-                    self._retry_timer = None
-
-                # Clear command queue
-                while not self._command_queue.empty():
-                    try:
-                        self._command_queue.get_nowait()
-                    except Exception:
-                        pass
-
-                # Try to stop the motor first
+            # Clear command queue
+            while not self._command_queue.empty():
                 try:
-                    if self.controller:
-                        self.controller.stop_motor()
-                        self.controller.stop()
-                        self.logger.info("Motor stop command sent during cleanup")
-                except Exception as e:
-                    self.logger.error(f"Failed to stop motor during cleanup: {e}")
+                    self._command_queue.get_nowait()
+                except queue.Empty:
+                    break
 
-                # Wait for thread to finish
-                self.wait()
+            # Stop the motor controller
+            if self.controller:
+                try:
+                    self.controller.stop_motor()
+                    self.controller.stop()  # This will reset the controller state
+                except Exception as e:
+                    self.logger.error(f"Error stopping motor controller: {e}")
+
+            # Reset worker state
+            self._is_calibrated = False
+            self._target_position = None
+            self._current_position = 0.0
+            self._paused = False
+            self._pause_updates = False
+            self._command_in_progress = False
+            self._in_sequence = False
 
             # Remove from active instances
             with self._instance_lock:
@@ -985,15 +981,21 @@ class MotorWorker(QThread):
                     self._active_instances.remove(self)
                 self._instance_count = max(0, self._instance_count - 1)
 
-            self.logger.info(f"Motor worker {self._instance_id} cleaned up")
+            self.logger.info("Motor worker cleaned up successfully")
 
         except Exception as e:
-            self.logger.error(f"Error cleaning up motor worker: {e}")
-            # Ensure instance is removed even if cleanup fails
+            self.logger.error(f"Error during motor worker cleanup: {e}")
+            # Still try to remove from active instances even if cleanup fails
             with self._instance_lock:
                 if self in self._active_instances:
                     self._active_instances.remove(self)
                 self._instance_count = max(0, self._instance_count - 1)
+
+    def stop(self):
+        """Stop the worker thread."""
+        self._running = False
+        self.cleanup()  # Ensure cleanup is called when stopping
+        self.wait()  # Wait for thread to finish
 
     @classmethod
     def reset_instance_count(cls):
