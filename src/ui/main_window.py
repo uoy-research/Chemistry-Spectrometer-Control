@@ -2647,7 +2647,7 @@ class MainWindow(QMainWindow):
         return None
 
     def load_motor_macro(self, macro_num: int) -> dict:
-        """Load motor macro data from JSON file.
+        """Load motor macro data from config manager.
 
         Args:
             macro_num: Macro number (1-6)
@@ -2656,13 +2656,14 @@ class MainWindow(QMainWindow):
             dict: Macro data or None if not found
         """
         try:
-            json_path = Path("C:/ssbubble/motor_macro_data.json")
-            if json_path.exists():
-                with open(json_path, 'r') as f:
-                    data = json.load(f)
-                    for macro in data:
-                        if macro["Macro No."] == f"Macro {macro_num}":
-                            return macro
+            config_manager = ConfigManager()
+            macro_data = config_manager.motor_macros.get(str(macro_num))
+            if macro_data:
+                return {
+                    "Macro No.": f"Macro {macro_num}",
+                    "Label": macro_data.get("Label", f"Motor Macro {macro_num}"),
+                    "Position": macro_data.get("Position", 0)
+                }
         except Exception as e:
             self.logger.error(f"Error loading motor macro {macro_num}: {e}")
         return None
