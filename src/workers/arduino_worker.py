@@ -162,35 +162,62 @@ class ArduinoWorker(QThread):
         self.status_changed.emit("Arduino worker running")
 
         last_valve_check = time.time()
+        consecutive_errors = 0
+        MAX_CONSECUTIVE_ERRORS = 5
 
         while self._running:
-            if not self._paused:
-                # Process valve commands
-                if self._valve_queue:
-                    states = self._valve_queue.pop(0)
-                    success = self.controller.set_valves(states)
-                    self.valve_updated.emit(success)
+            try:
+                if not self._paused:
+                    # Process valve commands
+                    if self._valve_queue:
+                        states = self._valve_queue.pop(0)
+                        success = self.controller.set_valves(states)
+                        self.valve_updated.emit(success)
 
-                # Get pressure readings
-                readings = self.controller.get_readings()
-                if readings:
-                    self.readings_updated.emit(readings)
-                    if isinstance(self.controller, MockArduinoController):
-                        # Debug log the mock readings
-                        # self.logger.debug(f"Mock readings: {readings}")
-                        pass
-                else:
-                    self.error_occurred.emit("Failed to get pressure readings")
+                    # Get pressure readings
+                    readings = self.controller.get_readings()
+                    if readings:
+                        self.readings_updated.emit(readings)
+                        consecutive_errors = 0  # Reset error counter on success
+                        if isinstance(self.controller, MockArduinoController):
+                            pass
+                    else:
+                        consecutive_errors += 1
+                        error_msg = "Failed to get pressure readings"
+                        self.error_occurred.emit(error_msg)
+                        self.logger.error(error_msg)
+                        
+                        # If too many consecutive errors, attempt reconnection
+                        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                            self.logger.warning("Too many consecutive errors, attempting reconnection...")
+                            self.controller.stop()
+                            if self.controller.start():
+                                consecutive_errors = 0
+                                self.logger.info("Successfully reconnected to Arduino")
+                            else:
+                                self.error_occurred.emit("Failed to reconnect to Arduino")
+                                self.logger.error("Failed to reconnect to Arduino")
+                                break
 
-                # Periodically verify valve states (every 1 second)
-                now = time.time()
-                if now - last_valve_check > 1.0:
-                    if hasattr(self.controller, 'verify_valve_states'):
-                        self.controller.verify_valve_states()
-                    last_valve_check = now
+                    # Periodically verify valve states (every 1 second)
+                    now = time.time()
+                    if now - last_valve_check > 1.0:
+                        if hasattr(self.controller, 'verify_valve_states'):
+                            self.controller.verify_valve_states()
+                        last_valve_check = now
 
-            # Sleep for update interval
-            time.sleep(self.update_interval)
+                # Sleep for update interval
+                time.sleep(self.update_interval)
+
+            except Exception as e:
+                self.logger.error(f"Unexpected error in Arduino worker: {str(e)}", exc_info=True)
+                self.error_occurred.emit(f"Unexpected error: {str(e)}")
+                consecutive_errors += 1
+                
+                # If too many consecutive errors, stop the worker
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    self.logger.error("Too many consecutive errors, stopping worker")
+                    break
 
         self.controller.stop()
         self.status_changed.emit("Arduino worker stopped")

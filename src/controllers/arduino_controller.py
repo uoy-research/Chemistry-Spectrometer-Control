@@ -6,6 +6,7 @@ Description: Arduino controller using minimalmodbus for valve control and pressu
 import minimalmodbus
 import logging
 import time
+import math
 from typing import List, Optional
 from PyQt6.QtCore import QTimer
 
@@ -100,22 +101,51 @@ class ArduinoController:
             List of 4 pressure readings in standard units or None if error
         """
         if not self.running:
+            self.logger.warning("Attempted to get readings while controller not running")
             return None
 
         try:
             # Read 4 pressure registers using function code 4
             raw_readings = self.arduino.read_registers(0, 4, 4)
             
+            # Validate readings
+            if not raw_readings or len(raw_readings) != 4:
+                self.logger.error(f"Invalid readings received: {raw_readings}")
+                return None
+                
+            # Check for invalid values
+            if any(not isinstance(x, (int, float)) for x in raw_readings):
+                self.logger.error(f"Non-numeric readings received: {raw_readings}")
+                return None
+                
             # Convert readings to standard units
-            converted_readings = [
-                (float(raw) - 203.53) / 0.8248 / 100 
-                for raw in raw_readings
-            ]
-            
-            self.logger.debug(f"Raw pressure readings: {raw_readings}")
-            self.logger.debug(f"Converted pressure readings: {converted_readings}")
-            return converted_readings
+            try:
+                converted_readings = [
+                    (float(raw) - 203.53) / 0.8248 / 100 
+                    for raw in raw_readings
+                ]
+                
+                # Validate converted readings
+                if any(math.isnan(x) or math.isinf(x) for x in converted_readings):
+                    self.logger.error(f"Invalid converted readings: {converted_readings}")
+                    return None
+                    
+                self.logger.debug(f"Raw pressure readings: {raw_readings}")
+                self.logger.debug(f"Converted pressure readings: {converted_readings}")
+                return converted_readings
+                
+            except (ValueError, TypeError) as e:
+                self.logger.error(f"Error converting readings: {e}")
+                return None
 
+        except minimalmodbus.NoResponseError as e:
+            self.logger.error(f"No response from Arduino: {e}")
+            self.running = False
+            return None
+        except minimalmodbus.InvalidResponseError as e:
+            self.logger.error(f"Invalid response from Arduino: {e}")
+            self.running = False
+            return None
         except Exception as e:
             self.logger.error(f"Error getting readings: {e}")
             self.running = False
