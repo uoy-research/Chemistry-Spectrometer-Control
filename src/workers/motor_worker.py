@@ -31,7 +31,7 @@ class MockMotorController:
     def __init__(self):
         self.running = False
         self._position = 0.0  # Store position as float
-        self.POSITION_MAX = 364.40  # Match real motor's maximum position
+        self.POSITION_MAX = 324.05  # Match real motor's maximum position
         self.POSITION_MIN = 0.0     # Home position (top)
         self.SPEED_MAX = 6501  # Match real controller speed limits
         self.SPEED_MIN = 0

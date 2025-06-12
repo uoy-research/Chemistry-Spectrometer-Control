@@ -2950,26 +2950,27 @@ class MainWindow(QMainWindow):
                 if any(pos is not None and pos < 0 for pos in motor_positions):
                     self.logger.error("Motor positions must be non-negative")
                     return False
-                # Check if all non-None positions are equal to 364.40
-                if all(pos is None or abs(pos - 364.40) < 0.01 for pos in motor_positions):
-                    # If motor is not connected, it's not required
-                    if not self.motor_worker or not self.motor_worker.running:
-                        self.motor_flag = False
-                        self.logger.info(
-                            "Motor not required - not connected and all positions are at maximum (364.40)")
-                    else:
-                        # Check current position
+                # Check if all non-None positions are equal to 324.05
+                if all(pos is None or abs(pos - 324.05) < 0.01 for pos in motor_positions):
+                    self.logger.info(
+                        "Motor not required - not connected and all positions are at maximum (324.05)")
+                    return False
+                # Check current position
+                try:
+                    if self.motor_worker:
                         current_pos = self.motor_worker.get_current_position()
-                        if abs(current_pos - 364.40) < 0.01:
-                            self.motor_flag = False
+                        if abs(current_pos - 324.05) < 0.01:
                             self.logger.info(
-                                "Motor not required - already at maximum position (364.40)")
+                                "Motor not required - already at maximum position (324.05)")
+                            return False
                         else:
                             self.motor_flag = True
                             self.logger.info(
-                                "Motor required - needs to move to maximum position (364.40)")
-                elif any(pos is not None for pos in motor_positions):
-                    self.motor_flag = True
+                                "Motor required - needs to move to maximum position (324.05)")
+                except Exception as e:
+                    self.logger.error(f"Error checking motor position: {e}")
+                    self.logger.info("Assuming motor not required due to error")
+                    return False
             except ValueError:
                 self.logger.error(
                     f"Invalid motor positions in sequence file - must be numbers or 'None'. Values: {motor_positions}")

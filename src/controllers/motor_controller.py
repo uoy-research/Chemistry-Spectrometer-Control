@@ -15,7 +15,7 @@ class MotorController:
     SPEED_MIN = 0
     ACCEL_MAX = 23250  # Add acceleration limits
     ACCEL_MIN = 0
-    POSITION_MAX = 364.40  # Maximum downward position
+    POSITION_MAX = 324.05  # Maximum downward position
     POSITION_MIN = 0.0     # Home position (top)
     STEPS_PER_MM = 6400.0
 

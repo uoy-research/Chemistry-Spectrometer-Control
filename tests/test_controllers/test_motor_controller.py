@@ -316,7 +316,7 @@ class TestMotorController:
         # Let's say the current position is 100.0mm (steps = 100 * 6400 = 640000)
         # high = 640000 // 65536 = 9, low = 640000 % 65536 = 50176
         mock_instrument.return_value.read_registers.return_value = [9, 50176]
-        # POSITION_MAX is 364.40, so offset should be (640000/6400) - 364.40 = 100.0 - 364.40 = -264.40
+        # POSITION_MAX is 324.05, so offset should be (640000/6400) - 324.05 = 100.0 - 324.05 = -224.05
         expected_offset = (640000 / controller.STEPS_PER_MM) - \
             controller.POSITION_MAX
         assert controller.check_calibrated() is True
