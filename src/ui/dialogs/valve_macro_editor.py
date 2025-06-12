@@ -130,6 +130,9 @@ class ValveMacroEditor(QtWidgets.QDialog):
             # Macro numbers are 1-based
             self.config_manager.update_valve_macro(i+1, macro)
 
+        # Reload the config to ensure changes are reflected
+        self.config_manager.reload_config()
+
         # Emit signal that macros were updated BEFORE closing
         self.macro_updated.emit()
 
