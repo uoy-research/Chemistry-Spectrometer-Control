@@ -235,8 +235,10 @@ class PlotWidget(QWidget):
                 self.logger.warning(
                     "Already recording to a different file - stopping current recording")
                 self.stop_recording()
-            else:
-                self.start_time = time.time()  # Reset start time for recording
+
+            # Reset start time and clear plot data
+            self.start_time = time.time()
+            self.clear_plot(reset_time=False)  # Don't reset time again since we just did
 
             # Verify file path
             if not filepath:
@@ -251,8 +253,10 @@ class PlotWidget(QWidget):
             self.logger.debug(f"Writing CSV header: {header}")
             self.csv_writer.writerow(header)
 
+            # Add a small delay to ensure clean timing
+            time.sleep(0.1)  # 100ms delay
+
             self.recording = True
-            # Do not reset start_time here to maintain time continuity across sequences
 
             # Verify recording state
             self.logger.info(
