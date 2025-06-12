@@ -42,7 +42,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
                 macro_num = str(i + 1)
                 macro_data = motor_macros.get(macro_num, {
                     "Label": f"Motor Macro {i+1}",
-                    "Position": 0
+                    "Position": 0.0
                 })
                 
                 # Macro No.
@@ -55,10 +55,12 @@ class MotorMacroEditor(QtWidgets.QDialog):
                 label_item = QtWidgets.QTableWidgetItem(label_text)
                 self.table.setItem(i, 1, label_item)
                 
-                # Position SpinBox
-                position_spinbox = QtWidgets.QSpinBox()
-                position_spinbox.setRange(0, 400)
-                position_val = macro_data.get("Position", 0)
+                # Position DoubleSpinBox
+                position_spinbox = QtWidgets.QDoubleSpinBox()
+                position_spinbox.setRange(0.0, 324.05)
+                position_spinbox.setDecimals(2)  # Set to 2 decimal places
+                position_spinbox.setSingleStep(0.01)  # Step by 0.01
+                position_val = float(macro_data.get("Position", 0.0))
                 position_spinbox.setValue(position_val)
                 self.table.setCellWidget(i, 2, position_spinbox)
         except Exception as e:
@@ -74,10 +76,12 @@ class MotorMacroEditor(QtWidgets.QDialog):
             # Label
             label_item = QtWidgets.QTableWidgetItem(f"Motor Macro {i+1}")
             self.table.setItem(i, 1, label_item)
-            # Position SpinBox
-            position_spinbox = QtWidgets.QSpinBox()
-            position_spinbox.setRange(0, 400)
-            position_spinbox.setValue(0)
+            # Position DoubleSpinBox
+            position_spinbox = QtWidgets.QDoubleSpinBox()
+            position_spinbox.setRange(0.0, 324.05)
+            position_spinbox.setDecimals(2)  # Set to 2 decimal places
+            position_spinbox.setSingleStep(0.01)  # Step by 0.01
+            position_spinbox.setValue(0.0)
             self.table.setCellWidget(i, 2, position_spinbox)
 
     def get_macro_data(self):
@@ -85,7 +89,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
         for row in range(self.table.rowCount()):
             label_text = self.table.item(row, 1).text()
             position_spinbox = self.table.cellWidget(row, 2)
-            position_value = position_spinbox.value() if position_spinbox else 0
+            position_value = float(position_spinbox.value()) if position_spinbox else 0.0
             data.append({
                 "Label": label_text,
                 "Position": position_value

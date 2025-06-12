@@ -2662,7 +2662,7 @@ class MainWindow(QMainWindow):
                 return {
                     "Macro No.": f"Macro {macro_num}",
                     "Label": macro_data.get("Label", f"Motor Macro {macro_num}"),
-                    "Position": macro_data.get("Position", 0)
+                    "Position": float(macro_data.get("Position", 0.0))
                 }
         except Exception as e:
             self.logger.error(f"Error loading motor macro {macro_num}: {e}")
