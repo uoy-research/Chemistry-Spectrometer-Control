@@ -2319,7 +2319,7 @@ class MainWindow(QMainWindow):
                     # Check the macro button
                     macro_button.setChecked(True)
 
-                    # If macro has a timer, schedule valve reset
+                    # If macro has a timer > 0, schedule valve reset
                     timer = macro.get("Timer", 0)
                     if timer > 0:
                         def reset_valves():
@@ -2361,6 +2361,10 @@ class MainWindow(QMainWindow):
                         self.active_macro_timer.setSingleShot(True)
                         self.active_macro_timer.timeout.connect(reset_valves)
                         self.active_macro_timer.start(int(timer * 1000))
+                    else:
+                        # For timer = 0, don't set up auto-reset
+                        # The macro will stay active until manually unchecked
+                        self.logger.info(f"Started persistent valve macro {macro_num}: {macro['Label']}")
 
                     self.logger.info(f"Executed valve macro {macro_num}: {macro['Label']}")
                 else:
