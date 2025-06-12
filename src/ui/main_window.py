@@ -660,14 +660,41 @@ class MainWindow(QMainWindow):
         monitor_layout.setContentsMargins(0, 0, 0, 0)
 
         enum_pressure_sensors = ["Rig", "Inlet", "Tube", "Outlet"]
+        sensor_colors = {
+            "Rig": "blue",
+            "Inlet": "yellow",
+            "Tube": "green",
+            "Outlet": "red"
+        }
         # Create pressure radio buttons
         for i in range(1, 5):
-            radio = QRadioButton(enum_pressure_sensors[i-1])
+            sensor_name = enum_pressure_sensors[i-1]
+            radio = QRadioButton(sensor_name)
             font = QFont()
             font.setPointSize(10)
             radio.setFont(font)
             radio.setAutoExclusive(False)
             radio.setChecked(True)
+            # Style the radio button indicator
+            radio.setStyleSheet(f"""
+                QRadioButton {{
+                    color: black;
+                }}
+                QRadioButton::indicator {{
+                    width: 13px;
+                    height: 13px;
+                }}
+                QRadioButton::indicator:unchecked {{
+                    border: 2px solid {sensor_colors[sensor_name]};
+                    border-radius: 6px;
+                    background-color: white;
+                }}
+                QRadioButton::indicator:checked {{
+                    border: 2px solid {sensor_colors[sensor_name]};
+                    border-radius: 6px;
+                    background-color: {sensor_colors[sensor_name]};
+                }}
+            """)
             setattr(self, f"pressure{i}RadioButton", radio)
             row, col = (i-1) // 2, (i-1) % 2
             monitor_layout.addWidget(
