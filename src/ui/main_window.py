@@ -449,8 +449,8 @@ class MainWindow(QMainWindow):
             self.motor_to_bottom_button.setEnabled(
                 not disabled and self.motor_calibrated)
 
-            # Macro buttons 1-6
-            for i in range(1, 7):
+            # Macro buttons 1-4
+            for i in range(1, 5):  # Changed from range(1, 7) to range(1, 5)
                 btn = getattr(self, f"motor_macro{i}_button", None)
                 if btn:
                     btn.setEnabled(not disabled and self.motor_calibrated)
@@ -889,8 +889,8 @@ class MainWindow(QMainWindow):
         self.motor_to_bottom_button.setFont(font)
         motor_macro_layout.addWidget(self.motor_to_bottom_button, 0, 1, 1, 1)
 
-        # Create macro buttons 1-6
-        for i in range(1, 7):
+        # Create macro buttons 1-4
+        for i in range(1, 5):  # Changed from range(1, 7) to range(1, 5)
             btn = QPushButton(f"Macro {i}")
             btn.setMinimumSize(QSize(0, 35))
             btn.setMaximumWidth(135)
@@ -992,7 +992,7 @@ class MainWindow(QMainWindow):
                 self.motor_to_top_button.clicked.disconnect()
 
                 # Motor macro buttons
-                for i in range(1, 7):
+                for i in range(1, 5):
                     btn = getattr(self, f"motor_macro{i}_button")
                     btn.clicked.disconnect()
 
@@ -1052,7 +1052,7 @@ class MainWindow(QMainWindow):
                 self.on_motorToTopButton_clicked)
 
             # Motor macro buttons
-            for i in range(1, 7):
+            for i in range(1, 5):
                 btn = getattr(self, f"motor_macro{i}_button")
                 btn.clicked.connect(
                     lambda checked, x=i: self.on_motorMacroButton_clicked(x))
@@ -2082,7 +2082,7 @@ class MainWindow(QMainWindow):
                 macro_button = getattr(self, f"motor_macro{macro_num}_button")
 
                 # Uncheck all other macro buttons
-                for i in range(1, 7):
+                for i in range(1, 5):
                     if i != macro_num:
                         other_button = getattr(self, f"motor_macro{i}_button")
                         other_button.setChecked(False)
@@ -2777,7 +2777,7 @@ class MainWindow(QMainWindow):
 
             # Load motor macro labels from config manager
             motor_macros = config_manager.motor_macros
-            for i in range(6):
+            for i in range(4):  # Changed from range(6) to range(4)
                 macro_num = str(i + 1)
                 macro_data = motor_macros.get(macro_num, {
                     "Label": f"Motor Macro {i+1}",

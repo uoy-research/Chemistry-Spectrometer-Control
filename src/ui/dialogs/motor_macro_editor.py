@@ -17,7 +17,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
 
         # Create a table widget
         self.table = QtWidgets.QTableWidget(self)
-        self.table.setRowCount(6)
+        self.table.setRowCount(4)
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(
             ["Macro No.", "Label", "Position"])
@@ -38,7 +38,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
     def load_data(self):
         try:
             motor_macros = self.config_manager.motor_macros
-            for i in range(6):
+            for i in range(4):
                 macro_num = str(i + 1)
                 macro_data = motor_macros.get(macro_num, {
                     "Label": f"Motor Macro {i+1}",
@@ -68,7 +68,7 @@ class MotorMacroEditor(QtWidgets.QDialog):
             self.set_default_values()
 
     def set_default_values(self):
-        for i in range(6):
+        for i in range(4):
             # Macro No.
             item = QtWidgets.QTableWidgetItem(f"Macro {i+1}")
             item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)

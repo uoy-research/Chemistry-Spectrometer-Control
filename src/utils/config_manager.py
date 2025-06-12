@@ -74,7 +74,7 @@ class ConfigManager:
                     str(i): {
                         "Label": f"Motor Macro {i}",
                         "Position": 0
-                    } for i in range(1, 7)
+                    } for i in range(1, 5)
                 }
                 with open(self.motor_macros_path, 'w') as f:
                     json.dump(default_macros, f, indent=4)
@@ -82,7 +82,8 @@ class ConfigManager:
 
             with open(self.motor_macros_path, 'r') as f:
                 macros = json.load(f)
-                return macros
+                # Filter out macros 5 and 6 if they exist
+                return {k: v for k, v in macros.items() if int(k) <= 4}
         except Exception as e:
             self.logger.error(f"Error loading motor macros: {e}")
             return {}
