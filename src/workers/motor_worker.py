@@ -234,12 +234,13 @@ class MotorWorker(QThread):
     error_occurred = pyqtSignal(str)
     status_changed = pyqtSignal(str)
     calibration_state_changed = pyqtSignal(bool)
-    position_reached = pyqtSignal(float)  # Ensure this signal is defined
-    critical_error_occurred = pyqtSignal(str)  # New signal for critical errors
+    position_reached = pyqtSignal(float)
+    critical_error_occurred = pyqtSignal(str)
 
-    # Class variables
+    # Class variables for instance management
     _instance_count = 0
-    _instance_lock = threading.Lock()  # Add thread safety
+    _instance_lock = threading.Lock()
+    _active_instances = set()  # Track active instances
 
     def __init__(self, port: int, update_interval: float = 0.1, mock: bool = False, timing_mode: bool = False):
         """Initialize worker.
@@ -251,9 +252,23 @@ class MotorWorker(QThread):
             timing_mode: Enable timing logs for events
         """
         super().__init__()
+        
+        # Check if we already have an active instance
         with self._instance_lock:
-            MotorWorker._instance_count += 1
-            self._instance_id = MotorWorker._instance_count
+            if self._instance_count > 0:
+                # Clean up any existing instances
+                for instance in list(self._active_instances):
+                    try:
+                        instance.cleanup()
+                    except Exception:
+                        pass
+                self._active_instances.clear()
+                self._instance_count = 0
+            
+            # Create new instance
+            self._instance_count += 1
+            self._instance_id = self._instance_count
+            self._active_instances.add(self)
 
         self.port = port
         # Limit between 10ms and 1s
@@ -940,30 +955,56 @@ class MotorWorker(QThread):
                     self._position_timer.stop()
                     self._position_timer = None
 
+                # Stop retry timer if active
+                if self._retry_timer is not None:
+                    self._retry_timer.stop()
+                    self._retry_timer = None
+
+                # Clear command queue
+                while not self._command_queue.empty():
+                    try:
+                        self._command_queue.get_nowait()
+                    except Exception:
+                        pass
+
                 # Try to stop the motor first
                 try:
-                    self.controller.stop_motor()
-                    self.logger.info("Motor stop command sent during cleanup")
+                    if self.controller:
+                        self.controller.stop_motor()
+                        self.controller.stop()
+                        self.logger.info("Motor stop command sent during cleanup")
                 except Exception as e:
-                    self.logger.error(
-                        f"Failed to stop motor during cleanup: {e}")
+                    self.logger.error(f"Failed to stop motor during cleanup: {e}")
 
-                self.controller.stop()
+                # Wait for thread to finish
                 self.wait()
 
+            # Remove from active instances
             with self._instance_lock:
-                MotorWorker._instance_count = max(
-                    0, MotorWorker._instance_count - 1)
+                if self in self._active_instances:
+                    self._active_instances.remove(self)
+                self._instance_count = max(0, self._instance_count - 1)
 
             self.logger.info(f"Motor worker {self._instance_id} cleaned up")
 
         except Exception as e:
             self.logger.error(f"Error cleaning up motor worker: {e}")
+            # Ensure instance is removed even if cleanup fails
+            with self._instance_lock:
+                if self in self._active_instances:
+                    self._active_instances.remove(self)
+                self._instance_count = max(0, self._instance_count - 1)
 
     @classmethod
     def reset_instance_count(cls):
-        """Reset the instance counter - useful for testing."""
+        """Reset the instance counter and clean up all active instances."""
         with cls._instance_lock:
+            for instance in list(cls._active_instances):
+                try:
+                    instance.cleanup()
+                except Exception:
+                    pass
+            cls._active_instances.clear()
             cls._instance_count = 0
 
     def to_bottom(self) -> bool:

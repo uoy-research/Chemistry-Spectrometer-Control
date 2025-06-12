@@ -1139,86 +1139,65 @@ class MainWindow(QMainWindow):
             self.cleanup_motor_worker()
 
     def cleanup_motor_worker(self):
-        """Clean up motor worker resources."""
+        """Clean up motor worker resources and update UI state.
+        
+        This function handles:
+        1. Stopping all timers
+        2. Disconnecting all signals
+        3. Stopping the motor controller
+        4. Stopping and cleaning up the worker thread
+        5. Error handling and logging
+        
+        Note: UI state updates should be handled by the calling function.
+        """
         try:
             if self.motor_worker:
                 # First, stop any active timers in the worker
                 if hasattr(self.motor_worker, '_calibration_check_timer') and self.motor_worker._calibration_check_timer:
                     self.motor_worker._calibration_check_timer.stop()
 
-                # Disconnect all signals from the worker - use try/except for each
-                try:
-                    if hasattr(self.motor_worker, 'position_updated'):
-                        try:
-                            self.motor_worker.position_updated.disconnect()
-                        except TypeError:
-                            pass  # Signal wasn't connected
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting position_updated signal: {e}")
+                # Disconnect all signals from the worker
+                signals_to_disconnect = [
+                    'position_updated',
+                    'error_occurred',
+                    'status_changed',
+                    'calibration_state_changed',
+                    'position_reached',
+                    'movement_completed',
+                    'critical_error_occurred'
+                ]
 
-                try:
-                    if hasattr(self.motor_worker, 'error_occurred'):
-                        try:
-                            self.motor_worker.error_occurred.disconnect()
-                        except TypeError:
-                            pass
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting error_occurred signal: {e}")
+                for signal_name in signals_to_disconnect:
+                    try:
+                        if hasattr(self.motor_worker, signal_name):
+                            try:
+                                getattr(self.motor_worker, signal_name).disconnect()
+                            except TypeError:
+                                pass  # Signal wasn't connected
+                    except Exception as e:
+                        self.logger.warning(f"Error disconnecting {signal_name} signal: {e}")
 
+                # Try to stop the motor controller first
                 try:
-                    if hasattr(self.motor_worker, 'status_changed'):
-                        try:
-                            self.motor_worker.status_changed.disconnect()
-                        except TypeError:
-                            pass
+                    if hasattr(self.motor_worker, 'controller'):
+                        self.motor_worker.controller.stop_motor()
                 except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting status_changed signal: {e}")
-
-                try:
-                    if hasattr(self.motor_worker, 'calibration_state_changed'):
-                        try:
-                            self.motor_worker.calibration_state_changed.disconnect()
-                        except TypeError:
-                            pass
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting calibration_state_changed signal: {e}")
-
-                try:
-                    if hasattr(self.motor_worker, 'position_reached'):
-                        try:
-                            self.motor_worker.position_reached.disconnect()
-                        except TypeError:
-                            pass
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting position_reached signal: {e}")
-
-                try:
-                    if hasattr(self.motor_worker, 'movement_completed'):
-                        try:
-                            self.motor_worker.movement_completed.disconnect()
-                        except TypeError:
-                            pass
-                except Exception as e:
-                    self.logger.warning(
-                        f"Error disconnecting movement_completed signal: {e}")
+                    self.logger.warning(f"Error stopping motor controller: {e}")
 
                 # Properly stop the worker thread
                 self.motor_worker.cleanup()
 
                 # Wait for thread to finish (with timeout)
                 if not self.motor_worker.wait(1000):  # 1 second timeout
-                    self.logger.warning(
-                        "Motor worker thread did not terminate gracefully, forcing termination")
+                    self.logger.warning("Motor worker thread did not terminate gracefully, forcing termination")
                     self.motor_worker.terminate()
 
                 self.motor_worker = None
+                self.logger.info("Motor worker cleaned up successfully")
         except Exception as e:
             self.logger.error(f"Error cleaning up motor worker: {e}")
+            # Ensure motor_worker is set to None even if cleanup fails
+            self.motor_worker = None
 
     @pyqtSlot(bool)
     def handle_calibration_state(self, is_calibrated: bool):
@@ -3403,19 +3382,30 @@ class MainWindow(QMainWindow):
     def handle_critical_motor_error(self, message: str):
         """Handle critical motor errors by stopping the sequence, cleaning up, and alerting the user."""
         self.logger.critical(f"Critical motor error: {message}")
+        
         # Stop any running sequence
         try:
             if hasattr(self, 'step_timer') and self.step_timer:
                 self.step_timer.stop()
         except Exception:
             pass
-        # Clean up motor worker
+
+        # Clean up motor worker and update UI
         try:
-            self.cleanup_motor_worker()
-        except Exception:
-            pass
+            self.cleanup_motor_timers()  # Clean up timers first
+            self.cleanup_motor_worker()  # Then clean up worker
+            self.motor_connect_btn.setText("Connect")
+            self.motor_calibrated = False
+            self.motor_warning_label.setText("Warning: Motor not connected")
+            self.motor_warning_label.setVisible(True)
+            self.motor_calibrate_btn.setEnabled(False)
+            self.disable_motor_controls(True)
+        except Exception as e:
+            self.logger.error(f"Error during motor cleanup after critical error: {e}")
+
         # Show critical error dialog
-        QMessageBox.critical(self, "Critical Motor Error",
-                             f"A critical error occurred with the motor and the sequence has been stopped.\n\nError: {message}")
-        # Optionally, update UI to reflect stopped state
+        #QMessageBox.critical(self, "Critical Motor Error",
+        #                   f"A critical error occurred with the motor and the sequence has been stopped.\n\nError: {message}")
+        
+        # Update device status
         self.update_device_status()

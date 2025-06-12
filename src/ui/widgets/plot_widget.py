@@ -254,7 +254,7 @@ class PlotWidget(QWidget):
             self.csv_writer.writerow(header)
 
             # Add a small delay to ensure clean timing
-            time.sleep(0.1)  # 100ms delay
+            time.sleep(0.1)  # 100ms delay, adjust this if anomaly persists
 
             self.recording = True
 
