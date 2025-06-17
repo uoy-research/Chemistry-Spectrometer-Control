@@ -13,6 +13,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib
 import csv
+from datetime import datetime
 matplotlib.use('QtAgg')
 
 
@@ -222,6 +223,11 @@ class PlotWidget(QWidget):
     def start_recording(self, filepath: str):
         """Start recording data to CSV file."""
         try:
+            # Verify file path
+            if not filepath:    # Generate a default file name
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filepath = f"pressure_data_{timestamp}.csv"
+
             self.logger.info(f"Attempting to start recording to {filepath}")
 
             # Check if already recording to the same file
@@ -237,13 +243,10 @@ class PlotWidget(QWidget):
                 self.stop_recording()
 
             # Reset start time and clear plot data
-            self.start_time = time.time()
-            self.clear_plot(reset_time=False)  # Don't reset time again since we just did
-
-            # Verify file path
-            if not filepath:
-                self.logger.error("Empty file path provided")
-                return False
+            # self.start_time = time.time()
+            else:
+                # Don't reset time again since we just did
+                self.clear_plot(reset_time=False)
 
             self.save_file = open(filepath, 'w', newline='')
             self.csv_writer = csv.writer(self.save_file)
