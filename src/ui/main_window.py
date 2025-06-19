@@ -666,9 +666,9 @@ class MainWindow(QMainWindow):
         enum_pressure_sensors = ["Rig", "Inlet", "Tube", "Outlet"]
         sensor_colors = {
             "Rig": "blue",
-            "Inlet": "yellow",
-            "Tube": "green",
-            "Outlet": "red"
+            "Inlet": "orange",
+            "Outlet": "green",
+            "Tube": "red"
         }
         # Create pressure radio buttons
         for i in range(1, 5):
