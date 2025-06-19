@@ -1,5 +1,5 @@
-#include <ModbusSerial.h>
 #include <Arduino.h>
+#include <ModbusSerial.h>
 
 const int TxenPin = -1; // -1 disables the feature, change that if you are using an RS485 driver, this pin would be connected to the DE and /RE pins of the driver.
 
@@ -29,9 +29,12 @@ const unsigned long pollTime = 500; //default time between pressure readings
 const int T1 = 25; const int T2 = 3; const int T3 = 4; const int T4 = 2; const int T5 = 24; const int T6 = 27;
 
 //Analog pins - pressure1 is external
-//pins for Chym setup
+//temp fix for chym box
+//const int Pressure1 = A0; const int Pressure2 = A5; const int Pressure3 = A6; const int Pressure4 = A7;
+
+//pins for Chym setup -- not used anymore
 const int Pressure1 = A1; const int Pressure2 = A2; const int Pressure3 = A3; const int Pressure4 = A4;
-//pins for older setup
+//pins for older setup -- used on dodgy rig
 //const int Pressure1 = A0; const int Pressure2 = A2; const int Pressure3 = A4; const int Pressure4 = A6;
 
 //VARIABLES
