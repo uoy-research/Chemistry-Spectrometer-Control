@@ -49,7 +49,7 @@ class PlotWidget(QWidget):
         # Initialize data
         self.times = np.array([])
         self.pressures = [np.array([]) for _ in range(4)]
-        self.labels = ['Rig', 'Inlet', 'Tube', 'Outlet']
+        self.labels = ['Rig', 'Inlet', 'Outlet', 'Tube']
         self.lines = [self.ax.plot([], [], label=f'{self.labels[i]}')[0]
                       for i in range(4)]
 
@@ -252,7 +252,7 @@ class PlotWidget(QWidget):
             self.csv_writer = csv.writer(self.save_file)
 
             # Write header
-            header = ['Time', 'Rig', 'Inlet', 'Tube', 'Outlet']
+            header = ['Time', 'Rig', 'Inlet', 'Outlet', 'Tube']
             self.logger.debug(f"Writing CSV header: {header}")
             self.csv_writer.writerow(header)
 
