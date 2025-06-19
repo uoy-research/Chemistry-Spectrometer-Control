@@ -663,7 +663,7 @@ class MainWindow(QMainWindow):
         monitor_layout = QGridLayout(monitor_group)
         monitor_layout.setContentsMargins(0, 0, 0, 0)
 
-        enum_pressure_sensors = ["Rig", "Inlet", "Tube", "Outlet"]
+        enum_pressure_sensors = ["Rig", "Inlet", "Outlet", "Tube"]
         sensor_colors = {
             "Rig": "blue",
             "Inlet": "orange",
@@ -1687,6 +1687,9 @@ class MainWindow(QMainWindow):
 
         if checked:
             duration = self.bubbleTimeDoubleSpinBox.value()
+            # Store the original duration for reset
+            self.original_bubble_duration = duration
+            
             # Open inlet and outlet valves
             valve_states = self.arduino_worker.get_valve_states()
             valve_states[2] = 1  # Valve 2 (inlet)
@@ -1695,6 +1698,11 @@ class MainWindow(QMainWindow):
             valve_states[5] = 0  # Valve 5 (short)
             self.arduino_worker.set_valves(valve_states)
 
+            # Create countdown timer to update spinbox
+            self.bubble_countdown_timer = QTimer()
+            self.bubble_countdown_timer.timeout.connect(self.update_bubble_countdown)
+            self.bubble_countdown_timer.start(100)  # Update every 100ms
+            
             # Start timer to close valves after duration
             QTimer.singleShot(int(duration * 1000), self.stop_bubble)
             self.logger.info(f"Quick bubble started for {duration}s")
@@ -1705,12 +1713,44 @@ class MainWindow(QMainWindow):
         else:
             self.stop_bubble()
 
+    def update_bubble_countdown(self):
+        """Update the bubble countdown timer display."""
+        try:
+            if hasattr(self, 'original_bubble_duration'):
+                # Calculate remaining time
+                current_value = self.bubbleTimeDoubleSpinBox.value()
+                remaining = max(0.0, current_value - 0.1)  # Subtract 100ms (0.1s)
+                
+                # Update spinbox value
+                self.bubbleTimeDoubleSpinBox.setValue(remaining)
+                
+                # If countdown is complete, stop the timer
+                if remaining <= 0:
+                    if hasattr(self, 'bubble_countdown_timer'):
+                        self.bubble_countdown_timer.stop()
+                        self.bubble_countdown_timer.deleteLater()
+                        delattr(self, 'bubble_countdown_timer')
+        except Exception as e:
+            self.logger.error(f"Error updating bubble countdown: {e}")
+
     def stop_bubble(self):
         """Stop bubbling sequence."""
         if self.arduino_worker and self.arduino_worker.running:
             # Use the reset_valves method to preserve inlet/outlet valves
             self.reset_valves()
             self.quickBubbleButton.setChecked(False)
+            
+            # Stop countdown timer if it's running
+            if hasattr(self, 'bubble_countdown_timer'):
+                self.bubble_countdown_timer.stop()
+                self.bubble_countdown_timer.deleteLater()
+                delattr(self, 'bubble_countdown_timer')
+            
+            # Reset spinbox to original value
+            if hasattr(self, 'original_bubble_duration'):
+                self.bubbleTimeDoubleSpinBox.setValue(self.original_bubble_duration)
+                delattr(self, 'original_bubble_duration')
+            
             self.logger.info("Quick bubble complete")
 
     def disable_valve_controls(self, disabled: bool = True):
@@ -3423,6 +3463,13 @@ class MainWindow(QMainWindow):
             self.save_stop_timer.stop()
             self.save_stop_timer = None
             self.logger.info("Save stop timer cleaned up")
+
+        # Clean up bubble countdown timer if it exists
+        if hasattr(self, 'bubble_countdown_timer') and self.bubble_countdown_timer is not None:
+            self.bubble_countdown_timer.stop()
+            self.bubble_countdown_timer.deleteLater()
+            delattr(self, 'bubble_countdown_timer')
+            self.logger.info("Bubble countdown timer cleaned up")
 
         # Cancel any pending single-shot timers related to motor operations
         # Use QCoreApplication instead of QApplication for better compatibility
