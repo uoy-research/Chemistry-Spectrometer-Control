@@ -120,11 +120,18 @@ class ArduinoController:
                 
             # Convert readings to standard units
             try:
+                """
                 converted_readings = [
                     (float(raw) - 203.53) / 0.8248 / 100 
                     for raw in raw_readings
                 ]
-                
+                """
+
+                converted_readings = [
+                    (raw*0.0122) - 2.63 #2.5
+                    for raw in raw_readings
+                ]
+
                 # Validate converted readings
                 if any(math.isnan(x) or math.isinf(x) for x in converted_readings):
                     self.logger.error(f"Invalid converted readings: {converted_readings}")
